@@ -29,6 +29,7 @@ last_review: 2026-08-11
 
 ### M1B · 单镜 H3 闭环 · open
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
+- [ ] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + 同 prompt/seed 三方对照验证（见 research/2026-08-11-h3-hybrid-loader-assessment.md）
 - [ ] 本地 ComfyUI adapter + submit/poll worker
 - [ ] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
@@ -46,6 +47,7 @@ last_review: 2026-08-11
 ## 参考源（已评估，见 .hive/research/）
 - `director`（本地私有仓库，检视 commit cb7358b）— 生产政策参考：Mode 验证状态、资产生命周期、生成锁、opening/ending state、代表性 take 门禁 → 已吸收进 M1A
 - `luojiang419/filmstoryboard`（检视 commit d7572b1）— 桌面工作台信息架构、项目/素材管理 → 借鉴思路，不复用代码（无 LICENSE）
+- `scottmudge/ComfyUI_MinimaxH3HybridLoader`（MIT，检视 commit 861c7df）— r2v 质量根因（ref2va 训练缺陷）+ 混合加载解药 → M1B r2v 路径采纳
 - `huangserva/h3-film-studio`（自家项目，检视 commit 8693cc7）— **唯一实跑通本地 H3 的参考**：ComfyUI submit/poll 契约（M1B adapter 蓝本）、三模式↔reference 用途映射、角色 bible 三重锚（Q2 证据）、H3 硬约束（÷32 / 17k+5 / 中文 Audio 行会被念出）、INTENT 协议 ≈ production brief 原型
 
 ## Scope
