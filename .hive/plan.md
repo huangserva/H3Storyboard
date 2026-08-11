@@ -29,9 +29,11 @@ last_review: 2026-08-11
 - [x] 代表性 take 审批门（与单条 QC 独立；重复 job 需 approved representative 或审计 override）
 
 ### M1B · 单镜 H3 闭环 · open
+- [x] M1B-1：TypeScript ComfyUI contract adapter、I2V graph、提交前 H3 lint 与只读 capability discovery
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
 - [ ] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + 同 prompt/seed 三方对照验证（见 research/2026-08-11-h3-hybrid-loader-assessment.md）
-- [ ] 本地 ComfyUI adapter + submit/poll worker
+- [ ] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
+- [ ] M1B-3：协调 GPU 窗口后的真实 graph 出片、结果验证与 Mode evidence 升级
 - [ ] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
 
@@ -97,3 +99,9 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 - Studio 原型与演示数据已完成，质量门禁通过。
 - 106 nginx 与反向隧道链路在中转机本地验证可达；公网 `9994` 超时，需 user 开放阿里云安全组。
 - 本机 systemd unit 已纳入 `ops/systemd/`，安装/启用受本机 sudo 凭证阻塞；当前使用同参数前台隧道临时承载。
+
+## 2026-08-11 M1B-1 ComfyUI H3 adapter 交付状态
+- commit `e0c4f1c`：`packages/h3-provider` 新增可注入 fetch 的 ComfyUI client、确定性 H3 I2V graph、尺寸/帧/prompt lint、只读 capability evidence。
+- 本地真实 HTTP stub 覆盖 upload→submit→poll→download→free 及 4 类失败路径；默认测试不依赖 ComfyUI。
+- `H3_COMFY_PROBE=1` 对 `127.0.0.1:8190` 只读探测通过：11 个所需节点全部 present；未调用真实 `/prompt`、`/upload/image` 或 `/free`，不把节点存在表述为端到端已验证。
+- 调研双产出：`research/2026-08-11-comfyui-h3-adapter-contract.md` + `reports/2026-08-11-comfyui-h3-adapter-contract.html`。

@@ -23,9 +23,10 @@ M1A passed the required architecture, bug, test, and protocol reviews. Follow-up
 
 ## M1B — single-shot H3 loop
 
+- [x] Contract-level TypeScript ComfyUI client, deterministic H3 I2V graph, preflight lint, and read-only node capability evidence (`e0c4f1c`).
 - [ ] Explicit image, first-frame, and last-frame binding slots.
 - [ ] `i2v`, `fl2v`, and `r2v` provider validation.
-- [ ] Local ComfyUI adapter with live capability discovery and `candidate` / `verified` / `blocked` evidence.
+- [ ] Promote live capabilities from node-presence evidence to `validated` only after a coordinated real-generation experiment.
 - [ ] Provider worker for submit-once, poll-same-task, cancel, restart recovery, and explicit rerun (store lifecycle is complete).
 - [ ] Download, non-empty verification, content hash, canonical asset registration, and pending-take creation before job completion.
 - [x] Actual result capture and QC verdict contract/API.
