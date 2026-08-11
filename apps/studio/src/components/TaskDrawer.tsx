@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import type { ShotActual, ShotPlan } from '@h3storyboard/protocol';
+import type { H3Job, ShotActual, ShotPlan } from '@h3storyboard/protocol';
 
 interface TaskDrawerProps {
   shot: ShotPlan | null;
   actual: ShotActual | null;
+  job: H3Job | null;
 }
 
 const qcItems = ['构图与动作', '角色一致性', '镜头连续性', '视听同步', '技术质量'];
 
-export function TaskDrawer({ shot, actual }: TaskDrawerProps) {
+export function TaskDrawer({ shot, actual, job }: TaskDrawerProps) {
   const [open, setOpen] = useState(true);
   const qcState = actual?.qc_verdict ?? 'pending';
   const qcLabel = qcState === 'approved'
@@ -27,7 +28,7 @@ export function TaskDrawer({ shot, actual }: TaskDrawerProps) {
       <button className="drawer-handle" type="button" onClick={() => setOpen((value) => !value)}>
         <span className="eyebrow">TASKS & QUALITY CONTROL</span>
         <span className="drawer-summary">
-          <i /> 队列 0&nbsp;&nbsp;·&nbsp;&nbsp; QC {qcLabel}
+          <i /> {job ? `WORKER ${job.status}` : '队列 0'}&nbsp;&nbsp;·&nbsp;&nbsp; QC {qcLabel}
           <b aria-hidden="true">{open ? '⌄' : '⌃'}</b>
         </span>
       </button>
@@ -36,8 +37,12 @@ export function TaskDrawer({ shot, actual }: TaskDrawerProps) {
           <div className="task-empty">
             <span>QUEUE 00</span>
             <div>
-              <strong>{shot ? '尚未提交生成任务' : '请选择计划镜头'}</strong>
-              <small>任务会记录排队、运行、失败与每次生成血缘。</small>
+              <strong>{job ? `${job.status.toUpperCase()} · ATTEMPT ${job.attempt}`
+                : shot ? '尚未提交生成任务' : '请选择计划镜头'}</strong>
+              <small>{job
+                ? `PROVIDER TASK ${job.provider_job_id ?? '等待提交'}${job.error_code
+                  ? ` · ${job.error_code}` : ''}`
+                : '任务会记录排队、运行、失败与每次生成血缘。'}</small>
             </div>
           </div>
           <div className="qc-strip">

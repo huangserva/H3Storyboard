@@ -141,7 +141,22 @@ export function claimH3Job(
   leaseDurationMs = 60_000,
 ): H3Job {
   requireLeaseDuration(leaseDurationMs);
+  return runWriteTransaction(db, () => claimJob(db, jobId, leaseDurationMs));
+}
+
+export function claimNextH3Job(db: Database.Database,
+  leaseDurationMs = 60_000): H3Job | null {
+  requireLeaseDuration(leaseDurationMs);
   return runWriteTransaction(db, () => {
+    const row = db.prepare(`SELECT id FROM h3_jobs
+      WHERE provider = 'local_comfyui' AND status IN ('draft', 'timed_out')
+      ORDER BY created_at, id LIMIT 1`).get() as { id: string } | undefined;
+    return row ? claimJob(db, row.id, leaseDurationMs) : null;
+  });
+}
+
+function claimJob(db: Database.Database, jobId: string,
+  leaseDurationMs: number): H3Job {
     const job = getJob(db, jobId);
     requireJobTransition(job, 'submitting');
     const nowDate = new Date();
@@ -164,10 +179,12 @@ export function claimH3Job(
       `UPDATE h3_jobs
        SET status = 'submitting', attempt = attempt + 1,
            lease_token = ?, lease_expires_at = ?, heartbeat_at = ?, updated_at = ?,
-           provider_job_id = NULL, output_asset_id = NULL,
+           provider_job_id = ?, output_asset_id = NULL,
            error_code = NULL, error_message = NULL, completed_at = NULL
        WHERE id = ? AND status = ?`,
-    ).run(leaseToken, leaseExpiresAt, now, now, jobId, job.status);
+    ).run(leaseToken, leaseExpiresAt, now, now,
+      job.status === 'timed_out' ? job.provider_job_id : null,
+      jobId, job.status);
     if (result.changes !== 1) {
       throw new StoreError(
         'H3_JOB_STATUS_INVALID',
@@ -184,7 +201,6 @@ export function claimH3Job(
       now,
     );
     return getJob(db, jobId);
-  });
 }
 
 export function markH3JobQueued(

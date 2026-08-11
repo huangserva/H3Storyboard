@@ -96,6 +96,7 @@ export const H3JobSchema = z.object({
   lock_snapshot: JobLockSnapshotSchema.nullable(),
   compiled_bindings: z.array(CompiledBindingSchema).nullable(),
   gate_override_reason: NonEmptyTextSchema.max(1_000).nullable(),
+  cancel_reason: NonEmptyTextSchema.max(1_000).nullable(),
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 

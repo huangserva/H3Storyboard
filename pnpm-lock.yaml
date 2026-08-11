@@ -29,12 +29,18 @@ importers:
 
   apps/api:
     dependencies:
+      '@h3storyboard/h3-provider':
+        specifier: workspace:*
+        version: link:../../packages/h3-provider
       '@h3storyboard/project-store':
         specifier: workspace:*
         version: link:../../packages/project-store
       '@h3storyboard/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@h3storyboard/task-engine':
+        specifier: workspace:*
+        version: link:../../packages/task-engine
       zod:
         specifier: ^4.1.5
         version: 4.4.3
@@ -93,6 +99,9 @@ importers:
 
   packages/task-engine:
     dependencies:
+      '@h3storyboard/h3-provider':
+        specifier: workspace:*
+        version: link:../h3-provider
       '@h3storyboard/protocol':
         specifier: workspace:*
         version: link:../protocol

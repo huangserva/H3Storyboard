@@ -39,7 +39,8 @@ protocol (single JSON contract)
 13. Candidate and archived assets cannot enter a job. Submission snapshots the approved current-asset manifest so later replacements do not rewrite generation history.
 14. Each planned generation unit is self-contained and records its opening and ending state; it never relies on instructions such as “continue the previous shot”.
 15. Batch generation requires an explicitly approved representative result. Provider success alone is not creative or QC approval.
-16. A worker submits once per lease and polls the same provider task. A remote URL is not an asset until the output is downloaded, verified, hashed, registered, and linked to the job.
+16. A worker with no persisted provider task submits once, stores the returned task id, and polls that same task across lease recovery. A remote URL is not an asset until the output is downloaded, verified, hashed, registered, and linked to a pending take.
+17. Worker completion exposes the candidate asset, completed job, and pending take in one immediate SQLite transaction; a filesystem write is staged with a temporary file and compensated if the database transaction fails.
 
 ## Production-policy boundary
 
@@ -63,15 +64,17 @@ packages/project-store
   domain operations       assets/manifests, shots, jobs, migrations
 packages/h3-provider
   pure binding compiler + exact submitted-input audit
+packages/task-engine
+  lease state machine + interface-driven H3 worker orchestration
 apps/api
-  small domain route dispatchers; no domain-policy reimplementation
+  small domain route dispatchers + optional H3_WORKER=1 runtime assembly
 apps/studio
   director UI consuming only Protocol 1.1 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
 
-Migrations v7–v13 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics.
+Migrations v7–v14 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason; the existing `provider_job_id` and `output_asset_id` already satisfy worker persistence and output lineage, so they are not duplicated.
 
 ## Initial deployment
 

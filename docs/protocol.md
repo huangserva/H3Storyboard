@@ -1,6 +1,6 @@
-# Protocol 1.1
+# Protocol 1.2
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.1 retains the M0 planned/actual and lease invariants and adds the complete M1A production contract below.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.2 retains the M0 planned/actual and M1A production invariants and adds the M1B lease-worker audit fields below.
 
 ## Project lineage
 
@@ -66,8 +66,13 @@ draft -> submitting -> queued -> running -> completed
 - Replaying it with different input returns `IDEMPOTENCY_KEY_REUSED`.
 - Every transition appends a `job_event` in the same database transaction.
 - Heartbeats renew active leases. On restart, expired active leases move once to `timed_out` and can be explicitly reclaimed.
+- `provider_job_id` is the durable ComfyUI task id. Reclaiming `timed_out` work preserves it and polls that same task; only a job without one may submit.
+- Cancel records a non-empty `cancel_reason`; a rerun is a new job/idempotency key and never reuses the provider task.
+- A worker output becomes visible atomically as a candidate video `Asset` with a real `sha256:<64 hex>` hash, the completed job output, and a pending `ShotActual`. Any database failure rolls back all three.
 
-M0 persists creation, claim, queued, running, completion, fail, cancel, heartbeat, and expired-lease recovery. Opening the store automatically moves expired active leases to `timed_out`; the worker may also invoke recovery while it runs. A real provider worker that invokes those operations is M1 work.
+The optional local worker is disabled unless `H3_WORKER=1`. Before a new submission it may call `/free` (default enabled), uploads the compiled first frame, persists the returned prompt id, and only then polls. Download, non-empty validation, file persistence, hash, canonical asset registration, pending take, and job completion form the completion gate. Protocol 1.2 does not claim real-provider validation; M1B-3 supplies that evidence.
+
+Worker failures persist stable `H3_WORKER_*` or `H3_COMFY_*` codes. Input mode/seed/binding/file failures are distinct from provider HTTP/protocol/timeout/output failures; clients must not infer them from messages.
 
 ## Character identity
 

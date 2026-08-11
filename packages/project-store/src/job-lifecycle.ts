@@ -105,17 +105,21 @@ export function failH3Job(
 export function cancelH3Job(
   db: Database.Database,
   jobId: string,
+  reason = 'Canceled by user',
 ): H3Job {
+  if (!reason.trim()) throw new StoreError('INPUT_INVALID',
+    'Canceled jobs require a non-empty reason');
   return runWriteTransaction(db, () => {
     const job = getJob(db, jobId);
     if (job.status === 'canceled') return job;
     requireJobTransition(job, 'canceled');
     const now = new Date().toISOString();
     const result = db.prepare(
-      `UPDATE h3_jobs SET status = 'canceled', completed_at = ?, updated_at = ?,
+      `UPDATE h3_jobs SET status = 'canceled', cancel_reason = ?,
+       completed_at = ?, updated_at = ?,
        lease_token = NULL, lease_expires_at = NULL, heartbeat_at = ?
        WHERE id = ? AND status = ?`,
-    ).run(now, now, now, jobId, job.status);
+    ).run(reason.trim(), now, now, now, jobId, job.status);
     if (result.changes !== 1) {
       throw new StoreError(
         'H3_JOB_STATUS_INVALID',
@@ -123,7 +127,7 @@ export function cancelH3Job(
         { job_id: jobId },
       );
     }
-    appendJobEvent(db, jobId, job.status, 'canceled', 'Job canceled', now);
+    appendJobEvent(db, jobId, job.status, 'canceled', reason.trim(), now);
     return getJob(db, jobId);
   });
 }

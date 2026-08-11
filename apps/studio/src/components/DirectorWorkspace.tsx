@@ -47,6 +47,9 @@ export function DirectorWorkspace({
   );
   const displayedActual = actuals.find(({ is_representative }) =>
     is_representative) ?? currentActual;
+  const displayedJob = (snapshot?.h3_jobs ?? []).filter(
+    ({ shot_plan_id }) => shot_plan_id === selectedShot?.id,
+  ).at(-1) ?? null;
 
   if (!snapshot) {
     return (
@@ -98,7 +101,8 @@ export function DirectorWorkspace({
         </div>
         <ReferencePanel shot={selectedShot} />
       </div>}
-      {view === 'director' ? <TaskDrawer actual={displayedActual} shot={selectedShot} /> : null}
+      {view === 'director' ? <TaskDrawer actual={displayedActual}
+        job={displayedJob} shot={selectedShot} /> : null}
       {productionOpen ? <Suspense fallback={<div className="progress-bar" />}>
         <ProductionBriefPanel projectId={snapshot.project.id}
           onClose={() => setProductionOpen(false)} />

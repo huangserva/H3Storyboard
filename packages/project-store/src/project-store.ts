@@ -35,6 +35,7 @@ import {
 import { CharacterStore } from './character-store.js';
 import {
   claimH3Job,
+  claimNextH3Job,
   createH3Job,
   markH3JobQueued,
   markH3JobRunning,
@@ -67,6 +68,11 @@ import {
   updateShotPlan,
   reviewShotActual,
 } from './shot-operations.js';
+import {
+  finalizeWorkerOutput,
+  type WorkerOutputInput,
+  type WorkerOutputResult,
+} from './worker-completion.js';
 
 export class ProjectStore {
   readonly #database: Database.Database;
@@ -166,6 +172,15 @@ export class ProjectStore {
     return claimH3Job(this.#database, jobId, leaseDurationMs);
   }
 
+  claimNextH3Job(leaseDurationMs?: number): H3Job | null {
+    return claimNextH3Job(this.#database, leaseDurationMs);
+  }
+
+  finalizeWorkerOutput(jobId: string, leaseToken: string,
+    input: WorkerOutputInput): WorkerOutputResult {
+    return finalizeWorkerOutput(this.#database, jobId, leaseToken, input);
+  }
+
   markH3JobQueued(
     jobId: string,
     leaseToken: string,
@@ -214,8 +229,8 @@ export class ProjectStore {
     );
   }
 
-  cancelH3Job(jobId: string): H3Job {
-    return cancelH3Job(this.#database, jobId);
+  cancelH3Job(jobId: string, reason?: string): H3Job {
+    return cancelH3Job(this.#database, jobId, reason);
   }
 
   recoverExpiredH3Jobs(now?: Date): number {
