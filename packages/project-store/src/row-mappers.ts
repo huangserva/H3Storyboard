@@ -75,8 +75,17 @@ export const mapProject = (row: unknown): Project =>
 export const mapScriptVersion = (row: unknown): ScriptVersion =>
   decode(ScriptVersionSchema, objectRow(row));
 
-export const mapAsset = (row: unknown): Asset =>
-  decode(AssetSchema, objectRow(row));
+export function mapAsset(row: unknown): Asset {
+  const record = objectRow(row);
+  return decode(AssetSchema, {
+    ...record,
+    uri: record.uri ?? record.relative_path,
+    content_hash: record.content_hash === '' ? null : record.content_hash,
+    status: record.status ?? 'approved',
+    replaces_asset_id: record.replaces_asset_id ?? null,
+    updated_at: record.updated_at ?? record.created_at,
+  });
+}
 
 export const mapCanvasNode = (row: unknown): CanvasNode =>
   decode(CanvasNodeSchema, objectRow(row));

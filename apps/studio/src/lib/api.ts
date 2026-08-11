@@ -1,13 +1,17 @@
 import type {
+  Asset,
   CanvasNode,
   Character,
+  CreateAssetInput,
   CreateCharacterInput,
   CreateCanvasNodeInput,
   CreateProjectInput,
   CreateShotPlanInput,
+  CurrentAssetsManifestSnapshot,
   Project,
   ProjectSnapshot,
   UpdateCanvasNodeInput,
+  UpdateAssetInput,
   UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 
@@ -132,4 +136,44 @@ export async function updateCharacter(
     method: 'PATCH',
     body: JSON.stringify(input),
   });
+}
+
+export async function listAssets(projectId: string): Promise<Asset[]> {
+  return request<Asset[]>(`/api/projects/${projectId}/assets`);
+}
+
+export async function createAsset(
+  projectId: string,
+  input: CreateAssetInput,
+): Promise<Asset> {
+  return request<Asset>(`/api/projects/${projectId}/assets`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAsset(
+  projectId: string,
+  input: UpdateAssetInput,
+): Promise<Asset> {
+  return request<Asset>(`/api/projects/${projectId}/assets`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listAssetManifests(
+  projectId: string,
+): Promise<CurrentAssetsManifestSnapshot[]> {
+  return request<CurrentAssetsManifestSnapshot[]>(
+    `/api/projects/${projectId}/manifests`,
+  );
+}
+
+export async function freezeAssetManifest(
+  projectId: string,
+): Promise<CurrentAssetsManifestSnapshot> {
+  return request<CurrentAssetsManifestSnapshot>(
+    `/api/projects/${projectId}/manifests`, { method: 'POST' },
+  );
 }

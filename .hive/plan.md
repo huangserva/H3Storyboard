@@ -22,7 +22,7 @@ last_review: 2026-08-11
 
 ### M1A · 导演级生产契约 · open
 - [ ] Mode registry、production brief、锁快照
-- [ ] Asset 生命周期（candidate/approved/archived）+ 血缘
+- [x] Asset 生命周期（candidate/approved/archived）+ 血缘 + immutable current-assets manifest
 - [x] **角色定义基础**：一等实体、canonical appearance、seed 族、参考图血缘与归档
 - [ ] 角色接入 per-shot 语义引用绑定
 - [ ] 代表性 take 审批门
@@ -63,6 +63,10 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
+
+## 2026-08-11 M1A 资产交付状态
+- migration v8：Asset candidate/approved/archived 状态机、replacement 血缘、不可变且项目内单调递增的 current-assets manifest。
+- 角色参考图可关联 `asset_id`，旧 `uri` 契约保留；Studio 已增加资产登记、审批、归档与 manifest 冻结入口。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。

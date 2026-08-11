@@ -61,6 +61,22 @@ function validateDerivedFrom(
   }
 }
 
+function validateAssetReference(db: Database.Database, projectId: string,
+  assetId: string | null, kind: string): void {
+  if (assetId === null) return;
+  const asset = db.prepare('SELECT project_id, kind FROM assets WHERE id = ?')
+    .get(assetId) as { project_id: string; kind: string } | undefined;
+  if (!asset) throw new StoreError('ASSET_NOT_FOUND', 'Asset does not exist', {
+    asset_id: assetId,
+  });
+  if (asset.project_id !== projectId) throw new StoreError(
+    'ASSET_PROJECT_MISMATCH', 'Asset belongs to another project', {
+      project_id: projectId, asset_id: assetId,
+    });
+  if (asset.kind !== kind) throw new StoreError('ASSET_KIND_MISMATCH',
+    'Character reference kind must match its asset', { asset_id: assetId });
+}
+
 export function listCharacterReferences(db: Database.Database, projectId: string,
   characterId: string): CharacterReference[] {
   return db.transaction(() => {
@@ -78,14 +94,15 @@ export function createCharacterReference(db: Database.Database, projectId: strin
   return db.transaction(() => {
     requireCharacter(db, projectId, characterId);
     validateDerivedFrom(db, projectId, characterId, input.derived_from);
+    validateAssetReference(db, projectId, input.asset_id, input.kind);
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
       `INSERT INTO character_references
-       (id, character_id, uri, kind, content_hash, derived_from, sort_order,
-        created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, characterId, input.uri, input.kind, input.content_hash,
-      input.derived_from, input.sort_order, now, now);
+       (id, character_id, asset_id, uri, kind, content_hash, derived_from,
+        sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, characterId, input.asset_id, input.uri, input.kind,
+      input.content_hash, input.derived_from, input.sort_order, now, now);
     return mapCharacterReference(
       db.prepare('SELECT * FROM character_references WHERE id = ?').get(id),
     );
@@ -106,11 +123,14 @@ export function updateCharacterReference(db: Database.Database, projectId: strin
     const source = input.derived_from === undefined
       ? existing.derived_from : input.derived_from;
     validateDerivedFrom(db, projectId, characterId, source, existing.id);
+    const assetId = input.asset_id === undefined ? existing.asset_id : input.asset_id;
+    const kind = input.kind ?? existing.kind;
+    validateAssetReference(db, projectId, assetId, kind);
     const now = new Date().toISOString();
     db.prepare(
-      `UPDATE character_references SET uri = ?, kind = ?, content_hash = ?,
+      `UPDATE character_references SET asset_id = ?, uri = ?, kind = ?, content_hash = ?,
        derived_from = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-    ).run(input.uri ?? existing.uri, input.kind ?? existing.kind,
+    ).run(assetId, input.uri ?? existing.uri, kind,
       input.content_hash === undefined ? existing.content_hash : input.content_hash,
       source, input.sort_order ?? existing.sort_order, now, existing.id);
     return mapCharacterReference(

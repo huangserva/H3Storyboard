@@ -8,8 +8,9 @@ import {
 import { migrateAssetProducers } from './migration-v5.js';
 import { createCanvasNodes } from './migration-v6.js';
 import { createCharacters } from './migration-v7.js';
+import { addAssetLifecycle } from './migration-v8.js';
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -253,6 +254,12 @@ export function migrateDatabase(db: Database.Database): void {
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(7, new Date().toISOString());
+    }
+    if (!appliedVersions.has(8)) {
+      addAssetLifecycle(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(8, new Date().toISOString());
     }
   })();
 }

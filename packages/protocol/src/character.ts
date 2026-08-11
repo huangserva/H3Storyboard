@@ -54,6 +54,7 @@ export const CharacterSchema = z.object({
 export type Character = z.infer<typeof CharacterSchema>;
 
 const referenceFields = {
+  asset_id: IdSchema.nullable(),
   uri: NonEmptyTextSchema.max(2_000),
   kind: AssetKindSchema,
   content_hash: NonEmptyTextSchema.nullable(),
@@ -63,6 +64,7 @@ const referenceFields = {
 
 export const CreateCharacterReferenceInputSchema = z.object({
   ...referenceFields,
+  asset_id: referenceFields.asset_id.default(null),
   content_hash: referenceFields.content_hash.default(null),
   derived_from: referenceFields.derived_from.default(null),
   sort_order: referenceFields.sort_order.default(0),
@@ -74,6 +76,7 @@ export type CreateCharacterReferenceInput = z.input<
 export const UpdateCharacterReferenceInputSchema = z
   .object({
     reference_id: IdSchema,
+    asset_id: referenceFields.asset_id.optional(),
     uri: referenceFields.uri.optional(),
     kind: referenceFields.kind.optional(),
     content_hash: referenceFields.content_hash.optional(),
@@ -81,8 +84,8 @@ export const UpdateCharacterReferenceInputSchema = z
     sort_order: referenceFields.sort_order.optional(),
   })
   .refine(
-    ({ uri, kind, content_hash, derived_from, sort_order }) =>
-      [uri, kind, content_hash, derived_from, sort_order].some(
+    ({ asset_id, uri, kind, content_hash, derived_from, sort_order }) =>
+      [asset_id, uri, kind, content_hash, derived_from, sort_order].some(
         (value) => value !== undefined,
       ),
     { message: 'At least one character reference field must be updated' },

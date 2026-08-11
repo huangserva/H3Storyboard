@@ -10,6 +10,7 @@ import {
 import { useCanvasNodes } from '../lib/use-canvas-nodes.js';
 import { useCharacters } from '../lib/use-characters.js';
 import { CanvasCharacterCard } from './CanvasCharacterCard.js';
+import { AssetLibraryPanel } from './AssetLibraryPanel.js';
 import { CanvasShotCard } from './CanvasShotCard.js';
 import { CharacterLibraryPanel } from './CharacterLibraryPanel.js';
 
@@ -180,6 +181,7 @@ export function InfiniteCanvas({
         <small>拖拽平移 · 滚轮缩放 · 拖动卡片 · 双击聚焦 · 空格拖拽平移</small></div>
       {error ? <div className="canvas-status" role="alert">{error}</div> : null}
       {loading ? <div className="canvas-status">正在加载画布布局…</div> : null}
+      <AssetLibraryPanel projectId={snapshot.project.id} />
       <CharacterLibraryPanel characters={characterStore.characters}
         canvasCharacterIds={new Set(nodes.filter(({ node_type }) =>
           node_type === 'character').map(({ ref_id }) => ref_id))}

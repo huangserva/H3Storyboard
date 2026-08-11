@@ -1,5 +1,6 @@
 import type {
   Asset,
+  CurrentAssetsManifestSnapshot,
   CanvasNode,
   Character,
   CharacterReference,
@@ -18,6 +19,7 @@ import type {
   UpdateCanvasNodeInput,
   UpdateCharacterInput,
   UpdateCharacterReferenceInput,
+  UpdateAssetInput,
   JobEvent,
   ShotActual,
   ShotPlan,
@@ -25,6 +27,11 @@ import type {
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import {
+  createAsset,
+  listAssets,
+  updateAsset,
+} from './asset-operations.js';
 import {
   createCanvasNode,
   listCanvasNodes,
@@ -56,7 +63,11 @@ import {
 } from './job-lifecycle.js';
 import { migrateDatabase } from './migrations.js';
 import {
-  createAsset,
+  freezeCurrentAssetsManifest,
+  getCurrentAssetsManifest,
+  listCurrentAssetsManifests,
+} from './manifest-operations.js';
+import {
   createProject,
   getProjectSnapshot,
   listProjects,
@@ -103,6 +114,27 @@ export class ProjectStore {
 
   createAsset(projectId: string, input: CreateAssetInput): Asset {
     return createAsset(this.#database, projectId, input);
+  }
+
+  listAssets(projectId: string): Asset[] {
+    return listAssets(this.#database, projectId);
+  }
+
+  updateAsset(projectId: string, input: UpdateAssetInput): Asset {
+    return updateAsset(this.#database, projectId, input);
+  }
+
+  freezeCurrentAssetsManifest(projectId: string): CurrentAssetsManifestSnapshot {
+    return freezeCurrentAssetsManifest(this.#database, projectId);
+  }
+
+  listCurrentAssetsManifests(projectId: string): CurrentAssetsManifestSnapshot[] {
+    return listCurrentAssetsManifests(this.#database, projectId);
+  }
+
+  getCurrentAssetsManifest(projectId: string,
+    version: number): CurrentAssetsManifestSnapshot {
+    return getCurrentAssetsManifest(this.#database, projectId, version);
   }
 
   listCanvasNodes(projectId: string): CanvasNode[] {

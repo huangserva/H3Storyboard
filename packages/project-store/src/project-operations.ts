@@ -1,9 +1,6 @@
 import {
-  CreateAssetInputSchema,
   CreateProjectInputSchema,
   ProjectSnapshotSchema,
-  type Asset,
-  type CreateAssetInput,
   type CreateProjectInput,
   type Project,
   type ProjectSnapshot,
@@ -117,72 +114,5 @@ export function getProjectSnapshot(
       },
       'DATABASE_RECORD_INVALID',
     );
-  })();
-}
-
-export function createAsset(
-  db: Database.Database,
-  projectId: string,
-  rawInput: CreateAssetInput,
-): Asset {
-  const input = parseInput(CreateAssetInputSchema, rawInput);
-  return db.transaction(() => {
-    const project = db
-      .prepare('SELECT id FROM projects WHERE id = ?')
-      .get(projectId);
-    if (!project) {
-      throw new StoreError('PROJECT_NOT_FOUND', 'Project does not exist', {
-        project_id: projectId,
-      });
-    }
-    if (input.derived_from_asset_id !== null) {
-      const source = db
-        .prepare('SELECT project_id, kind FROM assets WHERE id = ?')
-        .get(input.derived_from_asset_id) as
-        | { project_id: string; kind: string }
-        | undefined;
-      if (!source) {
-        throw new StoreError('ASSET_NOT_FOUND', 'Source asset does not exist', {
-          asset_id: input.derived_from_asset_id,
-        });
-      }
-      if (source.project_id !== projectId) {
-        throw new StoreError(
-          'ASSET_PROJECT_MISMATCH',
-          'Source asset belongs to another project',
-          { asset_id: input.derived_from_asset_id, project_id: projectId },
-        );
-      }
-      if (source.kind !== 'video') {
-        throw new StoreError(
-          'ASSET_DERIVATION_INVALID',
-          'Boundary frames must be derived from a video asset',
-          { asset_id: input.derived_from_asset_id, asset_kind: source.kind },
-        );
-      }
-    }
-    const id = randomUUID();
-    const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO assets
-       (id, project_id, kind, name, relative_path, content_hash,
-        derived_from_asset_id, derivation_kind, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      id,
-      projectId,
-      input.kind,
-      input.name,
-      input.relative_path,
-      input.content_hash,
-      input.derived_from_asset_id,
-      input.derivation_kind,
-      now,
-    );
-    db.prepare('UPDATE projects SET updated_at = ? WHERE id = ?').run(
-      now,
-      projectId,
-    );
-    return mapAsset(db.prepare('SELECT * FROM assets WHERE id = ?').get(id));
   })();
 }

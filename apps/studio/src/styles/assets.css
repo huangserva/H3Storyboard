@@ -1,0 +1,27 @@
+.asset-library {
+  background: rgba(13, 16, 15, .96); border: 1px solid var(--line);
+  border-radius: var(--radius-md); box-shadow: var(--shadow); display: flex;
+  flex-direction: column; left: 16px; max-height: calc(100% - 88px); overflow: hidden;
+  position: absolute; top: 16px; width: 310px; z-index: 12;
+}
+.asset-library[data-open="false"] { width: 220px; }
+.asset-library > header, .asset-library > header > div, .asset-list article header,
+.asset-list article footer { align-items: center; display: flex; }
+.asset-library > header { border-bottom: 1px solid var(--line); justify-content: space-between; padding: 12px; }
+.asset-library > header > div { align-items: flex-start; flex-direction: column; gap: 5px; }
+.asset-library > header strong { font-size: 10px; }
+.asset-library button { background: transparent; color: var(--muted); cursor: pointer; font: 650 8px/1 var(--mono); padding: 7px; }
+.asset-library button:hover:not(:disabled) { color: var(--acid); }
+.asset-form { border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 70px 1fr auto; gap: 5px; padding: 10px; }
+.asset-form input, .asset-form select { background: var(--ink-0); border: 1px solid var(--line); border-radius: 3px; font: 600 8px/1 var(--mono); min-width: 0; padding: 7px; }
+.asset-list { overflow-y: auto; }
+.asset-list article { background: var(--ink-2); border-bottom: 1px solid var(--line); padding: 10px; }
+.asset-list article header { justify-content: space-between; }
+.asset-list article header span, .asset-list article header i { color: var(--planned); font: 650 7px/1 var(--mono); font-style: normal; text-transform: uppercase; }
+.asset-list article[data-status="approved"] header i { color: var(--acid); }
+.asset-list article[data-status="archived"] { opacity: .48; }
+.asset-list article > strong { display: block; font: 600 9px/1.4 var(--mono); margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-list article footer { justify-content: flex-end; margin-top: 5px; }
+.asset-freeze { border-top: 1px solid var(--line); color: var(--acid) !important; padding: 11px !important; }
+.asset-error { color: var(--danger); font: 600 8px/1.4 var(--mono); margin: 0; padding: 8px 10px; }
+@media (max-width: 720px) { .asset-library { max-height: 42%; width: calc(100% - 32px); } }

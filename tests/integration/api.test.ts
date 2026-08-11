@@ -8,6 +8,7 @@ import {
   CanvasNodeSchema,
   CharacterReferenceSchema,
   CharacterSchema,
+  CurrentAssetsManifestSnapshotSchema,
   H3JobSchema,
   ProjectSchema,
   ProjectSnapshotSchema,
@@ -633,7 +634,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(7);
+    expect(schemaVersion.version).toBe(8);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -810,6 +811,131 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     expect(CharacterReferenceSchema.array().parse(
       (await listReferences.json() as { data: unknown }).data,
     )).toEqual([rootReference, patchedReference]);
+  });
+
+  test('freezes immutable approved asset manifests across lifecycle changes', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+    const projectA = ProjectSchema.parse((await (await postJson(
+      `${api.origin}/api/projects`,
+      { title: 'Asset lifecycle A', script_title: 'Assets A', script_content:
+        'A complete script establishes an authoritative approved asset manifest.' },
+    )).json() as { data: unknown }).data);
+    const projectB = ProjectSchema.parse((await (await postJson(
+      `${api.origin}/api/projects`,
+      { title: 'Asset lifecycle B', script_title: 'Assets B', script_content:
+        'A separate complete script must not accept foreign replacement assets.' },
+    )).json() as { data: unknown }).data);
+
+    const master = AssetSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { kind: 'image', uri: 'references/courier-master-v1.png',
+        content_hash: null },
+    )).json() as { data: unknown }).data);
+    expect(master.status).toBe('candidate');
+    const approvedMaster = AssetSchema.parse((await (await patchJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: master.id, status: 'approved' },
+    )).json() as { data: unknown }).data);
+    expect(approvedMaster.status).toBe('approved');
+    const illegalRollback = await patchJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: master.id, status: 'candidate' },
+    );
+    await expectError(illegalRollback, 409, 'ASSET_STATUS_INVALID');
+
+    const replacement = AssetSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { kind: 'image', uri: 'references/courier-master-v2.png',
+        content_hash: 'sha256:courier-v2', replaces_asset_id: master.id },
+    )).json() as { data: unknown }).data);
+    expect(replacement.replaces_asset_id).toBe(master.id);
+    const assetsAfterReplace = AssetSchema.array().parse((await (await fetch(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+    )).json() as { data: unknown }).data);
+    expect(assetsAfterReplace.find(({ id }) => id === master.id)?.status)
+      .toBe('archived');
+    const approvedReplacement = AssetSchema.parse((await (await patchJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: replacement.id, status: 'approved' },
+    )).json() as { data: unknown }).data);
+
+    const characterA = CharacterSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectA.id}/characters`,
+      { name: 'Courier', canonical_appearance:
+        'A night courier with a sharp black bob and an amber raincoat.',
+        seed_family: [41] },
+    )).json() as { data: unknown }).data);
+    const linkedReference = CharacterReferenceSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectA.id}/characters/${characterA.id}/references`,
+      { uri: approvedReplacement.uri, kind: 'image', content_hash: null,
+        asset_id: approvedReplacement.id, derived_from: null, sort_order: 0 },
+    )).json() as { data: unknown }).data);
+    expect(linkedReference.asset_id).toBe(approvedReplacement.id);
+    const characterB = CharacterSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectB.id}/characters`,
+      { name: 'Observer', canonical_appearance:
+        'A distant observer in a charcoal coat with silver hair.',
+        seed_family: [77] },
+    )).json() as { data: unknown }).data);
+    const crossProjectReference = await postJson(
+      `${api.origin}/api/projects/${projectB.id}/characters/${characterB.id}/references`,
+      { uri: approvedReplacement.uri, kind: 'image', content_hash: null,
+        asset_id: approvedReplacement.id, derived_from: null, sort_order: 0 },
+    );
+    await expectError(crossProjectReference, 422, 'ASSET_PROJECT_MISMATCH');
+
+    const foreignReplacement = await postJson(
+      `${api.origin}/api/projects/${projectB.id}/assets`,
+      { kind: 'image', uri: 'references/foreign.png', content_hash: null,
+        replaces_asset_id: approvedReplacement.id },
+    );
+    await expectError(foreignReplacement, 422, 'ASSET_PROJECT_MISMATCH');
+
+    const manifestV1 = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await postJson(
+        `${api.origin}/api/projects/${projectA.id}/manifests`, {},
+      )).json() as { data: unknown }).data,
+    );
+    expect(manifestV1.manifest.manifest_version).toBe(1);
+    expect(manifestV1.entries.map(({ asset_id }) => asset_id))
+      .toEqual([approvedReplacement.id]);
+
+    const scene = AssetSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { kind: 'image', uri: 'references/rainy-cinema-master.png',
+        content_hash: null },
+    )).json() as { data: unknown }).data);
+    await patchJson(`${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: scene.id, status: 'approved' });
+    const frozenV1 = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await fetch(
+        `${api.origin}/api/projects/${projectA.id}/manifests/1`,
+      )).json() as { data: unknown }).data,
+    );
+    expect(frozenV1).toEqual(manifestV1);
+    const manifestV2 = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await postJson(
+        `${api.origin}/api/projects/${projectA.id}/manifests`, {},
+      )).json() as { data: unknown }).data,
+    );
+    expect(manifestV2.manifest.manifest_version).toBe(2);
+    expect(new Set(manifestV2.entries.map(({ asset_id }) => asset_id)))
+      .toEqual(new Set([approvedReplacement.id, scene.id]));
+    const listed = CurrentAssetsManifestSnapshotSchema.array().parse(
+      (await (await fetch(
+        `${api.origin}/api/projects/${projectA.id}/manifests`,
+      )).json() as { data: unknown }).data,
+    );
+    expect(listed).toEqual([manifestV1, manifestV2]);
+
+    await patchJson(`${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: scene.id, status: 'archived' });
+    const reapproveArchived = await patchJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: scene.id, status: 'approved' },
+    );
+    await expectError(reapproveArchived, 409, 'ASSET_ARCHIVED');
   });
 });
 

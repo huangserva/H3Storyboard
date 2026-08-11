@@ -1,4 +1,5 @@
 export * from './common.js';
+export * from './asset-manifest.js';
 export * from './canvas.js';
 export * from './character.js';
 export * from './h3-job.js';

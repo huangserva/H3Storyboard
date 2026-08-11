@@ -33,30 +33,43 @@ export const AssetDerivationKindSchema = z.enum([
   'frame_extract',
 ]);
 
-const assetFields = {
+const RelativeAssetPathSchema = NonEmptyTextSchema.refine(
+  (value) => {
+    const segments = value.split(/[\\/]+/);
+    return (
+      !value.startsWith('/') &&
+      !value.startsWith('\\') &&
+      !/^[a-zA-Z]:[\\/]/.test(value) &&
+      segments.every((segment) => segment !== '.' && segment !== '..')
+    );
+  },
+  { message: 'Asset paths must be relative to the project data directory' },
+);
+
+const createAssetFields = {
   kind: AssetKindSchema,
-  name: NonEmptyTextSchema,
-  relative_path: NonEmptyTextSchema.refine(
-    (value) => {
-      const segments = value.split(/[\\/]+/);
-      return (
-        !value.startsWith('/') &&
-        !value.startsWith('\\') &&
-        !/^[a-zA-Z]:[\\/]/.test(value) &&
-        segments.every((segment) => segment !== '.' && segment !== '..')
-      );
-    },
-    { message: 'Asset paths must be relative to the project data directory' },
-  ),
-  content_hash: NonEmptyTextSchema,
+  uri: NonEmptyTextSchema.max(2_000).optional(),
+  name: NonEmptyTextSchema.max(240).optional(),
+  relative_path: RelativeAssetPathSchema.optional(),
+  content_hash: NonEmptyTextSchema.nullable().default(null),
+  status: z.literal('candidate').default('candidate'),
+  replaces_asset_id: IdSchema.nullable().default(null),
   derived_from_asset_id: IdSchema.nullable().default(null),
   derivation_kind: AssetDerivationKindSchema.nullable().default(null),
 };
 
 function validateAssetDerivation(
-  asset: { kind: AssetKind; derived_from_asset_id: string | null; derivation_kind: string | null },
+  asset: { kind: AssetKind; uri?: string | undefined; relative_path?: string | undefined;
+    derived_from_asset_id: string | null; derivation_kind: string | null },
   context: z.RefinementCtx,
 ): void {
+  if (!asset.uri && !asset.relative_path) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Assets require uri or relative_path',
+      path: ['uri'],
+    });
+  }
   const hasSource = asset.derived_from_asset_id !== null;
   const hasKind = asset.derivation_kind !== null;
   if (hasSource !== hasKind) {
@@ -76,17 +89,26 @@ function validateAssetDerivation(
 }
 
 export const CreateAssetInputSchema = z
-  .object(assetFields)
+  .object(createAssetFields)
   .superRefine(validateAssetDerivation);
 export type CreateAssetInput = z.input<typeof CreateAssetInputSchema>;
 
 export const AssetSchema = z
   .object({
-    ...assetFields,
     id: IdSchema,
     project_id: IdSchema,
+    kind: AssetKindSchema,
+    uri: NonEmptyTextSchema.max(2_000),
+    content_hash: NonEmptyTextSchema.nullable(),
+    status: z.enum(['candidate', 'approved', 'archived']),
+    replaces_asset_id: IdSchema.nullable(),
+    name: NonEmptyTextSchema.max(240),
+    relative_path: z.string().min(1),
+    derived_from_asset_id: IdSchema.nullable(),
+    derivation_kind: AssetDerivationKindSchema.nullable(),
     producer_job_id: IdSchema.nullable(),
     created_at: TimestampSchema,
+    updated_at: TimestampSchema,
   })
   .superRefine(validateAssetDerivation);
 export type Asset = z.infer<typeof AssetSchema>;

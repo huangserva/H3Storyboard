@@ -1,5 +1,4 @@
 import {
-  CreateAssetInputSchema,
   CreateH3JobInputSchema,
   CreateProjectInputSchema,
   CreateShotActualInputSchema,
@@ -14,6 +13,7 @@ import { ApiError } from './api-error.js';
 import { readJson } from './http.js';
 import { dispatchCanvasRoute } from './canvas-routes.js';
 import { dispatchCharacterRoute } from './character-routes.js';
+import { dispatchAssetRoute } from './asset-routes.js';
 
 interface RouteResult {
   status: number;
@@ -86,18 +86,6 @@ const routes: readonly Route[] = [
   },
   {
     method: 'POST',
-    pattern: /^\/api\/projects\/([^/]+)\/assets$/,
-    param_names: ['project_id'],
-    handle: async ({ request, params, store }) => ({
-      status: 201,
-      body: store.createAsset(
-        requiredParam(params, 'project_id'),
-        CreateAssetInputSchema.parse(await readJson(request)),
-      ),
-    }),
-  },
-  {
-    method: 'POST',
     pattern: /^\/api\/shots\/([^/]+)\/jobs$/,
     param_names: ['shot_plan_id'],
     handle: async ({ request, params, store }) => ({
@@ -151,6 +139,8 @@ export async function dispatchRoute(
     request, store, method, pathname,
   );
   if (characterResult) return characterResult;
+  const assetResult = await dispatchAssetRoute(request, store, method, pathname);
+  if (assetResult) return assetResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;
