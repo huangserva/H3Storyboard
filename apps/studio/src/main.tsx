@@ -10,6 +10,7 @@ import './styles/drawers.css';
 import './styles/overlays.css';
 import './styles/responsive.css';
 import './styles/canvas.css';
+import './styles/characters.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');

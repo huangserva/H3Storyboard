@@ -24,6 +24,7 @@ export function CanvasShotCard({
       aria-label={`计划分镜 ${shot.ordinal}: ${shot.title}`}
       className="canvas-shot-card"
       data-selected={selected}
+      data-canvas-node={node.id}
       data-shot-card={shot.id}
       style={{
         height: node.height,

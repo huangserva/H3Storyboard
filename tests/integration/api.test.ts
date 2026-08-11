@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import {
   AssetSchema,
   CanvasNodeSchema,
+  CharacterReferenceSchema,
+  CharacterSchema,
   H3JobSchema,
   ProjectSchema,
   ProjectSnapshotSchema,
@@ -600,7 +602,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const unsupported = await postJson(
       `${first.origin}/api/projects/${project.id}/canvas_nodes`,
       {
-        node_type: 'character',
+        node_type: 'location',
         ref_id: randomUUID(),
         x: 0,
         y: 0,
@@ -631,7 +633,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(6);
+    expect(schemaVersion.version).toBe(7);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -653,6 +655,161 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     expect(replacementAddress.port).toBe(address.port);
     const health = await fetch(`${replacementAddress.origin}/api/health`);
     expect(health.status).toBe(200);
+  });
+
+  test('persists characters, reference lineage, and character canvas nodes', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const first = await startApi(databasePath);
+    const projectA = ProjectSchema.parse((await (await postJson(
+      `${first.origin}/api/projects`,
+      { title: 'Character A', script_title: 'Identity A', script_content:
+        'A complete script establishes the first character identity project.' },
+    )).json() as { data: unknown }).data);
+    const projectB = ProjectSchema.parse((await (await postJson(
+      `${first.origin}/api/projects`,
+      { title: 'Character B', script_title: 'Identity B', script_content:
+        'A separate complete script establishes another identity project.' },
+    )).json() as { data: unknown }).data);
+
+    const emptyAppearance = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters`,
+      { name: 'Courier', canonical_appearance: '  ', seed_family: [41] },
+    );
+    await expectError(emptyAppearance, 400, 'VALIDATION_FAILED');
+
+    const characterResponse = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters`,
+      {
+        name: 'Courier',
+        canonical_appearance:
+          'A composed East Asian woman in her early thirties with a sharp black bob and steady amber-brown eyes.',
+        seed_family: [41, 1041],
+      },
+    );
+    expect(characterResponse.status).toBe(201);
+    const character = CharacterSchema.parse(
+      (await characterResponse.json() as { data: unknown }).data,
+    );
+    expect(character.status).toBe('candidate');
+
+    const updatedResponse = await patchJson(
+      `${first.origin}/api/projects/${projectA.id}/characters`,
+      { character_id: character.id, name: 'Night Courier',
+        seed_family: [41, 1041, 2041], status: 'approved' },
+    );
+    expect(updatedResponse.status).toBe(200);
+    const updated = CharacterSchema.parse(
+      (await updatedResponse.json() as { data: unknown }).data,
+    );
+    expect(updated).toMatchObject({ name: 'Night Courier', status: 'approved',
+      seed_family: [41, 1041, 2041] });
+
+    const rootReference = CharacterReferenceSchema.parse(
+      (await (await postJson(
+        `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+        { uri: 'references/courier-master.png', kind: 'image',
+          content_hash: 'sha256:courier-master', derived_from: null,
+          sort_order: 0 },
+      )).json() as { data: unknown }).data,
+    );
+    const derivedResponse = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { uri: 'references/courier-profile.png', kind: 'image',
+        content_hash: null, derived_from: rootReference.id, sort_order: 1 },
+    );
+    expect(derivedResponse.status).toBe(201);
+    const derived = CharacterReferenceSchema.parse(
+      (await derivedResponse.json() as { data: unknown }).data,
+    );
+    expect(derived.derived_from).toBe(rootReference.id);
+
+    const patchedReference = CharacterReferenceSchema.parse(
+      (await (await patchJson(
+        `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+        { reference_id: derived.id, content_hash: 'sha256:courier-profile',
+          sort_order: 2 },
+      )).json() as { data: unknown }).data,
+    );
+    expect(patchedReference).toMatchObject({
+      content_hash: 'sha256:courier-profile', sort_order: 2,
+    });
+
+    const badDerived = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { uri: 'references/missing-parent.png', kind: 'image',
+        content_hash: null, derived_from: randomUUID(), sort_order: 3 },
+    );
+    await expectError(badDerived, 404, 'CHARACTER_REFERENCE_NOT_FOUND');
+
+    const foreignCharacter = CharacterSchema.parse(
+      (await (await postJson(
+        `${first.origin}/api/projects/${projectB.id}/characters`,
+        { name: 'Observer', canonical_appearance:
+          'A tall older man with silver hair, deep-set gray eyes, and a charcoal wool coat.',
+          seed_family: [77] },
+      )).json() as { data: unknown }).data,
+    );
+    const foreignReference = CharacterReferenceSchema.parse(
+      (await (await postJson(
+        `${first.origin}/api/projects/${projectB.id}/characters/${foreignCharacter.id}/references`,
+        { uri: 'references/observer-master.png', kind: 'image',
+          content_hash: null, derived_from: null, sort_order: 0 },
+      )).json() as { data: unknown }).data,
+    );
+    const crossProjectReference = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { uri: 'references/cross-project.png', kind: 'image', content_hash: null,
+        derived_from: foreignReference.id, sort_order: 4 },
+    );
+    await expectError(
+      crossProjectReference,
+      422,
+      'CHARACTER_REFERENCE_PROJECT_MISMATCH',
+    );
+
+    const canvasResponse = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/canvas_nodes`,
+      { node_type: 'character', ref_id: character.id, x: 920, y: 100,
+        width: 240, height: 220, z_index: 20 },
+    );
+    expect(canvasResponse.status).toBe(201);
+    expect(CanvasNodeSchema.parse(
+      (await canvasResponse.json() as { data: unknown }).data,
+    ).node_type).toBe('character');
+    const foreignCanvasNode = await postJson(
+      `${first.origin}/api/projects/${projectB.id}/canvas_nodes`,
+      { node_type: 'character', ref_id: character.id, x: 0, y: 0,
+        width: 240, height: 220, z_index: 1 },
+    );
+    await expectError(foreignCanvasNode, 422, 'CANVAS_NODE_REF_PROJECT_MISMATCH');
+
+    const archivedResponse = await patchJson(
+      `${first.origin}/api/projects/${projectA.id}/characters`,
+      { character_id: character.id, status: 'archived' },
+    );
+    expect(CharacterSchema.parse(
+      (await archivedResponse.json() as { data: unknown }).data,
+    ).status).toBe('archived');
+    const unarchive = await patchJson(
+      `${first.origin}/api/projects/${projectA.id}/characters`,
+      { character_id: character.id, status: 'approved' },
+    );
+    await expectError(unarchive, 409, 'CHARACTER_ARCHIVED');
+
+    await closeApi(first.server);
+    const second = await startApi(databasePath);
+    const listCharacters = await fetch(
+      `${second.origin}/api/projects/${projectA.id}/characters`,
+    );
+    expect(CharacterSchema.array().parse(
+      (await listCharacters.json() as { data: unknown }).data,
+    )).toHaveLength(1);
+    const listReferences = await fetch(
+      `${second.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+    );
+    expect(CharacterReferenceSchema.array().parse(
+      (await listReferences.json() as { data: unknown }).data,
+    )).toEqual([rootReference, patchedReference]);
   });
 });
 

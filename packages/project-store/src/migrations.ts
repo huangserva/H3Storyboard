@@ -7,8 +7,9 @@ import {
 } from './migration-v4.js';
 import { migrateAssetProducers } from './migration-v5.js';
 import { createCanvasNodes } from './migration-v6.js';
+import { createCharacters } from './migration-v7.js';
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -246,6 +247,12 @@ export function migrateDatabase(db: Database.Database): void {
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(6, new Date().toISOString());
+    }
+    if (!appliedVersions.has(7)) {
+      createCharacters(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(7, new Date().toISOString());
     }
   })();
 }

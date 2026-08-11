@@ -19,7 +19,9 @@ async function loadNodes(snapshot: ProjectSnapshot): Promise<CanvasNode[]> {
   const defaults = createInitialPositions(snapshot.shot_plans);
   const existing = await api.listCanvasNodes(projectId);
   const byRefId = new Map(existing.map((node) => [node.ref_id, node]));
-  const nodes: CanvasNode[] = [];
+  const nodes: CanvasNode[] = existing.filter(
+    ({ node_type }) => node_type === 'character',
+  );
 
   for (const shot of snapshot.shot_plans) {
     const persisted = byRefId.get(shot.id);
@@ -113,5 +115,28 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
     }
   };
 
-  return { nodes, loading, error, updateLocalNode, persistNode };
+  const placeCharacter = async (characterId: string) => {
+    if (nodes.some((node) =>
+      node.node_type === 'character' && node.ref_id === characterId)) return;
+    try {
+      const characterCount = nodes.filter(
+        ({ node_type }) => node_type === 'character',
+      ).length;
+      const created = await api.createCanvasNode(snapshot.project.id, {
+        node_type: 'character',
+        ref_id: characterId,
+        x: 940,
+        y: 100 + characterCount * 244,
+        width: 240,
+        height: 220,
+        z_index: Math.max(0, ...nodes.map(({ z_index }) => z_index)) + 1,
+      });
+      setNodes((current) => [...current, created]);
+      setError(null);
+    } catch (placeError) {
+      setError(describeError(placeError));
+    }
+  };
+
+  return { nodes, loading, error, updateLocalNode, persistNode, placeCharacter };
 }

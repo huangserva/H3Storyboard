@@ -13,6 +13,7 @@ import type { IncomingMessage } from 'node:http';
 import { ApiError } from './api-error.js';
 import { readJson } from './http.js';
 import { dispatchCanvasRoute } from './canvas-routes.js';
+import { dispatchCharacterRoute } from './character-routes.js';
 
 interface RouteResult {
   status: number;
@@ -146,6 +147,10 @@ export async function dispatchRoute(
     pathname,
   );
   if (canvasResult) return canvasResult;
+  const characterResult = await dispatchCharacterRoute(
+    request, store, method, pathname,
+  );
+  if (characterResult) return characterResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

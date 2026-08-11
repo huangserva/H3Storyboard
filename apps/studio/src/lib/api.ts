@@ -1,11 +1,14 @@
 import type {
   CanvasNode,
+  Character,
+  CreateCharacterInput,
   CreateCanvasNodeInput,
   CreateProjectInput,
   CreateShotPlanInput,
   Project,
   ProjectSnapshot,
   UpdateCanvasNodeInput,
+  UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -102,6 +105,30 @@ export async function updateCanvasNode(
   input: UpdateCanvasNodeInput,
 ): Promise<CanvasNode> {
   return request<CanvasNode>(`/api/projects/${projectId}/canvas_nodes`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listCharacters(projectId: string): Promise<Character[]> {
+  return request<Character[]>(`/api/projects/${projectId}/characters`);
+}
+
+export async function createCharacter(
+  projectId: string,
+  input: CreateCharacterInput,
+): Promise<Character> {
+  return request<Character>(`/api/projects/${projectId}/characters`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCharacter(
+  projectId: string,
+  input: UpdateCharacterInput,
+): Promise<Character> {
+  return request<Character>(`/api/projects/${projectId}/characters`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });

@@ -42,20 +42,30 @@ export function createCanvasNode(
   const input = parseInput(CreateCanvasNodeInputSchema, rawInput);
   return db.transaction(() => {
     requireProject(db, projectId);
-    const shot = db
-      .prepare('SELECT project_id FROM shot_plans WHERE id = ?')
-      .get(input.ref_id) as { project_id: string } | undefined;
-    if (!shot) {
-      throw new StoreError('SHOT_PLAN_NOT_FOUND', 'Shot plan does not exist', {
-        shot_plan_id: input.ref_id,
-      });
+    const reference = input.node_type === 'shot_plan'
+      ? db.prepare('SELECT project_id, NULL AS status FROM shot_plans WHERE id = ?')
+          .get(input.ref_id)
+      : db.prepare('SELECT project_id, status FROM characters WHERE id = ?')
+          .get(input.ref_id) as { project_id: string; status: string | null } | undefined;
+    if (!reference) {
+      throw new StoreError(
+        input.node_type === 'shot_plan' ? 'SHOT_PLAN_NOT_FOUND' : 'CHARACTER_NOT_FOUND',
+        input.node_type === 'shot_plan' ? 'Shot plan does not exist' : 'Character does not exist',
+        { ref_id: input.ref_id },
+      );
     }
-    if (shot.project_id !== projectId) {
+    const typedReference = reference as { project_id: string; status: string | null };
+    if (typedReference.project_id !== projectId) {
       throw new StoreError(
         'CANVAS_NODE_REF_PROJECT_MISMATCH',
         'Canvas node reference belongs to another project',
         { project_id: projectId, ref_id: input.ref_id },
       );
+    }
+    if (input.node_type === 'character' && typedReference.status === 'archived') {
+      throw new StoreError('CHARACTER_ARCHIVED', 'Archived character cannot enter canvas', {
+        character_id: input.ref_id,
+      });
     }
     const duplicate = db
       .prepare(

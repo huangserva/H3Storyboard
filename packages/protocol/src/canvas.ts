@@ -13,7 +13,7 @@ const positionFields = {
 };
 
 export const CreateCanvasNodeInputSchema = z.object({
-  node_type: z.literal('shot_plan'),
+  node_type: CanvasNodeTypeSchema,
   ref_id: IdSchema,
   ...positionFields,
 });

@@ -8,7 +8,10 @@ import {
   type CanvasViewport,
 } from '../lib/canvas-layout.js';
 import { useCanvasNodes } from '../lib/use-canvas-nodes.js';
+import { useCharacters } from '../lib/use-characters.js';
+import { CanvasCharacterCard } from './CanvasCharacterCard.js';
 import { CanvasShotCard } from './CanvasShotCard.js';
+import { CharacterLibraryPanel } from './CharacterLibraryPanel.js';
 
 interface InfiniteCanvasProps {
   snapshot: ProjectSnapshot;
@@ -21,7 +24,7 @@ interface InfiniteCanvasProps {
 type Interaction =
   | { kind: 'pan'; pointerId: number; lastX: number; lastY: number }
   | {
-      kind: 'card'; pointerId: number; nodeId: string; shotId: string;
+      kind: 'card'; pointerId: number; nodeId: string;
       lastX: number; lastY: number; x: number; y: number; zIndex: number;
     };
 
@@ -34,12 +37,22 @@ export function InfiniteCanvas({
   const interactionRef = useRef<Interaction | null>(null);
   const spacePressed = useRef(false);
   const [viewport, setViewport] = useState(RESET_VIEWPORT);
-  const { nodes, loading, error, updateLocalNode, persistNode } =
+  const { nodes, loading, error, updateLocalNode, persistNode, placeCharacter } =
     useCanvasNodes(snapshot);
+  const characterStore = useCharacters(snapshot.project.id);
+  const nodesById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node])),
+    [nodes],
+  );
   const shotNodes = useMemo(
     () => new Map(nodes.filter(({ node_type }) => node_type === 'shot_plan')
       .map((node) => [node.ref_id, node])),
     [nodes],
+  );
+  const charactersById = useMemo(
+    () => new Map(characterStore.characters.map((character) =>
+      [character.id, character])),
+    [characterStore.characters],
   );
 
   useEffect(() => {
@@ -90,18 +103,18 @@ export function InfiniteCanvas({
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.button !== 1) return;
     if ((event.target as HTMLElement).closest('button')) return;
-    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-shot-card]');
+    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-canvas-node]');
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     if (card && !spacePressed.current && event.button === 0) {
-      const shotId = card.dataset.shotCard;
-      const node = shotId ? shotNodes.get(shotId) : undefined;
-      if (!shotId || !node) return;
+      const nodeId = card.dataset.canvasNode;
+      const node = nodeId ? nodesById.get(nodeId) : undefined;
+      if (!node) return;
       const zIndex = nextCanvasZIndex(nodes);
-      onSelectShot(shotId);
+      if (node.node_type === 'shot_plan') onSelectShot(node.ref_id);
       updateLocalNode(node.id, { z_index: zIndex });
       interactionRef.current = { kind: 'card', pointerId: event.pointerId,
-        nodeId: node.id, shotId, lastX: event.clientX, lastY: event.clientY,
+        nodeId: node.id, lastX: event.clientX, lastY: event.clientY,
         x: node.x, y: node.y, zIndex };
     } else {
       interactionRef.current = { kind: 'pan', pointerId: event.pointerId,
@@ -149,8 +162,9 @@ export function InfiniteCanvas({
   };
 
   const onDoubleClick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-shot-card]');
-    const node = card?.dataset.shotCard ? shotNodes.get(card.dataset.shotCard) : undefined;
+    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-canvas-node]');
+    const node = card?.dataset.canvasNode
+      ? nodesById.get(card.dataset.canvasNode) : undefined;
     const surface = surfaceRef.current;
     if (!node || !surface) return;
     setViewport(centerViewportOnNode(surface.getBoundingClientRect(), node));
@@ -166,7 +180,14 @@ export function InfiniteCanvas({
         <small>拖拽平移 · 滚轮缩放 · 拖动卡片 · 双击聚焦 · 空格拖拽平移</small></div>
       {error ? <div className="canvas-status" role="alert">{error}</div> : null}
       {loading ? <div className="canvas-status">正在加载画布布局…</div> : null}
-      {snapshot.shot_plans.length === 0 ? (
+      <CharacterLibraryPanel characters={characterStore.characters}
+        canvasCharacterIds={new Set(nodes.filter(({ node_type }) =>
+          node_type === 'character').map(({ ref_id }) => ref_id))}
+        busy={characterStore.busy} error={characterStore.error}
+        onCreate={characterStore.create} onUpdate={characterStore.update}
+        onPlace={(characterId) => void placeCharacter(characterId)} />
+      {snapshot.shot_plans.length === 0 &&
+        !nodes.some(({ node_type }) => node_type === 'character') ? (
         <div className="canvas-empty"><span>EMPTY CANVAS</span><h2>从第一镜开始搭建场景</h2>
           <p>创建计划镜头后，画布会按场次自动聚簇。布局保存在项目数据库中。</p>
           <button className="button button-primary" disabled={busy} onClick={onNewShot}
@@ -185,6 +206,11 @@ export function InfiniteCanvas({
               selected={selectedShotId === shot.id}
               actuals={snapshot.shot_actuals.filter(
                 (actual) => actual.shot_plan_id === shot.id)} /> : null;
+          })}
+          {nodes.filter(({ node_type }) => node_type === 'character').map((node) => {
+            const character = charactersById.get(node.ref_id);
+            return character ? <CanvasCharacterCard key={node.id}
+              character={character} node={node} /> : null;
           })}
         </div>
       )}

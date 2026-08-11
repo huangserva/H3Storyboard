@@ -1,6 +1,8 @@
 import {
   AssetSchema,
   CanvasNodeSchema,
+  CharacterReferenceSchema,
+  CharacterSchema,
   H3JobSchema,
   JobEventSchema,
   ProjectSchema,
@@ -9,6 +11,8 @@ import {
   ShotPlanSchema,
   type Asset,
   type CanvasNode,
+  type Character,
+  type CharacterReference,
   type H3Job,
   type JobEvent,
   type Project,
@@ -76,6 +80,17 @@ export const mapAsset = (row: unknown): Asset =>
 
 export const mapCanvasNode = (row: unknown): CanvasNode =>
   decode(CanvasNodeSchema, objectRow(row));
+
+export function mapCharacter(row: unknown): Character {
+  const record = objectRow(row);
+  return decode(CharacterSchema, {
+    ...record,
+    seed_family: jsonColumn(record, 'seed_family_json'),
+  });
+}
+
+export const mapCharacterReference = (row: unknown): CharacterReference =>
+  decode(CharacterReferenceSchema, objectRow(row));
 
 export function mapShotPlan(row: unknown): ShotPlan {
   const record = objectRow(row);
