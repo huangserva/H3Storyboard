@@ -60,7 +60,7 @@ last_review: 2026-08-11
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果（公网 106 可访问）；M1 后端契约随后推进
+M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contract 级）→ M1B-2 submit/poll worker + 下载/hash/资产注册 → M1B-3 真机出片 + r2v-hybrid 对照验证（需与 user 协调 GPU 窗口）。本机即 GPU 盒（4090 48G，8190=H3 / 8188=Krea）。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
