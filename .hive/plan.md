@@ -74,7 +74,7 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 - Studio 已增加 Mode 创建、promote、block、reopen 入口；`r2v-hybrid` 保持 candidate，等待 M1B GPU 对照证据。
 
 ## 2026-08-11 M1A Production context 交付状态
-- migration v10：版本化 production brief、独立项目生成锁、H3 job 不可变 `{brief_version, manifest_version, mode_key, locked_at}` 快照。
+- commit `33d9845`：migration v10、版本化 production brief、独立项目生成锁、H3 job 不可变 `{brief_version, manifest_version, mode_key, locked_at}` 快照。
 - 锁定期间 brief 追加、资产状态迁移、manifest 冻结均拒绝；Studio 已提供 brief 新版本与 engage/release 操作入口。
 
 ## 2026-08-11 M2 原型交付状态
