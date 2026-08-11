@@ -33,10 +33,11 @@ last_review: 2026-08-11
 - [x] actual 结果捕获 + QC verdict 契约
 
 ### M2 · 无限画布 Studio · in_progress
-- [x] 无限画布原型：分镜卡片自由布局、平移缩放、浏览器本地位置持久化
+- [x] 无限画布：分镜卡片自由布局、平移缩放、SQLite v6 `canvas_nodes` 持久化（含旧 localStorage 一次迁移）
 - [x] 多分镜按 scene 聚簇并显示动态分组框（原型方案，待 user 体验反馈）
 - [ ] 角色库面板与画布联动
 - [x] 与 planned/actual 列视图通过工作区切换共存
+- [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列
@@ -58,6 +59,8 @@ last_review: 2026-08-11
 M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果（公网 106 可访问）；M1 后端契约随后推进
 
 ## 2026-08-11 M2 原型交付状态
+- 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。
+- 第二轮 commit `2c4359c`：migration v6 + canvas node CRUD + 聚焦/z-index，37 tests 通过。
 - Studio 原型与演示数据已完成，质量门禁通过。
 - 106 nginx 与反向隧道链路在中转机本地验证可达；公网 `9994` 超时，需 user 开放阿里云安全组。
 - 本机 systemd unit 已纳入 `ops/systemd/`，安装/启用受本机 sudo 凭证阻塞；当前使用同参数前台隧道临时承载。

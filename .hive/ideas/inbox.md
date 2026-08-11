@@ -4,7 +4,7 @@
 
 ## inbox（按加入时间倒序）
 
-（暂无）
+- 2026-08-11（user）：用 agent-reach 搜 GitHub 上先进的无限画布项目（tldraw/excalidraw/react-flow 级别的实现），学习交互和架构。注：agent-reach 装在 user 的 Mac（v1.5.0 + mcporter/Exa），本机未装；启动时二选一——user Mac 侧跑，或本机安装。
 
 ## promoted
 

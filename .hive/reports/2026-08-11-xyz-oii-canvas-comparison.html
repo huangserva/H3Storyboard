@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>xyz oii 画布 vs H3Storyboard 画布</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0a0f12; --panel:#141b20; --ink:#f0f4f2; --muted:#9ca9aa; --line:#29363b; --cyan:#79dbe7; --mint:#78e1b5; --amber:#f1bd70; --red:#ff897d; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 86% -5%,#17333e 0,transparent 34rem),var(--bg); color:var(--ink); font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1120px,calc(100% - 32px)); margin:46px auto 78px; }
+    h1 { max-width:920px; margin:0 0 18px; font-size:clamp(32px,5.5vw,58px); line-height:1.05; letter-spacing:-.04em; }
+    h2 { margin:40px 0 14px; font-size:23px; }
+    p { max-width:900px; }
+    .eyebrow { color:var(--cyan); font-size:12px; letter-spacing:.16em; text-transform:uppercase; }
+    .lede { color:var(--muted); font-size:19px; }
+    .decision { padding:22px 24px; border:1px solid #346c64; border-radius:16px; background:#10231f; font-size:18px; }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; background:#10171b; }
+    th,td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+    th { color:var(--cyan); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+    code { color:#b9f3d7; }
+    .take { color:var(--mint); } .avoid { color:var(--red); }
+    ul { padding-left:21px; }
+    footer { margin-top:42px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media (max-width:820px) { table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Canvas comparison · 2026-08-11</div>
+  <h1>同是无限画布，<br>一个是生成工作区，一个是规划视图。</h1>
+  <p class="lede">xyz-video-creator 的 oii 画布（Alpine.js，5778 行单文件）已经把角色和分镜放上画布并做了后端位置持久化；H3Storyboard 的新画布是协议之上的薄视图原型。各有对方该学的东西。</p>
+  <p class="decision"><strong>结论：</strong>把 xyz 画布的四个成熟机制搬进 H3Storyboard M2——canvas-nodes 后端持久化、角色节点上画布、zoomToNode 聚焦、拖拽时 z_index 提升；坚决不搬它"生成结果就地覆盖实体"的语义（违反 planned/actual 分离）和单文件形态（违反 250 行规则）。</p>
+
+  <h2>逐项对比</h2>
+  <table>
+    <thead><tr><th>维度</th><th>xyz oii 画布</th><th>H3Storyboard 画布（原型）</th></tr></thead>
+    <tbody>
+      <tr><td>技术栈</td><td>Alpine.js CDN，单文件 5778 行，无构建无测试</td><td>React + TS，组件拆分（184/50/85 行），viewport 数学有单测</td></tr>
+      <tr><td>位置持久化</td><td class="take">后端 <code>canvas-nodes</code> API（x/y/w/h/z_index 入库）</td><td>localStorage（原型临时方案）</td></tr>
+      <tr><td>节点类型</td><td class="take">character + storyboard 双类型同画布，ref_id 指实体</td><td>仅分镜卡片；角色面板在 M2 待做</td></tr>
+      <tr><td>缩放</td><td>滚轮以鼠标为中心 + 按钮步进（0.2–3x）+ <span class="take">zoomToNode 点击聚焦</span> + 一键复位</td><td>滚轮以指针为中心连续缩放（指数）</td></tr>
+      <tr><td>拖拽</td><td class="take">节点拖拽时 z_index 提到最高</td><td>卡片拖动 + 背景/空格平移（pointer capture）</td></tr>
+      <tr><td>分组</td><td>无（初始网格摆放）</td><td class="take">按 scene 动态分组框</td></tr>
+      <tr><td>生成动作</td><td class="take">挂在画布实体上（主形象/设定图/场景图，SSE 日志流）</td><td>暂无（等 M1B 接通 provider）</td></tr>
+      <tr><td>数据语义</td><td class="avoid">生成结果就地更新同一实体，无 planned/actual 之分</td><td class="take">画布只是视图，planned/actual 分离与 QC 协议不受视图影响</td></tr>
+    </tbody>
+  </table>
+
+  <h2>进 M2 迭代清单</h2>
+  <ul>
+    <li>位置持久化从 localStorage 迁 SQLite（<code>canvas_nodes</code> 表：node_type/ref_id/x/y/w/h/z_index，照 xyz 字段起手，走正规 migration）</li>
+    <li>角色节点上画布（与"角色库面板联动"合并做，等 Q2 定角色实体）</li>
+    <li>zoomToNode 聚焦 + 画布复位按钮</li>
+    <li>拖拽 z_index 提升</li>
+    <li>M1B 接通后：画布卡片挂生成动作 + SSE 日志流</li>
+  </ul>
+
+  <footer>检视对象：github.com/huangserva/xyz-video-creator @ 67d11bf（SSH 浅克隆）· 画布代码 frontend/oii-app.js:5300-5560 · 关联：.hive/research/2026-08-11-xyz-oii-canvas-comparison.md</footer>
+</main>
+</body>
+</html>
