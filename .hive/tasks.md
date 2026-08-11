@@ -9,8 +9,9 @@
 3. ⏳ M1B-3 真机出片 + r2v-hybrid 三方对照（装 HybridLoader 需重启 ComfyUI，**须与 user 协调 GPU 窗口**）
 门禁：每刀四路 review 纪律沿用；真实生成前必须项目锁 + brief + manifest（M1A 契约）。
 
-- [ ] **全栈工程师** dispatch `478c3bf6` — 任务：M1B-1——ComfyUI H3 adapter（TypeScript，contract 级）+ 只读能力发现。蓝本：h3-film-studio 的 scripts/local_providers.py
+- [x] **全栈工程师** dispatch `478c3bf6` — 任务：M1B-1——ComfyUI H3 adapter（TypeScript，contract 级）+ 只读能力发现。蓝本：h3-film-studio 的 scripts/local_providers.py
 
+- [x] **全栈工程师** dispatch `d5958f44` — 任务：M1B-2——H3 provider lease worker：submit-once / poll-same-task / 恢复 + 完成管线（下载→非空校验→hash→canonical 资产注册→pending take）。蓝…
 ## Done
 
 ### 2026-08-11 · M1A 导演级生产契约（done，commit 70d83c7 收官）

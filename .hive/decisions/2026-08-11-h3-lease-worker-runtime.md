@@ -1,7 +1,7 @@
 # 决策：H3 lease worker 归属 task-engine，由 API 进程按环境开关装配
 
 **日期**: 2026-08-11
-**状态**: 提案中
+**状态**: accepted（orch 架构 review 通过 2026-08-11；结果段待 M1B-3 真机回填）
 **关联**: plan.md → M1B-2
 
 ## 背景
