@@ -1,7 +1,7 @@
 # ADR（draft）：镜头（camera shot）与生成段（generation segment）边界
 
 - 日期：2026-08-11
-- 状态：**draft — 等 user 拍板**
+- 状态：accepted（user 2026-08-11 拍板选 A）
 - 关联：docs/plan.md M1A 前置问题 · .hive/research/2026-08-11-director-reference-assessment.md（结论第 30 行）· h3-film-studio 实证
 
 ## 背景
@@ -25,4 +25,4 @@ director 的"片段"可以包含多个镜头；H3Storyboard 的 `ShotPlan` 当�
 
 ## 结果
 
-（user 拍板后回填）
+选定方案 A：ShotPlan = 一次 H3 生成段 = 一个 job = 一段 2–15s 素材；段内多机位为 prompt 表达属性，不建新实体。Protocol 1.1 迁移按此设计，血缘保持 ShotPlan -> H3Job -> ShotActual 一一对应。
