@@ -11,7 +11,6 @@
 
 ### 🟠 medium — 影响下一步规划
 
-- **Q2** 🟠 角色定义范围：角色实体最少需要哪些字段？h3-film-studio 实证给出建议答案：规范外观文本（可逐字注入 prompt）+ 参考图集 + seed 族 + 派生血缘为最小集，服装/造型状态机后置——user 确认即按此定 M1A 协议。证据见 .hive/research/2026-08-11-h3-film-studio-assessment.md。(2026-08-11)
 
 ### 🟢 low — 灰度区
 
@@ -19,4 +18,4 @@
 
 ## 已答（archive 留追溯）
 
-（暂无）
+- **Q2** ✅ 2026-08-11 user 拍板：角色实体按最小字段集——规范外观文本 + 参考图集 + seed 族 + 派生血缘；服装/造型状态机后置。ADR：.hive/decisions/2026-08-11-character-entity-minimal-fields.md

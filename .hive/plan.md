@@ -23,7 +23,8 @@ last_review: 2026-08-11
 ### M1A · 导演级生产契约 · open
 - [ ] Mode registry、production brief、锁快照
 - [ ] Asset 生命周期（candidate/approved/archived）+ 血缘
-- [ ] **角色定义**：角色作为一等实体（外观、参考图、状态），接入 per-shot 语义引用绑定
+- [x] **角色定义基础**：一等实体、canonical appearance、seed 族、参考图血缘与归档
+- [ ] 角色接入 per-shot 语义引用绑定
 - [ ] 代表性 take 审批门
 
 ### M1B · 单镜 H3 闭环 · open
@@ -35,7 +36,7 @@ last_review: 2026-08-11
 ### M2 · 无限画布 Studio · in_progress
 - [x] 无限画布：分镜卡片自由布局、平移缩放、SQLite v6 `canvas_nodes` 持久化（含旧 localStorage 一次迁移）
 - [x] 多分镜按 scene 聚簇并显示动态分组框（原型方案，待 user 体验反馈）
-- [ ] 角色库面板与画布联动
+- [x] 角色库面板与画布联动（character node 共用 SQLite 布局/z-index）
 - [x] 与 planned/actual 列视图通过工作区切换共存
 - [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
 
@@ -57,6 +58,9 @@ last_review: 2026-08-11
 
 ## 当前 phase
 M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果（公网 106 可访问）；M1 后端契约随后推进
+
+## 2026-08-11 M1A 角色交付状态
+- commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。
