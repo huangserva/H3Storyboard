@@ -1,7 +1,7 @@
 # 决策：v8 增量扩展既有 assets 表
 
 **日期**: 2026-08-11
-**状态**: 提案中
+**状态**: accepted（orch 架构 review 通过 2026-08-11，附 M1B 清理条件）
 **关联**: plan.md → M1A · 导演级生产契约
 
 ## 背景
@@ -20,4 +20,4 @@ v8 原位增加 `uri`、`status`、`replaces_asset_id`、`updated_at`，保留 `
 - 资产响应暂时包含兼容字段；未来清理需单独版本化协议与迁移，不能直接删除。
 
 ## 结果（后写）
-v8 migration、真实 HTTP+SQLite 状态机/manifest 测试和 Studio 资产面板均已实现；等待架构 review 后决定是否转为已采纳。
+v8 migration、真实 HTTP+SQLite 状态机/manifest 测试和 Studio 资产面板均已实现（commit d2490e3，39 tests 过）。orch review 结论：接受——重建表的外键风险大于空串哨兵的代价，且哨兵已收敛在 row mapper 单点。绑定条件：M1B 落地真实 hash 计算时回填全部空串；届时若仍有残留，再评估是否做表重建迁移。
