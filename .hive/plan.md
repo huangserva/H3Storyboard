@@ -70,7 +70,7 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 - 角色参考图可关联 `asset_id`，旧 `uri` 契约保留；Studio 已增加资产登记、审批、归档与 manifest 冻结入口。
 
 ## 2026-08-11 M1A Mode registry 交付状态
-- migration v9：全局 production Mode、可扩展 capability declaration、candidate→validated→blocked→candidate 证据状态机。
+- commit `ee35ccf`：migration v9、全局 production Mode、可扩展 capability declaration、candidate→validated→blocked→candidate 证据状态机。
 - Studio 已增加 Mode 创建、promote、block、reopen 入口；`r2v-hybrid` 保持 candidate，等待 M1B GPU 对照证据。
 
 ## 2026-08-11 M2 原型交付状态
