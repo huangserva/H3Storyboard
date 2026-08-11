@@ -11,8 +11,9 @@ M1A 拆五刀顺序推进，每刀一个 dispatch、独立可验收、完成即 
 5. ⏳ M1A-5 per-shot 语义引用 → 有序 H3 binding 编译 + 代表性 take 审批门
 前置决策已锁：shot=生成段（ADR 方案 A）；角色最小字段（ADR Q2）。
 
-- [ ] **全栈工程师** dispatch `3900177d` — 任务：M1A-2——资产（Asset）生命周期 + 权威 current-assets manifest。设计依据：.hive/research/2026-08-11-director-reference-assessment.md（资产…
+- [x] **全栈工程师** dispatch `3900177d` — 任务：M1A-2——资产（Asset）生命周期 + 权威 current-assets manifest。设计依据：.hive/research/2026-08-11-director-reference-assessment.md（资产…
 
+- [x] **全栈工程师** dispatch `90ba2bd7` — 任务：M1A-3——可扩展 production Mode registry（candidate/validated 能力状态）。设计依据：.hive/research/2026-08-11-director-reference-asse…
 ## Done
 
 ### 2026-08-11 · M2 画布提前批

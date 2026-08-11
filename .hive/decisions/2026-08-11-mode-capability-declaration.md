@@ -1,7 +1,7 @@
 # 决策：Production Mode capability declaration 的可扩展边界
 
 **日期**: 2026-08-11
-**状态**: 提案中
+**状态**: accepted（orch 架构 review 通过 2026-08-11）
 **关联**: plan.md → M1A · 导演级生产契约
 
 ## 背景
@@ -20,4 +20,4 @@ Mode 作为 SQLite 中的全局持久资源；capability declaration 的核心�
 - Mode 本轮不关联 project，M1A-4 production brief 引用时需要新增版本化外键/快照。
 
 ## 结果（后写）
-v9、全局 API、真实 HTTP+SQLite 状态机测试与 Studio 面板已实现；等待架构 review 后决定是否转为已采纳。
+v9、全局 API、真实 HTTP+SQLite 状态机测试与 Studio 面板已实现（commit ee35ccf，40 tests 过）。orch review 通过：强类型核心 + extensions 的边界划分正确；extensions 语义由 M1B provider 侧二次校验的责任转移已知悉。
