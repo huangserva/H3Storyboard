@@ -37,6 +37,23 @@ export function zoomViewportAt(
   };
 }
 
+export function centerViewportOnNode(
+  surface: { width: number; height: number },
+  node: CanvasPoint & { width: number; height: number },
+): CanvasViewport {
+  return {
+    x: surface.width / 2 - (node.x + node.width / 2),
+    y: surface.height / 2 - (node.y + node.height / 2),
+    zoom: 1,
+  };
+}
+
+export function nextCanvasZIndex(
+  nodes: ReadonlyArray<{ z_index: number }>,
+): number {
+  return Math.max(0, ...nodes.map(({ z_index }) => z_index)) + 1;
+}
+
 export function createInitialPositions(shots: LayoutShot[]): CanvasPositions {
   const positions: CanvasPositions = {};
   const scenes = new Map<string, LayoutShot[]>();

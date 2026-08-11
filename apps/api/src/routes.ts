@@ -12,6 +12,7 @@ import type { ProjectStore } from '@h3storyboard/project-store';
 import type { IncomingMessage } from 'node:http';
 import { ApiError } from './api-error.js';
 import { readJson } from './http.js';
+import { dispatchCanvasRoute } from './canvas-routes.js';
 
 interface RouteResult {
   status: number;
@@ -138,6 +139,13 @@ export async function dispatchRoute(
 ): Promise<RouteResult> {
   const method = request.method ?? 'GET';
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+  const canvasResult = await dispatchCanvasRoute(
+    request,
+    store,
+    method,
+    pathname,
+  );
+  if (canvasResult) return canvasResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

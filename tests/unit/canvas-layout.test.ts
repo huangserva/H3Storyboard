@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  centerViewportOnNode,
   createInitialPositions,
+  nextCanvasZIndex,
   parseStoredPositions,
   zoomViewportAt,
 } from '../../apps/studio/src/lib/canvas-layout.js';
@@ -40,5 +42,16 @@ describe('infinite canvas layout', () => {
       ),
     ).toEqual({ good: { x: 12, y: -4 } });
     expect(parseStoredPositions('{bad json')).toEqual({});
+  });
+
+  it('centers a node at 100% zoom and raises it above all siblings', () => {
+    expect(
+      centerViewportOnNode(
+        { width: 1200, height: 800 },
+        { x: 300, y: 200, width: 260, height: 196 },
+      ),
+    ).toEqual({ x: 170, y: 102, zoom: 1 });
+    expect(nextCanvasZIndex([{ z_index: 2 }, { z_index: 9 }])).toBe(10);
+    expect(nextCanvasZIndex([])).toBe(1);
   });
 });

@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent } from 'react';
-import type { ProjectSnapshot } from '@h3storyboard/protocol';
+import type { CanvasNode, ProjectSnapshot } from '@h3storyboard/protocol';
 import {
-  createInitialPositions,
-  parseStoredPositions,
+  centerViewportOnNode,
+  nextCanvasZIndex,
   zoomViewportAt,
-  type CanvasPositions,
-  type CanvasPoint,
   type CanvasViewport,
 } from '../lib/canvas-layout.js';
+import { useCanvasNodes } from '../lib/use-canvas-nodes.js';
 import { CanvasShotCard } from './CanvasShotCard.js';
 
 interface InfiniteCanvasProps {
@@ -21,32 +20,31 @@ interface InfiniteCanvasProps {
 
 type Interaction =
   | { kind: 'pan'; pointerId: number; lastX: number; lastY: number }
-  | { kind: 'card'; pointerId: number; shotId: string; lastX: number; lastY: number };
+  | {
+      kind: 'card'; pointerId: number; nodeId: string; shotId: string;
+      lastX: number; lastY: number; x: number; y: number; zIndex: number;
+    };
 
-const INITIAL_VIEWPORT: CanvasViewport = { x: 24, y: 20, zoom: 0.86 };
-const CARD_WIDTH = 260;
-const CARD_HEIGHT = 196;
+const RESET_VIEWPORT: CanvasViewport = { x: 0, y: 0, zoom: 1 };
 
 export function InfiniteCanvas({
-  snapshot,
-  selectedShotId,
-  busy,
-  onNewShot,
-  onSelectShot,
+  snapshot, selectedShotId, busy, onNewShot, onSelectShot,
 }: InfiniteCanvasProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const interactionRef = useRef<Interaction | null>(null);
   const spacePressed = useRef(false);
-  const [viewport, setViewport] = useState(INITIAL_VIEWPORT);
-  const [positions, setPositions] = useState<CanvasPositions>({});
-  const storageKey = `h3storyboard.canvas.v1.${snapshot.project.id}`;
+  const [viewport, setViewport] = useState(RESET_VIEWPORT);
+  const { nodes, loading, error, updateLocalNode, persistNode } =
+    useCanvasNodes(snapshot);
+  const shotNodes = useMemo(
+    () => new Map(nodes.filter(({ node_type }) => node_type === 'shot_plan')
+      .map((node) => [node.ref_id, node])),
+    [nodes],
+  );
 
   useEffect(() => {
-    const defaults = createInitialPositions(snapshot.shot_plans);
-    const stored = parseStoredPositions(localStorage.getItem(storageKey));
-    setPositions({ ...defaults, ...stored });
-    setViewport(INITIAL_VIEWPORT);
-  }, [snapshot.project.id, snapshot.shot_plans, storageKey]);
+    setViewport(RESET_VIEWPORT);
+  }, [snapshot.project.id]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -71,24 +69,23 @@ export function InfiniteCanvas({
   }, []);
 
   const scenes = useMemo(() => {
-    const groups = new Map<string, ProjectSnapshot['shot_plans']>();
+    const groups = new Map<string, CanvasNode[]>();
     for (const shot of snapshot.shot_plans) {
+      const node = shotNodes.get(shot.id);
+      if (!node) continue;
       const group = groups.get(shot.scene_id) ?? [];
-      group.push(shot);
+      group.push(node);
       groups.set(shot.scene_id, group);
     }
-    return [...groups.entries()].map(([sceneId, shots]) => {
-      const points = shots
-        .map((shot) => positions[shot.id])
-        .filter((point): point is CanvasPoint => point !== undefined);
-      if (points.length === 0) return null;
-      const minX = Math.min(...points.map(({ x }) => x)) - 24;
-      const minY = Math.min(...points.map(({ y }) => y)) - 48;
-      const maxX = Math.max(...points.map(({ x }) => x)) + CARD_WIDTH + 24;
-      const maxY = Math.max(...points.map(({ y }) => y)) + CARD_HEIGHT + 24;
-      return { sceneId, count: shots.length, x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-    }).filter((scene) => scene !== null);
-  }, [positions, snapshot.shot_plans]);
+    return [...groups.entries()].map(([sceneId, sceneNodes]) => {
+      const minX = Math.min(...sceneNodes.map(({ x }) => x)) - 24;
+      const minY = Math.min(...sceneNodes.map(({ y }) => y)) - 48;
+      const maxX = Math.max(...sceneNodes.map(({ x, width }) => x + width)) + 24;
+      const maxY = Math.max(...sceneNodes.map(({ y, height }) => y + height)) + 24;
+      return { sceneId, count: sceneNodes.length, x: minX, y: minY,
+        width: maxX - minX, height: maxY - minY };
+    });
+  }, [shotNodes, snapshot.shot_plans]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.button !== 1) return;
@@ -98,11 +95,17 @@ export function InfiniteCanvas({
     event.currentTarget.setPointerCapture(event.pointerId);
     if (card && !spacePressed.current && event.button === 0) {
       const shotId = card.dataset.shotCard;
-      if (!shotId) return;
+      const node = shotId ? shotNodes.get(shotId) : undefined;
+      if (!shotId || !node) return;
+      const zIndex = nextCanvasZIndex(nodes);
       onSelectShot(shotId);
-      interactionRef.current = { kind: 'card', pointerId: event.pointerId, shotId, lastX: event.clientX, lastY: event.clientY };
+      updateLocalNode(node.id, { z_index: zIndex });
+      interactionRef.current = { kind: 'card', pointerId: event.pointerId,
+        nodeId: node.id, shotId, lastX: event.clientX, lastY: event.clientY,
+        x: node.x, y: node.y, zIndex };
     } else {
-      interactionRef.current = { kind: 'pan', pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      interactionRef.current = { kind: 'pan', pointerId: event.pointerId,
+        lastX: event.clientX, lastY: event.clientY };
       event.currentTarget.dataset.panning = 'true';
     }
   };
@@ -118,24 +121,22 @@ export function InfiniteCanvas({
       setViewport((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
       return;
     }
-    setPositions((currentPositions) => {
-      const current = currentPositions[interaction.shotId];
-      if (!current) return currentPositions;
-      const next = {
-        ...currentPositions,
-        [interaction.shotId]: { x: current.x + dx / viewport.zoom, y: current.y + dy / viewport.zoom },
-      };
-      localStorage.setItem(storageKey, JSON.stringify(next));
-      return next;
-    });
+    interaction.x += dx / viewport.zoom;
+    interaction.y += dy / viewport.zoom;
+    updateLocalNode(interaction.nodeId, { x: interaction.x, y: interaction.y });
   };
 
   const endInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (interactionRef.current?.pointerId !== event.pointerId) return;
+    const interaction = interactionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
     interactionRef.current = null;
     event.currentTarget.dataset.panning = 'false';
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (interaction.kind === 'card') {
+      void persistNode({ node_id: interaction.nodeId, x: interaction.x,
+        y: interaction.y, z_index: interaction.zIndex });
     }
   };
 
@@ -143,39 +144,47 @@ export function InfiniteCanvas({
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    setViewport((current) => zoomViewportAt(current, pointer, current.zoom * Math.exp(-event.deltaY * 0.0015)));
+    setViewport((current) => zoomViewportAt(current, pointer,
+      current.zoom * Math.exp(-event.deltaY * 0.0015)));
+  };
+
+  const onDoubleClick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-shot-card]');
+    const node = card?.dataset.shotCard ? shotNodes.get(card.dataset.shotCard) : undefined;
+    const surface = surfaceRef.current;
+    if (!node || !surface) return;
+    setViewport(centerViewportOnNode(surface.getBoundingClientRect(), node));
   };
 
   return (
     <div className="infinite-canvas" ref={surfaceRef} data-space="false" data-panning="false"
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endInteraction}
+      onDoubleClick={onDoubleClick} onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove} onPointerUp={endInteraction}
       onPointerCancel={endInteraction} onWheel={onWheel}>
-      <div className="canvas-hud">
-        <span>{Math.round(viewport.zoom * 100)}%</span>
-        <button type="button" onClick={() => setViewport(INITIAL_VIEWPORT)}>回到起点</button>
-        <small>拖动画布平移 · 滚轮缩放 · 拖动卡片排布 · 空格拖拽平移</small>
-      </div>
+      <div className="canvas-hud"><span>{Math.round(viewport.zoom * 100)}%</span>
+        <button type="button" onClick={() => setViewport(RESET_VIEWPORT)}>复位视图</button>
+        <small>拖拽平移 · 滚轮缩放 · 拖动卡片 · 双击聚焦 · 空格拖拽平移</small></div>
+      {error ? <div className="canvas-status" role="alert">{error}</div> : null}
+      {loading ? <div className="canvas-status">正在加载画布布局…</div> : null}
       {snapshot.shot_plans.length === 0 ? (
-        <div className="canvas-empty">
-          <span>EMPTY CANVAS</span><h2>从第一镜开始搭建场景</h2>
-          <p>创建计划镜头后，画布会按场次自动聚簇。之后可自由拖动，位置只保存在这台浏览器。</p>
-          <button className="button button-primary" disabled={busy} onClick={onNewShot} type="button">＋ 新增计划镜头</button>
-        </div>
+        <div className="canvas-empty"><span>EMPTY CANVAS</span><h2>从第一镜开始搭建场景</h2>
+          <p>创建计划镜头后，画布会按场次自动聚簇。布局保存在项目数据库中。</p>
+          <button className="button button-primary" disabled={busy} onClick={onNewShot}
+            type="button">＋ 新增计划镜头</button></div>
       ) : (
-        <div className="canvas-world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
-          {scenes.map((scene) => (
-            <section className="canvas-scene-frame" key={scene.sceneId}
-              style={{ transform: `translate(${scene.x}px, ${scene.y}px)`, width: scene.width, height: scene.height }}>
-              <header><strong>{scene.sceneId}</strong><span>{scene.count} SHOTS</span></header>
-            </section>
-          ))}
+        <div className="canvas-world" style={{ transform:
+          `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
+          {scenes.map((scene) => <section className="canvas-scene-frame" key={scene.sceneId}
+            style={{ transform: `translate(${scene.x}px, ${scene.y}px)`,
+              width: scene.width, height: scene.height }}>
+            <header><strong>{scene.sceneId}</strong><span>{scene.count} SHOTS</span></header>
+          </section>)}
           {snapshot.shot_plans.map((shot) => {
-            const position = positions[shot.id];
-            return position ? (
-              <CanvasShotCard key={shot.id} shot={shot} position={position}
-                selected={selectedShotId === shot.id}
-                actuals={snapshot.shot_actuals.filter((actual) => actual.shot_plan_id === shot.id)} />
-            ) : null;
+            const node = shotNodes.get(shot.id);
+            return node ? <CanvasShotCard key={shot.id} shot={shot} node={node}
+              selected={selectedShotId === shot.id}
+              actuals={snapshot.shot_actuals.filter(
+                (actual) => actual.shot_plan_id === shot.id)} /> : null;
           })}
         </div>
       )}

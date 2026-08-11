@@ -1,8 +1,11 @@
 import type {
+  CanvasNode,
+  CreateCanvasNodeInput,
   CreateProjectInput,
   CreateShotPlanInput,
   Project,
   ProjectSnapshot,
+  UpdateCanvasNodeInput,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -78,4 +81,28 @@ export async function createShotPlan(
     body: JSON.stringify(input),
   });
   return getProject(projectId);
+}
+
+export async function listCanvasNodes(projectId: string): Promise<CanvasNode[]> {
+  return request<CanvasNode[]>(`/api/projects/${projectId}/canvas_nodes`);
+}
+
+export async function createCanvasNode(
+  projectId: string,
+  input: CreateCanvasNodeInput,
+): Promise<CanvasNode> {
+  return request<CanvasNode>(`/api/projects/${projectId}/canvas_nodes`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCanvasNode(
+  projectId: string,
+  input: UpdateCanvasNodeInput,
+): Promise<CanvasNode> {
+  return request<CanvasNode>(`/api/projects/${projectId}/canvas_nodes`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }

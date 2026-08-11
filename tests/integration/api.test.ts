@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AssetSchema,
+  CanvasNodeSchema,
   H3JobSchema,
   ProjectSchema,
   ProjectSnapshotSchema,
@@ -519,6 +520,120 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     });
   });
 
+  test('persists canvas node CRUD and rejects unsupported nodes or projects', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const first = await startApi(databasePath);
+    const projectResponse = await postJson(`${first.origin}/api/projects`, {
+      title: 'Canvas persistence',
+      script_title: 'Canvas layout script',
+      script_content:
+        'A complete script provides a real project and shot for canvas persistence.',
+    });
+    const project = ProjectSchema.parse(
+      (await projectResponse.json() as { data: unknown }).data,
+    );
+    const shotResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/shots`,
+      validShotInput(),
+    );
+    const shot = ShotPlanSchema.parse(
+      (await shotResponse.json() as { data: unknown }).data,
+    );
+
+    const emptyResponse = await fetch(
+      `${first.origin}/api/projects/${project.id}/canvas_nodes`,
+    );
+    expect(emptyResponse.status).toBe(200);
+    expect(await emptyResponse.json()).toEqual({ data: [] });
+
+    const createResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/canvas_nodes`,
+      {
+        node_type: 'shot_plan',
+        ref_id: shot.id,
+        x: 80,
+        y: 100,
+        width: 260,
+        height: 196,
+        z_index: 1,
+      },
+    );
+    expect(createResponse.status).toBe(201);
+    const created = CanvasNodeSchema.parse(
+      (await createResponse.json() as { data: unknown }).data,
+    );
+    expect(created).toMatchObject({
+      project_id: project.id,
+      node_type: 'shot_plan',
+      ref_id: shot.id,
+      x: 80,
+      y: 100,
+      width: 260,
+      height: 196,
+      z_index: 1,
+    });
+
+    const updateResponse = await patchJson(
+      `${first.origin}/api/projects/${project.id}/canvas_nodes`,
+      {
+        node_id: created.id,
+        x: -42.5,
+        y: 212,
+        width: 280,
+        height: 210,
+        z_index: 7,
+      },
+    );
+    expect(updateResponse.status).toBe(200);
+    const updated = CanvasNodeSchema.parse(
+      (await updateResponse.json() as { data: unknown }).data,
+    );
+    expect(updated).toMatchObject({
+      id: created.id,
+      x: -42.5,
+      y: 212,
+      width: 280,
+      height: 210,
+      z_index: 7,
+    });
+
+    const unsupported = await postJson(
+      `${first.origin}/api/projects/${project.id}/canvas_nodes`,
+      {
+        node_type: 'character',
+        ref_id: randomUUID(),
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+        z_index: 0,
+      },
+    );
+    await expectError(unsupported, 400, 'VALIDATION_FAILED');
+
+    const missingProject = await fetch(
+      `${first.origin}/api/projects/${randomUUID()}/canvas_nodes`,
+    );
+    await expectError(missingProject, 404, 'PROJECT_NOT_FOUND');
+
+    await closeApi(first.server);
+    const second = await startApi(databasePath);
+    const listResponse = await fetch(
+      `${second.origin}/api/projects/${project.id}/canvas_nodes`,
+    );
+    expect(listResponse.status).toBe(200);
+    expect(CanvasNodeSchema.array().parse(
+      (await listResponse.json() as { data: unknown }).data,
+    )).toEqual([updated]);
+
+    const database = new Database(databasePath, { readonly: true });
+    const schemaVersion = database
+      .prepare('SELECT MAX(version) AS version FROM schema_version')
+      .get() as { version: number };
+    database.close();
+    expect(schemaVersion.version).toBe(6);
+  });
+
   test('closes a listener when close overlaps the initial start', async () => {
     const databasePath = await temporaryDatabasePath();
     const server = createApiServer({ database_path: databasePath, port: 0 });
@@ -584,6 +699,14 @@ async function closeApi(server: ApiServer): Promise<void> {
 async function postJson(url: string, body: unknown): Promise<Response> {
   return fetch(url, {
     method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function patchJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
+    method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });

@@ -1,5 +1,7 @@
 import type {
   Asset,
+  CanvasNode,
+  CreateCanvasNodeInput,
   CreateAssetInput,
   CreateH3JobInput,
   CreateProjectInput,
@@ -9,6 +11,7 @@ import type {
   Project,
   ProjectSnapshot,
   ReviewShotActualInput,
+  UpdateCanvasNodeInput,
   JobEvent,
   ShotActual,
   ShotPlan,
@@ -16,6 +19,11 @@ import type {
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import {
+  createCanvasNode,
+  listCanvasNodes,
+  updateCanvasNode,
+} from './canvas-operations.js';
 import {
   claimH3Job,
   createH3Job,
@@ -79,6 +87,24 @@ export class ProjectStore {
 
   createAsset(projectId: string, input: CreateAssetInput): Asset {
     return createAsset(this.#database, projectId, input);
+  }
+
+  listCanvasNodes(projectId: string): CanvasNode[] {
+    return listCanvasNodes(this.#database, projectId);
+  }
+
+  createCanvasNode(
+    projectId: string,
+    input: CreateCanvasNodeInput,
+  ): CanvasNode {
+    return createCanvasNode(this.#database, projectId, input);
+  }
+
+  updateCanvasNode(
+    projectId: string,
+    input: UpdateCanvasNodeInput,
+  ): CanvasNode {
+    return updateCanvasNode(this.#database, projectId, input);
   }
 
   createShotPlan(projectId: string, input: CreateShotPlanInput): ShotPlan {

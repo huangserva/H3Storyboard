@@ -1,5 +1,6 @@
 import {
   AssetSchema,
+  CanvasNodeSchema,
   H3JobSchema,
   JobEventSchema,
   ProjectSchema,
@@ -7,6 +8,7 @@ import {
   ShotActualSchema,
   ShotPlanSchema,
   type Asset,
+  type CanvasNode,
   type H3Job,
   type JobEvent,
   type Project,
@@ -71,6 +73,9 @@ export const mapScriptVersion = (row: unknown): ScriptVersion =>
 
 export const mapAsset = (row: unknown): Asset =>
   decode(AssetSchema, objectRow(row));
+
+export const mapCanvasNode = (row: unknown): CanvasNode =>
+  decode(CanvasNodeSchema, objectRow(row));
 
 export function mapShotPlan(row: unknown): ShotPlan {
   const record = objectRow(row);

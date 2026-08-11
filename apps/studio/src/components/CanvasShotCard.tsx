@@ -1,17 +1,16 @@
-import type { ShotActual, ShotPlan } from '@h3storyboard/protocol';
-import type { CanvasPoint } from '../lib/canvas-layout.js';
+import type { CanvasNode, ShotActual, ShotPlan } from '@h3storyboard/protocol';
 
 interface CanvasShotCardProps {
   shot: ShotPlan;
   actuals: ShotActual[];
-  position: CanvasPoint;
+  node: CanvasNode;
   selected: boolean;
 }
 
 export function CanvasShotCard({
   shot,
   actuals,
-  position,
+  node,
   selected,
 }: CanvasShotCardProps) {
   const latestActual = actuals.reduce<ShotActual | null>(
@@ -26,7 +25,12 @@ export function CanvasShotCard({
       className="canvas-shot-card"
       data-selected={selected}
       data-shot-card={shot.id}
-      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      style={{
+        height: node.height,
+        transform: `translate(${node.x}px, ${node.y}px)`,
+        width: node.width,
+        zIndex: node.z_index,
+      }}
     >
       <header>
         <span>SHOT {String(shot.ordinal).padStart(2, '0')}</span>
@@ -47,4 +51,3 @@ export function CanvasShotCard({
     </article>
   );
 }
-

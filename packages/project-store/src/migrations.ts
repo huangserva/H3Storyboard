@@ -6,8 +6,9 @@ import {
   migrateContinuityContract,
 } from './migration-v4.js';
 import { migrateAssetProducers } from './migration-v5.js';
+import { createCanvasNodes } from './migration-v6.js';
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -195,10 +196,12 @@ export function migrateDatabase(db: Database.Database): void {
       )
     `);
 
-    const row = db
-      .prepare('SELECT MAX(version) AS version FROM schema_version')
-      .get() as { version: number | null };
-    const version = row.version ?? 0;
+    const appliedVersions = new Set(
+      (db.prepare('SELECT version FROM schema_version').all() as Array<{
+        version: number;
+      }>).map(({ version }) => version),
+    );
+    const version = Math.max(0, ...appliedVersions);
     if (version > CURRENT_SCHEMA_VERSION) {
       throw new StoreError(
         'SCHEMA_VERSION_UNSUPPORTED',
@@ -206,37 +209,43 @@ export function migrateDatabase(db: Database.Database): void {
         { database_version: version, supported_version: CURRENT_SCHEMA_VERSION },
       );
     }
-    if (version < 1) {
+    if (!appliedVersions.has(1)) {
       db.exec(MIGRATION_V1);
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(1, new Date().toISOString());
     }
-    if (version < 2) {
+    if (!appliedVersions.has(2)) {
       db.exec(MIGRATION_V2);
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(2, new Date().toISOString());
     }
-    if (version < 3) {
+    if (!appliedVersions.has(3)) {
       db.exec(MIGRATION_V3);
       migrateLegacyActiveJobs(db);
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(3, new Date().toISOString());
     }
-    if (version < 4) {
+    if (!appliedVersions.has(4)) {
       backfillLegacyLeaseEvents(db);
       migrateContinuityContract(db);
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(4, new Date().toISOString());
     }
-    if (version < 5) {
+    if (!appliedVersions.has(5)) {
       migrateAssetProducers(db);
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(5, new Date().toISOString());
+    }
+    if (!appliedVersions.has(6)) {
+      createCanvasNodes(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(6, new Date().toISOString());
     }
   })();
 }
