@@ -65,7 +65,7 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
 
 ## 2026-08-11 M1A 资产交付状态
-- migration v8：Asset candidate/approved/archived 状态机、replacement 血缘、不可变且项目内单调递增的 current-assets manifest。
+- commit `d2490e3`：migration v8、Asset candidate/approved/archived 状态机、replacement 血缘、不可变且项目内单调递增的 current-assets manifest。
 - 角色参考图可关联 `asset_id`，旧 `uri` 契约保留；Studio 已增加资产登记、审批、归档与 manifest 冻结入口。
 
 ## 2026-08-11 M2 原型交付状态
