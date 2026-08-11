@@ -82,7 +82,7 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 - Studio 已提供镜头语义引用与起止状态编辑、dry-run 编译及画布就绪徽标；“雨夜来信”第 1 镜已通过真实 API 编译为有序 r2v 输入。
 
 ## 2026-08-11 M1A Representative take gate 交付状态
-- migration v12 将代表 Take 状态与 job 门禁 override 原因持久化；QC verdict 与代表审批保持独立，第二个及后续同镜 job 必须已有 approved representative 或显式记录 override。
+- commit `fe3e62c`：migration v12 将代表 Take 状态与 job 门禁 override 原因持久化；QC verdict 与代表审批保持独立，第二个及后续同镜 job 必须已有 approved representative 或显式记录 override。
 - Studio 已提供标记、批准、拒绝、撤销操作；“雨夜来信”演示 Take 已标记并批准，同时保留 `qc_verdict=pending` 以证明两套裁决互不替代。
 - M1A 工程 bullet 已全部落地，里程碑保持 `review_pending`，待 AGENTS.md 要求的架构、缺陷、测试、协议四路独立 review 后再宣告 done。
 
