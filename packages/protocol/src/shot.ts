@@ -6,6 +6,35 @@ import {
   TimestampSchema,
 } from './common.js';
 import { validateH3BindingList } from './h3-job.js';
+import { SemanticReferencePurposeSchema } from './compiled-binding.js';
+
+export const SemanticReferenceSchema = z.object({
+  purpose: SemanticReferencePurposeSchema,
+  target: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('character'), character_id: IdSchema }),
+    z.object({ type: z.literal('asset'), asset_id: IdSchema }),
+  ]),
+});
+export type SemanticReference = z.infer<typeof SemanticReferenceSchema>;
+
+const CharacterStateSchema = z.object({
+  character_id: IdSchema,
+  position: NonEmptyTextSchema.max(500),
+  appearance_state: NonEmptyTextSchema.max(1_000),
+});
+const PropStateSchema = z.object({
+  name: NonEmptyTextSchema.max(200),
+  custody: NonEmptyTextSchema.max(500),
+  damage: NonEmptyTextSchema.max(500),
+});
+export const ShotStateSchema = z.object({
+  characters: z.array(CharacterStateSchema),
+  props: z.array(PropStateSchema),
+  scene_state: NonEmptyTextSchema.max(2_000),
+  sound_handoff: NonEmptyTextSchema.max(1_000),
+});
+export type ShotState = z.infer<typeof ShotStateSchema>;
+
 
 export const ContinuityModeSchema = z.enum([
   'independent',
@@ -43,6 +72,9 @@ const shotPlanFields = {
   continuity_dependencies: z.array(ContinuityDependencySchema).default([]),
   costume_state: z.record(z.string(), z.string()).default({}),
   reference_bindings: z.array(AssetBindingSchema).default([]),
+  semantic_references: z.array(SemanticReferenceSchema).default([]),
+  opening_state: ShotStateSchema.nullable().default(null),
+  ending_state: ShotStateSchema.nullable().default(null),
 };
 
 function addShotPlanIssues(
@@ -92,6 +124,16 @@ export const CreateShotPlanInputSchema = z
   .object(shotPlanFields)
   .superRefine(addShotPlanIssues);
 export type CreateShotPlanInput = z.infer<typeof CreateShotPlanInputSchema>;
+
+export const UpdateShotPlanInputSchema = z.object({
+  shot_plan_id: IdSchema,
+  semantic_references: z.array(SemanticReferenceSchema).optional(),
+  opening_state: ShotStateSchema.nullable().optional(),
+  ending_state: ShotStateSchema.nullable().optional(),
+}).refine(({ semantic_references, opening_state, ending_state }) =>
+  [semantic_references, opening_state, ending_state].some((value) => value !== undefined),
+{ message: 'At least one shot production field must be updated' });
+export type UpdateShotPlanInput = z.infer<typeof UpdateShotPlanInputSchema>;
 
 export const ShotPlanSchema = z
   .object({

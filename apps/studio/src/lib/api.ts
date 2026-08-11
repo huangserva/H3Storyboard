@@ -18,8 +18,10 @@ import type {
   UpdateAssetInput,
   UpdateModeInput,
   CreateProductionBriefInput,
+  CompiledBindingsResult,
   UpdateProjectGenerationLockInput,
   UpdateCharacterInput,
+  UpdateShotPlanInput,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -95,6 +97,25 @@ export async function createShotPlan(
     body: JSON.stringify(input),
   });
   return getProject(projectId);
+}
+
+export async function updateShotPlan(
+  input: UpdateShotPlanInput,
+): Promise<ProjectSnapshot> {
+  const shot = await request<{ project_id: string }>(
+    `/api/shots/${input.shot_plan_id}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    },
+  );
+  return getProject(shot.project_id);
+}
+
+export async function compileShotBindings(
+  shotPlanId: string,
+): Promise<CompiledBindingsResult> {
+  return request<CompiledBindingsResult>(
+    `/api/shots/${shotPlanId}/compile_bindings`, { method: 'POST' },
+  );
 }
 
 export async function listCanvasNodes(projectId: string): Promise<CanvasNode[]> {

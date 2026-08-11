@@ -13,9 +13,16 @@ import { StoreError } from './errors.js';
 import { requireGenerationUnlocked, requireProject } from './generation-locks.js';
 import { parseInput } from './input.js';
 import { mapGenerationLock, mapProductionBrief } from './row-mappers.js';
+import { compileShotBindings } from './binding-operations.js';
+import type { CompiledBindingsResult } from '@h3storyboard/protocol';
 
 export class ProductionStore {
   constructor(private readonly database: Database.Database) {}
+
+  compileBindings(shotPlanId: string): CompiledBindingsResult {
+    return this.database.transaction(() =>
+      compileShotBindings(this.database, shotPlanId))();
+  }
 
   listBriefs(projectId: string): ProductionBrief[] {
     return this.database.transaction(() => {

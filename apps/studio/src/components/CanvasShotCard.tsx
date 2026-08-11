@@ -5,6 +5,7 @@ interface CanvasShotCardProps {
   actuals: ShotActual[];
   node: CanvasNode;
   selected: boolean;
+  compileReady: boolean;
 }
 
 export function CanvasShotCard({
@@ -12,6 +13,7 @@ export function CanvasShotCard({
   actuals,
   node,
   selected,
+  compileReady,
 }: CanvasShotCardProps) {
   const latestActual = actuals.reduce<ShotActual | null>(
     (latest, actual) =>
@@ -35,7 +37,7 @@ export function CanvasShotCard({
     >
       <header>
         <span>SHOT {String(shot.ordinal).padStart(2, '0')}</span>
-        <i>PLANNED</i>
+        <i data-compile-ready={compileReady}>{compileReady ? '可编译' : '缺输入'}</i>
       </header>
       <div className="canvas-card-frame" aria-hidden="true">
         <b>{shot.shot_size}</b>

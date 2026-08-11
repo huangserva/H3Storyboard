@@ -49,7 +49,7 @@ function seedProductionContext(store: ProjectStore, projectId: string): void {
 }
 
 function testCapability() {
-  return { generation_modes: ['i2v', 'fl2v'] as const,
+  return { generation_modes: ['t2v', 'i2v', 'fl2v', 'r2v'] as const,
     duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
       max_width: 480, min_height: 864, max_height: 864 },
     lora_profile_requirements: [], provider_requirements: ['local_comfyui'] as const,
@@ -132,6 +132,13 @@ describe('ProjectStore', () => {
       derived_from_asset_id: output.id,
       derivation_kind: 'last_frame',
     });
+    first.production.updateLock(project.id, { engaged: false });
+    first.updateAsset(project.id, { asset_id: boundary.id, status: 'approved' });
+    first.freezeCurrentAssetsManifest(project.id);
+    first.production.updateLock(project.id, {
+      engaged: true,
+      reason: 'Store integration test',
+    });
     const continued = first.createShotPlan(project.id, {
       ...createShotInput('Legacy continued shot'),
       continuity_mode: 'visual_match',
@@ -152,6 +159,9 @@ describe('ProjectStore', () => {
         },
       ],
     });
+    first.updateShotPlan({ shot_plan_id: continued.id, semantic_references: [{
+      purpose: 'first_frame', target: { type: 'asset', asset_id: boundary.id },
+    }] });
     const legacyContinuedJob = first.createH3Job(continued.id, {
       mode: 'i2v',
       provider: 'local_comfyui',
@@ -281,7 +291,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(10);
+    ).toBe(11);
     migratedVersion.close();
   });
 
@@ -464,6 +474,16 @@ describe('ProjectStore', () => {
       derived_from_asset_id: output.id,
       derivation_kind: 'last_frame',
     });
+    store.production.updateLock(project.id, { engaged: false });
+    store.updateAsset(project.id, {
+      asset_id: boundaryFrame.id,
+      status: 'approved',
+    });
+    store.freezeCurrentAssetsManifest(project.id);
+    store.production.updateLock(project.id, {
+      engaged: true,
+      reason: 'Store integration test',
+    });
 
     expect(() =>
       store.createShotPlan(project.id, {
@@ -509,6 +529,9 @@ describe('ProjectStore', () => {
         },
       ],
     });
+    store.updateShotPlan({ shot_plan_id: continued.id, semantic_references: [{
+      purpose: 'first_frame', target: { type: 'asset', asset_id: boundaryFrame.id },
+    }] });
     expect(continued.continuity_dependencies[0]?.source_take_id).toBe(take.id);
     expect(() =>
       store.createH3Job(continued.id, {

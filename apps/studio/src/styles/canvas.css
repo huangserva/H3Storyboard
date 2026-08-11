@@ -127,6 +127,7 @@
 
 .canvas-shot-card > header span { color: var(--paper); font: 700 9px/1 var(--mono); }
 .canvas-shot-card > header i { color: var(--planned); font: 650 7px/1 var(--mono); font-style: normal; }
+.canvas-shot-card > header i[data-compile-ready="true"] { color: var(--teal); }
 
 .canvas-card-frame {
   align-items: flex-end;

@@ -13,6 +13,7 @@ import { CanvasCharacterCard } from './CanvasCharacterCard.js';
 import { AssetLibraryPanel } from './AssetLibraryPanel.js';
 import { CanvasShotCard } from './CanvasShotCard.js';
 import { CharacterLibraryPanel } from './CharacterLibraryPanel.js';
+import * as api from '../lib/api.js';
 
 interface InfiniteCanvasProps {
   snapshot: ProjectSnapshot;
@@ -38,6 +39,7 @@ export function InfiniteCanvas({
   const interactionRef = useRef<Interaction | null>(null);
   const spacePressed = useRef(false);
   const [viewport, setViewport] = useState(RESET_VIEWPORT);
+  const [compilableShots, setCompilableShots] = useState<Set<string>>(new Set());
   const { nodes, loading, error, updateLocalNode, persistNode, placeCharacter } =
     useCanvasNodes(snapshot);
   const characterStore = useCharacters(snapshot.project.id);
@@ -59,6 +61,17 @@ export function InfiniteCanvas({
   useEffect(() => {
     setViewport(RESET_VIEWPORT);
   }, [snapshot.project.id]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all(snapshot.shot_plans.map(async ({ id }) => {
+      try { await api.compileShotBindings(id); return id; }
+      catch { return null; }
+    })).then((ids) => {
+      if (active) setCompilableShots(new Set(ids.filter((id): id is string => id !== null)));
+    });
+    return () => { active = false; };
+  }, [snapshot.shot_plans]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -206,6 +219,7 @@ export function InfiniteCanvas({
             const node = shotNodes.get(shot.id);
             return node ? <CanvasShotCard key={shot.id} shot={shot} node={node}
               selected={selectedShotId === shot.id}
+              compileReady={compilableShots.has(shot.id)}
               actuals={snapshot.shot_actuals.filter(
                 (actual) => actual.shot_plan_id === shot.id)} /> : null;
           })}

@@ -295,7 +295,7 @@ function seedShot(store: ProjectStore): { projectId: string; shotId: string } {
 function seedProductionContext(store: ProjectStore, projectId: string): void {
   store.modes.create({ key: 'lease-recovery', title: 'Lease Recovery',
     description: 'Production policy used by lease recovery tests.',
-    capability_declaration: { generation_modes: ['i2v'],
+    capability_declaration: { generation_modes: ['t2v', 'i2v'],
       duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
         max_width: 480, min_height: 864, max_height: 864 },
       lora_profile_requirements: [], provider_requirements: ['local_comfyui'],

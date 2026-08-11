@@ -11,8 +11,9 @@ import { createCharacters } from './migration-v7.js';
 import { addAssetLifecycle } from './migration-v8.js';
 import { createModes } from './migration-v9.js';
 import { createProductionContext } from './migration-v10.js';
+import { addSemanticBindings } from './migration-v11.js';
 
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 11;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -274,6 +275,12 @@ export function migrateDatabase(db: Database.Database): void {
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(10, new Date().toISOString());
+    }
+    if (!appliedVersions.has(11)) {
+      addSemanticBindings(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(11, new Date().toISOString());
     }
   })();
 }

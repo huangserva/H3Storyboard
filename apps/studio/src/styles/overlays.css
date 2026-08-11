@@ -119,6 +119,7 @@
 }
 
 .composer-form input,
+.composer-form select,
 .composer-form textarea {
   background: var(--ink-1);
   border: 1px solid var(--line-strong);
@@ -131,6 +132,20 @@
   height: 40px;
   padding: 0 11px;
 }
+
+.composer-form select {
+  height: 40px;
+  padding: 0 11px;
+}
+
+.binding-editor-row {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1.4fr auto;
+}
+
+.binding-editor-row .icon-button { margin-bottom: 13px; }
 
 .composer-form textarea {
   line-height: 1.6;

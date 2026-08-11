@@ -8,6 +8,7 @@ import {
   CanvasNodeSchema,
   CharacterReferenceSchema,
   CharacterSchema,
+  CompiledBindingsResultSchema,
   CurrentAssetsManifestSnapshotSchema,
   H3JobSchema,
   ModeSchema,
@@ -74,7 +75,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       validShotInput(),
     );
     expect(shotResponse.status).toBe(201);
-    const shot = ShotPlanSchema.parse(
+    let shot = ShotPlanSchema.parse(
       (await shotResponse.json() as { data: unknown }).data,
     );
 
@@ -111,6 +112,14 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       ],
     };
     await prepareApiGenerationContext(first.origin, project.id, [asset.id]);
+    const semanticPatch = await patchJson(`${first.origin}/api/shots/${shot.id}`, {
+      semantic_references: [{ purpose: 'first_frame',
+        target: { type: 'asset', asset_id: asset.id } }],
+    });
+    expect(semanticPatch.status).toBe(200);
+    shot = ShotPlanSchema.parse(
+      (await semanticPatch.json() as { data: unknown }).data,
+    );
     const jobResponses = await Promise.all(
       Array.from({ length: 20 }, () =>
         postJson(`${first.origin}/api/shots/${shot.id}/jobs`, jobInput),
@@ -258,6 +267,25 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const continuedShot = ShotPlanSchema.parse(
       (await continuedShotResponse.json() as { data: unknown }).data,
     );
+    expect((await putJson(
+      `${first.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: false },
+    )).status).toBe(200);
+    expect((await patchJson(
+      `${first.origin}/api/projects/${project.id}/assets`,
+      { asset_id: boundary.id, status: 'approved' },
+    )).status).toBe(200);
+    expect((await postJson(
+      `${first.origin}/api/projects/${project.id}/manifests`, {},
+    )).status).toBe(201);
+    expect((await putJson(
+      `${first.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Continue approved take' },
+    )).status).toBe(200);
+    expect((await patchJson(`${first.origin}/api/shots/${continuedShot.id}`, {
+      semantic_references: [{ purpose: 'first_frame',
+        target: { type: 'asset', asset_id: boundary.id } }],
+    })).status).toBe(200);
 
     const continuityDropped = await postJson(
       `${first.origin}/api/shots/${continuedShot.id}/jobs`,
@@ -433,16 +461,23 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       ['fl2v', [imageBinding, lastBinding]],
       ['r2v', [characterBinding]],
       ['v2v', [motionBinding]],
-      [
-        'rv2v',
-        [characterBinding, { ...motionBinding, ordinal: 1 }],
-      ],
+      ['rv2v', [characterBinding, { ...motionBinding, ordinal: 1 }]],
     ] as const;
 
     await prepareApiGenerationContext(api.origin, project.id,
       [first.id, last.id, motion.id]);
 
     for (const [mode, inputBindings] of cases) {
+      const semantic_references = mode === 't2v' ? [] : mode === 'i2v'
+        ? [{ purpose: 'first_frame', target: { type: 'asset', asset_id: first.id } }]
+        : mode === 'fl2v' ? [
+          { purpose: 'first_frame', target: { type: 'asset', asset_id: first.id } },
+          { purpose: 'last_frame', target: { type: 'asset', asset_id: last.id } },
+        ] : mode === 'r2v' ? [{ purpose: 'reference_character',
+          target: { type: 'asset', asset_id: first.id } }] : [];
+      const semanticPatch = await patchJson(`${api.origin}/api/shots/${shot.id}`,
+        { semantic_references });
+      expect(semanticPatch.status).toBe(200);
       const response = await postJson(
         `${api.origin}/api/shots/${shot.id}/jobs`,
         h3JobInput(mode, `six-modes-${mode}`, inputBindings),
@@ -642,7 +677,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(10);
+    expect(schemaVersion.version).toBe(11);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -1020,7 +1055,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(10);
+    expect(schemaVersion.version).toBe(11);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {
@@ -1160,10 +1195,86 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     )).json() as { data: unknown }).data);
     expect(briefs.map(({ brief_version }) => brief_version)).toEqual([1, 2, 3]);
   });
+
+  test('compiles semantic references into immutable job bindings', async () => {
+    const api = await startApi(await temporaryDatabasePath());
+    const project = ProjectSchema.parse((await (await postJson(
+      `${api.origin}/api/projects`, { title: 'Binding compilation',
+        script_title: 'A complete binding script', script_content:
+          'A courier enters a rain-soaked cinema and stops beneath the marquee.' },
+    )).json() as { data: unknown }).data);
+    const shot = ShotPlanSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/shots`, validShotInput(),
+    )).json() as { data: unknown }).data);
+    const scene = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image', uri: 'references/cinema-master.png', content_hash: null,
+    });
+    const portrait = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image', uri: 'references/courier-master.png', content_hash: null,
+    });
+    const character = CharacterSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/characters`, {
+        name: 'Lin Lan', canonical_appearance:
+          'A young East Asian woman with a black bob, amber eyes, and a dark green raincoat.',
+        seed_family: [8811],
+      },
+    )).json() as { data: unknown }).data);
+    expect((await postJson(
+      `${api.origin}/api/projects/${project.id}/characters/${character.id}/references`,
+      { uri: portrait.uri, kind: 'image', content_hash: null,
+        asset_id: portrait.id, derived_from: null, sort_order: 0 },
+    )).status).toBe(201);
+    await prepareApiGenerationContext(api.origin, project.id,
+      [scene.id, portrait.id]);
+    const state = { characters: [{ character_id: character.id,
+      position: 'beneath the marquee', appearance_state: 'raincoat soaked' }],
+      props: [], scene_state: 'wet cinema entrance at night',
+      sound_handoff: 'rain and a distant tram bell' };
+    expect((await patchJson(`${api.origin}/api/shots/${shot.id}`, {
+      semantic_references: [
+        { purpose: 'reference_character',
+          target: { type: 'character', character_id: character.id } },
+        { purpose: 'first_frame',
+          target: { type: 'asset', asset_id: scene.id } },
+      ], opening_state: state, ending_state: state,
+    })).status).toBe(200);
+    const compiled = CompiledBindingsResultSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/compile_bindings`, {},
+    )).json() as { data: unknown }).data);
+    expect(compiled).toMatchObject({ generation_mode: 'r2v', bindings: [
+      { slot_index: 0, purpose: 'first_frame', asset_id: scene.id },
+      { slot_index: 1, purpose: 'reference_character', asset_id: portrait.id },
+    ] });
+    const submitted = [
+      { asset_id: scene.id, asset_kind: 'image', role: 'first_frame', ordinal: 0 },
+      { asset_id: portrait.id, asset_kind: 'image', role: 'character', ordinal: 1 },
+    ];
+    const job = H3JobSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('r2v', 'compiled-binding-job', submitted),
+    )).json() as { data: unknown }).data);
+    expect(job.compiled_bindings).toEqual(compiled.bindings);
+    const unrelated = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('r2v', 'compiled-extra-binding', [...submitted,
+        { ...submitted[1], ordinal: 2 }]));
+    await expectError(unrelated, 422, 'BINDING_UNRELATED_INPUT');
+
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: false });
+    const later = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image', uri: 'references/later.png', content_hash: null,
+    });
+    await patchJson(`${api.origin}/api/projects/${project.id}/assets`,
+      { asset_id: later.id, status: 'approved' });
+    await postJson(`${api.origin}/api/projects/${project.id}/manifests`, {});
+    const persisted = (await getSnapshot(api.origin, project.id)).h3_jobs
+      .find(({ id }) => id === job.id);
+    expect(persisted?.compiled_bindings).toEqual(compiled.bindings);
+  });
 });
 
 function productionCapability() {
-  return { generation_modes: ['i2v', 'fl2v'],
+  return { generation_modes: ['t2v', 'i2v', 'fl2v', 'r2v'],
     duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
       max_width: 480, min_height: 864, max_height: 864 },
     lora_profile_requirements: [], provider_requirements: ['local_comfyui'],

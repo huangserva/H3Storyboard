@@ -46,6 +46,9 @@ export function ShotPlanForm({
       continuity_dependencies: [],
       costume_state: {},
       reference_bindings: [],
+      semantic_references: [],
+      opening_state: null,
+      ending_state: null,
     });
     if (created) onClose();
   }

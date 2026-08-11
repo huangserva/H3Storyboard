@@ -4,6 +4,7 @@ import type {
   CreateShotPlanInput,
   Project,
   ProjectSnapshot,
+  UpdateShotPlanInput,
 } from '@h3storyboard/protocol';
 import * as api from './api.js';
 
@@ -96,6 +97,20 @@ export function useStudio() {
     [snapshot],
   );
 
+  const updateShot = useCallback(async (input: UpdateShotPlanInput) => {
+    setBusy(true);
+    try {
+      setSnapshot(await api.updateShotPlan(input));
+      setNotice({ tone: 'success', text: '镜头语义输入与起止状态已保存' });
+      return true;
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeError(error) });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   return {
     projects,
     snapshot,
@@ -107,6 +122,7 @@ export function useStudio() {
     selectShot: setSelectedShotId,
     addProject,
     addShot,
+    updateShot,
     dismissNotice: () => setNotice(null),
   };
 }

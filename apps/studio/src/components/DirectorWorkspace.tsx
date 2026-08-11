@@ -1,10 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
-import type { ProjectSnapshot, ShotPlan } from '@h3storyboard/protocol';
+import type { ProjectSnapshot, ShotPlan, UpdateShotPlanInput } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
 import { InfiniteCanvas } from './InfiniteCanvas.js';
 import { PlannedShotPanel } from './PlannedShotPanel.js';
 import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
+import { ShotProductionEditor } from './ShotProductionEditor.js';
 
 const ProductionBriefPanel = lazy(async () => {
   const module = await import('./ProductionBriefPanel.js');
@@ -17,6 +18,7 @@ interface DirectorWorkspaceProps {
   busy: boolean;
   onNewShot: () => void;
   onSelectShot: (id: string) => void;
+  onUpdateShot: (input: UpdateShotPlanInput) => Promise<boolean>;
 }
 
 export function DirectorWorkspace({
@@ -25,9 +27,11 @@ export function DirectorWorkspace({
   busy,
   onNewShot,
   onSelectShot,
+  onUpdateShot,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'director' | 'canvas'>('canvas');
   const [productionOpen, setProductionOpen] = useState(false);
+  const [shotProductionOpen, setShotProductionOpen] = useState(false);
   const actuals = snapshot?.shot_actuals.filter(
     (actual) => actual.shot_plan_id === selectedShot?.id,
   ) ?? [];
@@ -68,6 +72,8 @@ export function DirectorWorkspace({
           </div>
           <button className="button compact" type="button"
             onClick={() => setProductionOpen(true)}>BRIEF / LOCK</button>
+          <button className="button compact" disabled={!selectedShot} type="button"
+            onClick={() => setShotProductionOpen(true)}>INPUTS / STATES</button>
           <button className="button button-primary compact" disabled={busy} onClick={onNewShot} type="button">＋ 新增计划镜头</button>
         </div>
       </header>
@@ -87,6 +93,9 @@ export function DirectorWorkspace({
         <ProductionBriefPanel projectId={snapshot.project.id}
           onClose={() => setProductionOpen(false)} />
       </Suspense> : null}
+      {shotProductionOpen && selectedShot ? <ShotProductionEditor
+        busy={busy} projectId={snapshot.project.id} shot={selectedShot}
+        onClose={() => setShotProductionOpen(false)} onSave={onUpdateShot} /> : null}
     </section>
   );
 }

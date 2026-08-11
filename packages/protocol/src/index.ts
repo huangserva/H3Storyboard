@@ -1,4 +1,5 @@
 export * from './common.js';
+export * from './compiled-binding.js';
 export * from './asset-manifest.js';
 export * from './canvas.js';
 export * from './character.js';

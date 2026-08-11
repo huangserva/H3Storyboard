@@ -7,6 +7,8 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
 import { buildJobLockSnapshot } from './generation-locks.js';
+import { compileShotBindings } from './binding-operations.js';
+import { BindingCompilerError, validateCompiledInputs } from '@h3storyboard/h3-provider';
 import { parseInput } from './input.js';
 import {
   appendJobEvent,
@@ -51,6 +53,17 @@ export function createH3Job(
       return existing;
     }
     const lockSnapshot = buildJobLockSnapshot(db, shot.project_id);
+    const compiled = compileShotBindings(db, shotPlanId);
+    if (input.mode !== 'v2v' && input.mode !== 'rv2v') {
+      if (compiled.generation_mode !== input.mode) throw new StoreError(
+        'MODE_CAPABILITY_MISMATCH', 'Job mode differs from compiled generation mode');
+      try { validateCompiledInputs(compiled, input.input_bindings); }
+      catch (error) {
+        if (error instanceof BindingCompilerError) throw new StoreError(
+          error.code, error.message, { shot_plan_id: shotPlanId });
+        throw error;
+      }
+    }
 
     const id = randomUUID();
     const now = new Date().toISOString();
@@ -60,9 +73,9 @@ export function createH3Job(
         duration_seconds, seed, steps, input_bindings_json, idempotency_key,
         attempt, status, provider_job_id, output_asset_id, error_code,
         error_message, created_at, updated_at, completed_at, lease_expires_at,
-        heartbeat_at, lock_snapshot_json)
+        heartbeat_at, lock_snapshot_json, compiled_bindings_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', NULL, NULL,
-               NULL, NULL, ?, ?, NULL, NULL, NULL, ?)`,
+               NULL, NULL, ?, ?, NULL, NULL, NULL, ?, ?)`,
     ).run(
       id,
       shot.project_id,
@@ -79,6 +92,7 @@ export function createH3Job(
       now,
       now,
       JSON.stringify(lockSnapshot),
+      JSON.stringify(compiled.bindings),
     );
     appendJobEvent(db, id, null, 'draft', 'Job created', now);
     db.prepare('UPDATE projects SET updated_at = ? WHERE id = ?').run(

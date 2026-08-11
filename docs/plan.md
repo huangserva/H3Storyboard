@@ -14,10 +14,10 @@
 - [x] Extensible production Mode registry with `candidate` / `validated` / `blocked` capability status; no hard-coded production-policy enum.
 - [x] Versioned production brief, text style lock, project generation locks, and immutable lock snapshot on each job.
 - [x] Asset lifecycle (`candidate` / `approved` / `archived`), stable revisions, replacement lineage, and an authoritative current-assets manifest.
-- [ ] Per-shot semantic reference requirements compiled into exact ordered H3 bindings; reject both missing and unrelated inputs.
-- [ ] Explicit opening and ending state for character position, appearance state, prop custody/damage, scene state, and sound handoff.
+- [x] Per-shot semantic reference requirements compiled into exact ordered H3 bindings; reject both missing and unrelated inputs.
+- [x] Explicit opening and ending state for character position, appearance state, prop custody/damage, scene state, and sound handoff.
 - [ ] Representative-take approval gate before any batch submission.
-- [ ] Resolve the camera-shot versus multi-shot generation-segment boundary before Protocol 1.1 migration.
+- [x] Resolve the camera-shot versus multi-shot generation-segment boundary before Protocol 1.1 migration (ADR: one `ShotPlan` is one generation segment).
 
 ## M1B — single-shot H3 loop
 

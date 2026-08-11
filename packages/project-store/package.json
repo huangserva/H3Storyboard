@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@h3storyboard/protocol": "workspace:*",
+    "@h3storyboard/h3-provider": "workspace:*",
     "@h3storyboard/task-engine": "workspace:*",
     "better-sqlite3": "^13.0.3"
   }

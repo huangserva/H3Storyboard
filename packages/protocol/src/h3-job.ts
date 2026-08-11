@@ -7,6 +7,7 @@ import {
   TimestampSchema,
 } from './common.js';
 import { JobLockSnapshotSchema } from './production-brief.js';
+import { CompiledBindingSchema } from './compiled-binding.js';
 
 export const H3ModeSchema = z.enum([
   't2v',
@@ -92,6 +93,7 @@ export const H3JobSchema = z.object({
   updated_at: TimestampSchema,
   completed_at: TimestampSchema.nullable(),
   lock_snapshot: JobLockSnapshotSchema.nullable(),
+  compiled_bindings: z.array(CompiledBindingSchema).nullable(),
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 

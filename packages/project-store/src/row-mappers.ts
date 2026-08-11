@@ -117,6 +117,12 @@ export function mapShotPlan(row: unknown): ShotPlan {
     ),
     costume_state: jsonColumn(record, 'costume_state_json'),
     reference_bindings: jsonColumn(record, 'reference_bindings_json'),
+    semantic_references: record.semantic_references_json == null ? [] :
+      jsonColumn(record, 'semantic_references_json'),
+    opening_state: record.opening_state_json == null ? null :
+      jsonColumn(record, 'opening_state_json'),
+    ending_state: record.ending_state_json == null ? null :
+      jsonColumn(record, 'ending_state_json'),
   });
 }
 
@@ -132,6 +138,8 @@ export function mapH3Job(row: unknown): H3Job {
     lock_snapshot: record.lock_snapshot_json === null ||
       record.lock_snapshot_json === undefined
       ? null : jsonColumn(record, 'lock_snapshot_json'),
+    compiled_bindings: record.compiled_bindings_json == null ? null :
+      jsonColumn(record, 'compiled_bindings_json'),
   });
 }
 

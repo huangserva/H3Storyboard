@@ -20,6 +20,7 @@ import type {
   UpdateCharacterInput,
   UpdateCharacterReferenceInput,
   UpdateAssetInput,
+  UpdateShotPlanInput,
   JobEvent,
   ShotActual,
   ShotPlan,
@@ -77,6 +78,7 @@ import {
 import {
   createShotActual,
   createShotPlan,
+  updateShotPlan,
   reviewShotActual,
 } from './shot-operations.js';
 
@@ -85,7 +87,6 @@ export class ProjectStore {
   readonly modes: ModeStore;
   readonly production: ProductionStore;
   #closed = false;
-
   constructor(databasePath: string) {
     if (databasePath !== ':memory:') {
       mkdirSync(dirname(databasePath), { recursive: true });
@@ -198,6 +199,10 @@ export class ProjectStore {
 
   createShotPlan(projectId: string, input: CreateShotPlanInput): ShotPlan {
     return createShotPlan(this.#database, projectId, input);
+  }
+
+  updateShotPlan(input: UpdateShotPlanInput): ShotPlan {
+    return updateShotPlan(this.#database, input);
   }
 
   createH3Job(shotPlanId: string, input: CreateH3JobInput): H3Job {

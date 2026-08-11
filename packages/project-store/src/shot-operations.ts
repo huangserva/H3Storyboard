@@ -2,11 +2,13 @@ import {
   CreateShotActualInputSchema,
   CreateShotPlanInputSchema,
   ReviewShotActualInputSchema,
+  UpdateShotPlanInputSchema,
   type CreateShotActualInput,
   type CreateShotPlanInput,
   type ReviewShotActualInput,
   type ShotActual,
   type ShotPlan,
+  type UpdateShotPlanInput,
 } from '@h3storyboard/protocol';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
@@ -47,8 +49,9 @@ export function createShotPlan(
        (id, project_id, script_version_id, ordinal, title, scene_id,
         duration_seconds, shot_size, camera_movement, action, dialogue, sound,
         prompt, continuity_mode, continuity_dependencies_json,
-        costume_state_json, reference_bindings_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        costume_state_json, reference_bindings_json, semantic_references_json,
+        opening_state_json, ending_state_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       projectId,
@@ -67,6 +70,9 @@ export function createShotPlan(
       JSON.stringify(input.continuity_dependencies),
       JSON.stringify(input.costume_state),
       JSON.stringify(input.reference_bindings),
+      JSON.stringify(input.semantic_references),
+      input.opening_state === null ? null : JSON.stringify(input.opening_state),
+      input.ending_state === null ? null : JSON.stringify(input.ending_state),
       now,
       now,
     );
@@ -77,6 +83,22 @@ export function createShotPlan(
     return mapShotPlan(
       db.prepare('SELECT * FROM shot_plans WHERE id = ?').get(id),
     );
+  })();
+}
+
+export function updateShotPlan(db: Database.Database,
+  rawInput: UpdateShotPlanInput): ShotPlan {
+  const input = parseInput(UpdateShotPlanInputSchema, rawInput);
+  return db.transaction(() => {
+    const existing = requireShot(db, input.shot_plan_id);
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE shot_plans SET semantic_references_json = ?,
+      opening_state_json = ?, ending_state_json = ?, updated_at = ? WHERE id = ?`)
+      .run(JSON.stringify(input.semantic_references ?? existing.semantic_references),
+        JSON.stringify(input.opening_state === undefined ? existing.opening_state : input.opening_state),
+        JSON.stringify(input.ending_state === undefined ? existing.ending_state : input.ending_state),
+        now, existing.id);
+    return mapShotPlan(db.prepare('SELECT * FROM shot_plans WHERE id = ?').get(existing.id));
   })();
 }
 

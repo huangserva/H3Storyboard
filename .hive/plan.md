@@ -25,7 +25,7 @@ last_review: 2026-08-11
 - [x] Production brief、项目生成锁与 job 不可变锁快照
 - [x] Asset 生命周期（candidate/approved/archived）+ 血缘 + immutable current-assets manifest
 - [x] **角色定义基础**：一等实体、canonical appearance、seed 族、参考图血缘与归档
-- [ ] 角色接入 per-shot 语义引用绑定
+- [x] 角色接入 per-shot 语义引用绑定 + opening/ending state + 确定性 H3 binding 编译
 - [ ] 代表性 take 审批门
 
 ### M1B · 单镜 H3 闭环 · open
@@ -76,6 +76,10 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 ## 2026-08-11 M1A Production context 交付状态
 - commit `33d9845`：migration v10、版本化 production brief、独立项目生成锁、H3 job 不可变 `{brief_version, manifest_version, mode_key, locked_at}` 快照。
 - 锁定期间 brief 追加、资产状态迁移、manifest 冻结均拒绝；Studio 已提供 brief 新版本与 engage/release 操作入口。
+
+## 2026-08-11 M1A Per-shot binding 编译交付状态
+- migration v11 将语义引用、opening/ending state 与 job 编译清单持久化；纯函数编译器只解析权威 manifest 内 approved 资产，按固定 slot 顺序拒绝缺失、无关和 Mode 能力不匹配输入。
+- Studio 已提供镜头语义引用与起止状态编辑、dry-run 编译及画布就绪徽标；“雨夜来信”第 1 镜已通过真实 API 编译为有序 r2v 输入。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。

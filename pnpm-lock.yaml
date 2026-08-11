@@ -72,6 +72,9 @@ importers:
 
   packages/project-store:
     dependencies:
+      '@h3storyboard/h3-provider':
+        specifier: workspace:*
+        version: link:../h3-provider
       '@h3storyboard/protocol':
         specifier: workspace:*
         version: link:../protocol

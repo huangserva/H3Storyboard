@@ -16,6 +16,7 @@ import { dispatchCharacterRoute } from './character-routes.js';
 import { dispatchAssetRoute } from './asset-routes.js';
 import { dispatchModeRoute } from './mode-routes.js';
 import { dispatchBriefRoute } from './brief-routes.js';
+import { dispatchShotProductionRoute } from './shot-production-routes.js';
 
 interface RouteResult {
   status: number;
@@ -147,6 +148,9 @@ export async function dispatchRoute(
   if (modeResult) return modeResult;
   const briefResult = await dispatchBriefRoute(request, store, method, pathname);
   if (briefResult) return briefResult;
+  const shotProductionResult = await dispatchShotProductionRoute(
+    request, store, method, pathname);
+  if (shotProductionResult) return shotProductionResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

@@ -8,6 +8,7 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../protocol" },
+    { "path": "../h3-provider" },
     { "path": "../task-engine" }
   ]
 }

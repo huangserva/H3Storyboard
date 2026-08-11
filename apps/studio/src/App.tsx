@@ -37,6 +37,7 @@ export function App() {
           busy={studio.busy}
           onNewShot={() => setShotComposerOpen(true)}
           onSelectShot={studio.selectShot}
+          onUpdateShot={studio.updateShot}
           selectedShot={studio.selectedShot}
           snapshot={studio.snapshot}
         />
