@@ -32,9 +32,9 @@ last_review: 2026-08-11
 - [x] M1B-1：TypeScript ComfyUI contract adapter、I2V graph、提交前 H3 lint 与只读 capability discovery
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
 - [ ] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + 同 prompt/seed 三方对照验证（见 research/2026-08-11-h3-hybrid-loader-assessment.md）
-- [ ] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
+- [x] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
 - [ ] M1B-3：协调 GPU 窗口后的真实 graph 出片、结果验证与 Mode evidence 升级
-- [ ] 下载、hash、canonical asset 注册、pending take
+- [x] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
 
 ### M2 · 无限画布 Studio · in_progress
@@ -105,3 +105,10 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 - 本地真实 HTTP stub 覆盖 upload→submit→poll→download→free 及 4 类失败路径；默认测试不依赖 ComfyUI。
 - `H3_COMFY_PROBE=1` 对 `127.0.0.1:8190` 只读探测通过：11 个所需节点全部 present；未调用真实 `/prompt`、`/upload/image` 或 `/free`，不把节点存在表述为端到端已验证。
 - 调研双产出：`research/2026-08-11-comfyui-h3-adapter-contract.md` + `reports/2026-08-11-comfyui-h3-adapter-contract.html`。
+
+## 2026-08-11 M1B-2 H3 lease worker 交付状态
+- commit `dbc2559`：`task-engine` 新增接口驱动的 H3 worker；API 仅在 `H3_WORKER=1` 时装配，默认关闭。
+- submit 后先持久化既有 `provider_job_id`；过期 lease reclaim 保留并继续 poll 同一 task。migration v14 只补 `cancel_reason`，不重复已有 task/output 列。
+- 下载非空 → 项目相对路径落盘 → 真实 sha256 → candidate canonical asset → pending take → completed job；三条 DB 记录在一个 immediate transaction 内可见。
+- 真实 HTTP stub + SQLite 覆盖成功、恢复零重提交、零字节失败无半成品、hash、取消原因；Protocol 升至 1.2，Studio task drawer 显示 worker/job/provider task 状态。
+- 本轮 `H3_WORKER` 未设置，对真实 8190/8188 零 POST；真机首跑仍属于 M1B-3。

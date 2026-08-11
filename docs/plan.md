@@ -27,8 +27,8 @@ M1A passed the required architecture, bug, test, and protocol reviews. Follow-up
 - [ ] Explicit image, first-frame, and last-frame binding slots.
 - [ ] `i2v`, `fl2v`, and `r2v` provider validation.
 - [ ] Promote live capabilities from node-presence evidence to `validated` only after a coordinated real-generation experiment.
-- [ ] Provider worker for submit-once, poll-same-task, cancel, restart recovery, and explicit rerun (store lifecycle is complete).
-- [ ] Download, non-empty verification, content hash, canonical asset registration, and pending-take creation before job completion.
+- [x] Provider worker for submit-once, poll-same-task, cancel audit, restart recovery, and explicit rerun as a new job (`dbc2559`; runtime remains opt-in).
+- [x] Download, non-empty verification, content hash, canonical candidate asset registration, and pending-take creation before atomic job completion.
 - [x] Actual result capture and QC verdict contract/API.
 
 ## M2 — multimodal H3
