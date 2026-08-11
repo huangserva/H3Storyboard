@@ -62,6 +62,7 @@ import {
   recoverExpiredH3Jobs,
 } from './job-lifecycle.js';
 import { migrateDatabase } from './migrations.js';
+import { ModeStore } from './mode-store.js';
 import {
   freezeCurrentAssetsManifest,
   getCurrentAssetsManifest,
@@ -80,6 +81,7 @@ import {
 
 export class ProjectStore {
   readonly #database: Database.Database;
+  readonly modes: ModeStore;
   #closed = false;
 
   constructor(databasePath: string) {
@@ -87,6 +89,7 @@ export class ProjectStore {
       mkdirSync(dirname(databasePath), { recursive: true });
     }
     this.#database = new Database(databasePath);
+    this.modes = new ModeStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
     this.#database.pragma('journal_mode = WAL');

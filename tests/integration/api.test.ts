@@ -10,6 +10,7 @@ import {
   CharacterSchema,
   CurrentAssetsManifestSnapshotSchema,
   H3JobSchema,
+  ModeSchema,
   ProjectSchema,
   ProjectSnapshotSchema,
   ShotActualSchema,
@@ -634,7 +635,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(8);
+    expect(schemaVersion.version).toBe(9);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -936,6 +937,83 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       { asset_id: scene.id, status: 'approved' },
     );
     await expectError(reapproveArchived, 409, 'ASSET_ARCHIVED');
+  });
+
+  test('persists global production modes and enforces evidence-backed transitions', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const first = await startApi(databasePath);
+    const declaration = {
+      generation_modes: ['i2v', 'fl2v'],
+      duration_seconds: { min: 2, max: 15 },
+      resolution: { min_width: 480, max_width: 480,
+        min_height: 864, max_height: 864 },
+      lora_profile_requirements: [],
+      provider_requirements: ['local_comfyui'],
+      extensions: { quality_gate: 'representative-take' },
+    };
+    const createdResponse = await postJson(`${first.origin}/api/modes`, {
+      key: 'cinematic-drama', title: 'Cinematic Drama',
+      description: 'Narrative and quality policy for dramatic cinematic work.',
+      capability_declaration: declaration,
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = ModeSchema.parse(
+      (await createdResponse.json() as { data: unknown }).data,
+    );
+    expect(created).toMatchObject({ key: 'cinematic-drama',
+      validation_status: 'candidate', evidence: null });
+
+    const duplicate = await postJson(`${first.origin}/api/modes`, {
+      key: 'cinematic-drama', title: 'Duplicate', description: 'Duplicate key.',
+      capability_declaration: declaration,
+    });
+    await expectError(duplicate, 409, 'MODE_KEY_CONFLICT');
+    const missingMode = await patchJson(`${first.origin}/api/modes`, {
+      mode_id: randomUUID(), title: 'Missing mode',
+    });
+    await expectError(missingMode, 404, 'MODE_NOT_FOUND');
+    const illegalJump = await patchJson(`${first.origin}/api/modes`, {
+      mode_id: created.id, validation_status: 'blocked',
+      evidence: 'Not yet validated.',
+    });
+    await expectError(illegalJump, 409, 'MODE_TRANSITION_INVALID');
+    const missingEvidence = await patchJson(`${first.origin}/api/modes`, {
+      mode_id: created.id, validation_status: 'validated',
+    });
+    await expectError(missingEvidence, 422, 'MODE_EVIDENCE_REQUIRED');
+
+    const validated = ModeSchema.parse((await (await patchJson(
+      `${first.origin}/api/modes`, { mode_id: created.id,
+        validation_status: 'validated', evidence: 'GPU comparison run 2026-08-11.' },
+    )).json() as { data: unknown }).data);
+    expect(validated.validation_status).toBe('validated');
+    const blockedWithoutEvidence = await patchJson(`${first.origin}/api/modes`, {
+      mode_id: created.id, validation_status: 'blocked',
+    });
+    await expectError(blockedWithoutEvidence, 422, 'MODE_EVIDENCE_REQUIRED');
+    const blocked = ModeSchema.parse((await (await patchJson(
+      `${first.origin}/api/modes`, { mode_id: created.id,
+        validation_status: 'blocked', evidence: 'Provider regression detected.' },
+    )).json() as { data: unknown }).data);
+    expect(blocked.validation_status).toBe('blocked');
+    const reopened = ModeSchema.parse((await (await patchJson(
+      `${first.origin}/api/modes`, { mode_id: created.id,
+        validation_status: 'candidate' },
+    )).json() as { data: unknown }).data);
+    expect(reopened).toMatchObject({ validation_status: 'candidate', evidence: null });
+
+    await closeApi(first.server);
+    const second = await startApi(databasePath);
+    const listed = ModeSchema.array().parse((await (await fetch(
+      `${second.origin}/api/modes`,
+    )).json() as { data: unknown }).data);
+    expect(listed).toEqual([reopened]);
+    const database = new Database(databasePath, { readonly: true });
+    const schemaVersion = database.prepare(
+      'SELECT MAX(version) AS version FROM schema_version',
+    ).get() as { version: number };
+    database.close();
+    expect(schemaVersion.version).toBe(9);
   });
 });
 

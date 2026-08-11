@@ -11,7 +11,7 @@
 
 ## M1A — director-ready production contract
 
-- [ ] Extensible production Mode registry with `candidate` / `validated` capability status; no hard-coded four-mode enum.
+- [x] Extensible production Mode registry with `candidate` / `validated` / `blocked` capability status; no hard-coded production-policy enum.
 - [ ] Versioned production brief, text style lock, project generation locks, and immutable lock snapshot on each job.
 - [ ] Asset lifecycle (`candidate` / `approved` / `archived`), stable revisions, replacement lineage, and an authoritative current-assets manifest.
 - [ ] Per-shot semantic reference requirements compiled into exact ordered H3 bindings; reject both missing and unrelated inputs.

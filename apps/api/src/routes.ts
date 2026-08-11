@@ -14,6 +14,7 @@ import { readJson } from './http.js';
 import { dispatchCanvasRoute } from './canvas-routes.js';
 import { dispatchCharacterRoute } from './character-routes.js';
 import { dispatchAssetRoute } from './asset-routes.js';
+import { dispatchModeRoute } from './mode-routes.js';
 
 interface RouteResult {
   status: number;
@@ -141,6 +142,8 @@ export async function dispatchRoute(
   if (characterResult) return characterResult;
   const assetResult = await dispatchAssetRoute(request, store, method, pathname);
   if (assetResult) return assetResult;
+  const modeResult = await dispatchModeRoute(request, store, method, pathname);
+  if (modeResult) return modeResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

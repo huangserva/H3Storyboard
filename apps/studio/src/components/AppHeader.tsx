@@ -2,12 +2,14 @@ interface AppHeaderProps {
   projectTitle?: string | undefined;
   scriptVersion?: number | undefined;
   onNewProject: () => void;
+  onOpenModes: () => void;
 }
 
 export function AppHeader({
   projectTitle,
   scriptVersion,
   onNewProject,
+  onOpenModes,
 }: AppHeaderProps) {
   return (
     <header className="app-header">
@@ -31,6 +33,7 @@ export function AppHeader({
         <span className="local-status">
           <i aria-hidden="true" /> 本地存储
         </span>
+        <button className="button" type="button" onClick={onOpenModes}>MODES</button>
         <button className="button button-primary" type="button" onClick={onNewProject}>
           <span aria-hidden="true">＋</span> 新建项目
         </button>

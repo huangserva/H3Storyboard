@@ -8,10 +8,13 @@ import type {
   CreateProjectInput,
   CreateShotPlanInput,
   CurrentAssetsManifestSnapshot,
+  CreateModeInput,
+  Mode,
   Project,
   ProjectSnapshot,
   UpdateCanvasNodeInput,
   UpdateAssetInput,
+  UpdateModeInput,
   UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 
@@ -176,4 +179,20 @@ export async function freezeAssetManifest(
   return request<CurrentAssetsManifestSnapshot>(
     `/api/projects/${projectId}/manifests`, { method: 'POST' },
   );
+}
+
+export async function listModes(): Promise<Mode[]> {
+  return request<Mode[]>('/api/modes');
+}
+
+export async function createMode(input: CreateModeInput): Promise<Mode> {
+  return request<Mode>('/api/modes', {
+    method: 'POST', body: JSON.stringify(input),
+  });
+}
+
+export async function updateMode(input: UpdateModeInput): Promise<Mode> {
+  return request<Mode>('/api/modes', {
+    method: 'PATCH', body: JSON.stringify(input),
+  });
 }

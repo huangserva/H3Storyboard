@@ -5,6 +5,7 @@ import {
   CharacterSchema,
   H3JobSchema,
   JobEventSchema,
+  ModeSchema,
   ProjectSchema,
   ScriptVersionSchema,
   ShotActualSchema,
@@ -15,6 +16,7 @@ import {
   type CharacterReference,
   type H3Job,
   type JobEvent,
+  type Mode,
   type Project,
   type ScriptVersion,
   type ShotActual,
@@ -128,3 +130,11 @@ export function mapH3Job(row: unknown): H3Job {
 
 export const mapJobEvent = (row: unknown): JobEvent =>
   decode(JobEventSchema, objectRow(row));
+
+export function mapMode(row: unknown): Mode {
+  const record = objectRow(row);
+  return decode(ModeSchema, {
+    ...record,
+    capability_declaration: jsonColumn(record, 'capability_declaration_json'),
+  });
+}

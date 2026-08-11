@@ -21,7 +21,8 @@ last_review: 2026-08-11
 - 详细见 docs/plan.md（工程侧 delivery plan 以 docs/plan.md 为准）
 
 ### M1A · 导演级生产契约 · open
-- [ ] Mode registry、production brief、锁快照
+- [x] 可扩展 production Mode registry + candidate/validated/blocked 证据状态机
+- [ ] Production brief、项目生成锁与 job 锁快照
 - [x] Asset 生命周期（candidate/approved/archived）+ 血缘 + immutable current-assets manifest
 - [x] **角色定义基础**：一等实体、canonical appearance、seed 族、参考图血缘与归档
 - [ ] 角色接入 per-shot 语义引用绑定
@@ -67,6 +68,10 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 ## 2026-08-11 M1A 资产交付状态
 - commit `d2490e3`：migration v8、Asset candidate/approved/archived 状态机、replacement 血缘、不可变且项目内单调递增的 current-assets manifest。
 - 角色参考图可关联 `asset_id`，旧 `uri` 契约保留；Studio 已增加资产登记、审批、归档与 manifest 冻结入口。
+
+## 2026-08-11 M1A Mode registry 交付状态
+- migration v9：全局 production Mode、可扩展 capability declaration、candidate→validated→blocked→candidate 证据状态机。
+- Studio 已增加 Mode 创建、promote、block、reopen 入口；`r2v-hybrid` 保持 candidate，等待 M1B GPU 对照证据。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。

@@ -3,6 +3,7 @@ export * from './asset-manifest.js';
 export * from './canvas.js';
 export * from './character.js';
 export * from './h3-job.js';
+export * from './mode.js';
 export * from './project.js';
 export * from './shot.js';
 export * from './snapshot.js';

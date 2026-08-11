@@ -4,12 +4,14 @@ import { DirectorWorkspace } from './components/DirectorWorkspace.js';
 import { ProjectComposer } from './components/ProjectComposer.js';
 import { ProjectRail } from './components/ProjectRail.js';
 import { ShotPlanForm } from './components/ShotPlanForm.js';
+import { ModeRegistryPanel } from './components/ModeRegistryPanel.js';
 import { useStudio } from './lib/use-studio.js';
 
 export function App() {
   const studio = useStudio();
   const [projectComposerOpen, setProjectComposerOpen] = useState(false);
   const [shotComposerOpen, setShotComposerOpen] = useState(false);
+  const [modesOpen, setModesOpen] = useState(false);
   const suggestedScene =
     studio.selectedShot?.scene_id ?? studio.snapshot?.shot_plans.at(-1)?.scene_id ?? 'SCENE-01';
 
@@ -17,6 +19,7 @@ export function App() {
     <div className="app-shell">
       <AppHeader
         onNewProject={() => setProjectComposerOpen(true)}
+        onOpenModes={() => setModesOpen(true)}
         projectTitle={studio.snapshot?.project.title}
         scriptVersion={studio.snapshot?.script_version.version}
       />
@@ -54,6 +57,7 @@ export function App() {
           suggestedScene={suggestedScene}
         />
       ) : null}
+      {modesOpen ? <ModeRegistryPanel onClose={() => setModesOpen(false)} /> : null}
       {studio.notice ? (
         <button
           aria-live="polite"

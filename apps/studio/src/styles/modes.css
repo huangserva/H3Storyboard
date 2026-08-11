@@ -1,0 +1,33 @@
+.mode-registry { background: rgba(13, 16, 15, .98); border-left: 1px solid var(--line);
+  bottom: 0; box-shadow: var(--shadow); display: flex; flex-direction: column;
+  position: fixed; right: 0; top: 0; width: 420px; z-index: 40; }
+.mode-registry > header, .mode-registry > header > div, .mode-list article header,
+.mode-list article header > div, .mode-list article footer { display: flex; }
+.mode-registry > header { align-items: center; border-bottom: 1px solid var(--line);
+  justify-content: space-between; padding: 15px; }
+.mode-registry > header > div:first-child, .mode-list article header > div {
+  align-items: flex-start; flex-direction: column; gap: 5px; }
+.mode-registry button { background: transparent; color: var(--muted); cursor: pointer;
+  font: 650 8px/1 var(--mono); padding: 8px; }
+.mode-registry button:hover:not(:disabled) { color: var(--acid); }
+.mode-form { border-bottom: 1px solid var(--line); display: grid; gap: 9px;
+  max-height: 56%; overflow-y: auto; padding: 13px; }
+.mode-form label { display: grid; gap: 5px; }
+.mode-form label span { color: var(--faint); font: 650 7px/1 var(--mono); }
+.mode-form input, .mode-form textarea, .mode-list article > input { background: var(--ink-0);
+  border: 1px solid var(--line); border-radius: 3px; font: 600 9px/1.45 var(--mono); padding: 8px; }
+.mode-form textarea { min-height: 58px; resize: vertical; }
+.mode-form textarea.mode-capability { min-height: 180px; }
+.mode-list { overflow-y: auto; }
+.mode-list article { background: var(--ink-2); border-bottom: 1px solid var(--line); padding: 13px; }
+.mode-list article header { align-items: center; justify-content: space-between; }
+.mode-list article header strong { font-size: 12px; }
+.mode-list article header small, .mode-list article > small { color: var(--faint); font: 600 7px/1 var(--mono); }
+.mode-list article header span { color: var(--planned); font: 650 7px/1 var(--mono); text-transform: uppercase; }
+.mode-list article[data-status="validated"] header span { color: var(--acid); }
+.mode-list article[data-status="blocked"] header span { color: var(--danger); }
+.mode-list article p { color: var(--muted); font-size: 10px; line-height: 1.5; margin: 9px 0; }
+.mode-list article > input { box-sizing: border-box; margin-top: 10px; width: 100%; }
+.mode-list article footer { justify-content: flex-end; margin-top: 5px; }
+.mode-error { color: var(--danger); font: 600 8px/1.5 var(--mono); margin: 0; padding: 9px 13px; }
+@media (max-width: 720px) { .mode-registry { width: 100%; } }
