@@ -173,6 +173,22 @@ export type ReviewShotActualInput = z.infer<
   typeof ReviewShotActualInputSchema
 >;
 
+export const RepresentativeStatusSchema = z.enum([
+  'none', 'pending', 'approved', 'rejected',
+]);
+export const MarkRepresentativeInputSchema = z.object({
+  representative: z.boolean(),
+});
+export type MarkRepresentativeInput = z.infer<
+  typeof MarkRepresentativeInputSchema
+>;
+export const ReviewRepresentativeInputSchema = z.object({
+  representative_status: z.enum(['approved', 'rejected']),
+});
+export type ReviewRepresentativeInput = z.infer<
+  typeof ReviewRepresentativeInputSchema
+>;
+
 export const ShotActualSchema = z.object({
   ...shotActualFields,
   qc_verdict: QcVerdictSchema,
@@ -182,5 +198,8 @@ export const ShotActualSchema = z.object({
   attempt_number: z.number().int().positive(),
   created_at: TimestampSchema,
   reviewed_at: TimestampSchema.nullable(),
+  is_representative: z.boolean(),
+  representative_status: RepresentativeStatusSchema,
+  approved_at: TimestampSchema.nullable(),
 });
 export type ShotActual = z.infer<typeof ShotActualSchema>;

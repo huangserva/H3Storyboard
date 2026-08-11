@@ -136,3 +136,24 @@
   display: block;
   height: 100%;
 }
+.representative-controls {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.representative-controls > span { color: var(--faint); font: 650 8px/1 var(--mono); }
+.representative-controls > span[data-status="approved"] { color: var(--teal); }
+.representative-controls > span[data-status="pending"] { color: var(--acid); }
+.representative-controls > span[data-status="rejected"] { color: var(--danger); }
+.representative-controls > div { display: flex; gap: 5px; }
+.representative-controls button {
+  background: var(--ink-4);
+  border-radius: 3px;
+  color: var(--paper);
+  cursor: pointer;
+  font: 600 8px/1 var(--mono);
+  padding: 6px 7px;
+}

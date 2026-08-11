@@ -38,6 +38,8 @@ export function App() {
           onNewShot={() => setShotComposerOpen(true)}
           onSelectShot={studio.selectShot}
           onUpdateShot={studio.updateShot}
+          onMarkRepresentative={studio.markRepresentative}
+          onReviewRepresentative={studio.reviewRepresentative}
           selectedShot={studio.selectedShot}
           snapshot={studio.snapshot}
         />

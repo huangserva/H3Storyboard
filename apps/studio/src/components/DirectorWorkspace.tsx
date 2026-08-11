@@ -19,6 +19,9 @@ interface DirectorWorkspaceProps {
   onNewShot: () => void;
   onSelectShot: (id: string) => void;
   onUpdateShot: (input: UpdateShotPlanInput) => Promise<boolean>;
+  onMarkRepresentative: (actualId: string, representative: boolean) => Promise<boolean>;
+  onReviewRepresentative: (actualId: string,
+    status: 'approved' | 'rejected') => Promise<boolean>;
 }
 
 export function DirectorWorkspace({
@@ -28,6 +31,8 @@ export function DirectorWorkspace({
   onNewShot,
   onSelectShot,
   onUpdateShot,
+  onMarkRepresentative,
+  onReviewRepresentative,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'director' | 'canvas'>('canvas');
   const [productionOpen, setProductionOpen] = useState(false);
@@ -40,6 +45,8 @@ export function DirectorWorkspace({
       !latest || actual.attempt_number > latest.attempt_number ? actual : latest,
     null,
   );
+  const displayedActual = actuals.find(({ is_representative }) =>
+    is_representative) ?? currentActual;
 
   if (!snapshot) {
     return (
@@ -84,11 +91,14 @@ export function DirectorWorkspace({
       ) : <div className="director-grid">
         <div className="comparison-grid">
           <PlannedShotPanel shot={selectedShot} />
-          <ActualShotPanel actual={currentActual} hasSelectedShot={Boolean(selectedShot)} />
+          <ActualShotPanel actual={displayedActual} busy={busy}
+            hasSelectedShot={Boolean(selectedShot)}
+            onMarkRepresentative={onMarkRepresentative}
+            onReviewRepresentative={onReviewRepresentative} />
         </div>
         <ReferencePanel shot={selectedShot} />
       </div>}
-      {view === 'director' ? <TaskDrawer actual={currentActual} shot={selectedShot} /> : null}
+      {view === 'director' ? <TaskDrawer actual={displayedActual} shot={selectedShot} /> : null}
       {productionOpen ? <Suspense fallback={<div className="progress-bar" />}>
         <ProductionBriefPanel projectId={snapshot.project.id}
           onClose={() => setProductionOpen(false)} />

@@ -20,13 +20,13 @@ last_review: 2026-08-11
 - [x] 四路 review 全部 B- 以上
 - 详细见 docs/plan.md（工程侧 delivery plan 以 docs/plan.md 为准）
 
-### M1A · 导演级生产契约 · open
+### M1A · 导演级生产契约 · review_pending
 - [x] 可扩展 production Mode registry + candidate/validated/blocked 证据状态机
 - [x] Production brief、项目生成锁与 job 不可变锁快照
 - [x] Asset 生命周期（candidate/approved/archived）+ 血缘 + immutable current-assets manifest
 - [x] **角色定义基础**：一等实体、canonical appearance、seed 族、参考图血缘与归档
 - [x] 角色接入 per-shot 语义引用绑定 + opening/ending state + 确定性 H3 binding 编译
-- [ ] 代表性 take 审批门
+- [x] 代表性 take 审批门（与单条 QC 独立；重复 job 需 approved representative 或审计 override）
 
 ### M1B · 单镜 H3 闭环 · open
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
@@ -80,6 +80,11 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 ## 2026-08-11 M1A Per-shot binding 编译交付状态
 - commit `58fc506`：migration v11 将语义引用、opening/ending state 与 job 编译清单持久化；纯函数编译器只解析权威 manifest 内 approved 资产，按固定 slot 顺序拒绝缺失、无关和 Mode 能力不匹配输入。
 - Studio 已提供镜头语义引用与起止状态编辑、dry-run 编译及画布就绪徽标；“雨夜来信”第 1 镜已通过真实 API 编译为有序 r2v 输入。
+
+## 2026-08-11 M1A Representative take gate 交付状态
+- migration v12 将代表 Take 状态与 job 门禁 override 原因持久化；QC verdict 与代表审批保持独立，第二个及后续同镜 job 必须已有 approved representative 或显式记录 override。
+- Studio 已提供标记、批准、拒绝、撤销操作；“雨夜来信”演示 Take 已标记并批准，同时保留 `qc_verdict=pending` 以证明两套裁决互不替代。
+- M1A 工程 bullet 已全部落地，里程碑保持 `review_pending`，待 AGENTS.md 要求的架构、缺陷、测试、协议四路独立 review 后再宣告 done。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。

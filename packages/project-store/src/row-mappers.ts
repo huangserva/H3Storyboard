@@ -127,7 +127,13 @@ export function mapShotPlan(row: unknown): ShotPlan {
 }
 
 export function mapShotActual(row: unknown): ShotActual {
-  return decode(ShotActualSchema, objectRow(row));
+  const record = objectRow(row);
+  return decode(ShotActualSchema, {
+    ...record,
+    is_representative: record.is_representative === 1,
+    representative_status: record.representative_status ?? 'none',
+    approved_at: record.approved_at ?? null,
+  });
 }
 
 export function mapH3Job(row: unknown): H3Job {
@@ -140,6 +146,7 @@ export function mapH3Job(row: unknown): H3Job {
       ? null : jsonColumn(record, 'lock_snapshot_json'),
     compiled_bindings: record.compiled_bindings_json == null ? null :
       jsonColumn(record, 'compiled_bindings_json'),
+    gate_override_reason: record.gate_override_reason ?? null,
   });
 }
 

@@ -22,6 +22,7 @@ import type {
   UpdateProjectGenerationLockInput,
   UpdateCharacterInput,
   UpdateShotPlanInput,
+  ShotActual,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -116,6 +117,20 @@ export async function compileShotBindings(
   return request<CompiledBindingsResult>(
     `/api/shots/${shotPlanId}/compile_bindings`, { method: 'POST' },
   );
+}
+
+export async function markRepresentative(actualId: string,
+  representative: boolean): Promise<ShotActual> {
+  return request<ShotActual>(`/api/actuals/${actualId}/representative`, {
+    method: 'POST', body: JSON.stringify({ representative }),
+  });
+}
+
+export async function reviewRepresentative(actualId: string,
+  representative_status: 'approved' | 'rejected'): Promise<ShotActual> {
+  return request<ShotActual>(`/api/actuals/${actualId}/representative/review`, {
+    method: 'POST', body: JSON.stringify({ representative_status }),
+  });
 }
 
 export async function listCanvasNodes(projectId: string): Promise<CanvasNode[]> {

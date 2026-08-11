@@ -65,6 +65,7 @@ import {
 import { migrateDatabase } from './migrations.js';
 import { ModeStore } from './mode-store.js';
 import { ProductionStore } from './production-store.js';
+import { TakeStore } from './take-store.js';
 import {
   freezeCurrentAssetsManifest,
   getCurrentAssetsManifest,
@@ -86,6 +87,7 @@ export class ProjectStore {
   readonly #database: Database.Database;
   readonly modes: ModeStore;
   readonly production: ProductionStore;
+  readonly takes: TakeStore;
   #closed = false;
   constructor(databasePath: string) {
     if (databasePath !== ':memory:') {
@@ -94,6 +96,7 @@ export class ProjectStore {
     this.#database = new Database(databasePath);
     this.modes = new ModeStore(this.#database);
     this.production = new ProductionStore(this.#database);
+    this.takes = new TakeStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
     this.#database.pragma('journal_mode = WAL');
@@ -106,7 +109,6 @@ export class ProjectStore {
       throw error;
     }
   }
-
   createProject(input: CreateProjectInput): Project {
     return createProject(this.#database, input);
   }
@@ -114,7 +116,6 @@ export class ProjectStore {
   listProjects(): Project[] {
     return listProjects(this.#database);
   }
-
   getProjectSnapshot(projectId: string): ProjectSnapshot {
     return getProjectSnapshot(this.#database, projectId);
   }

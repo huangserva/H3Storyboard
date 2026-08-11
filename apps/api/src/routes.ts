@@ -17,6 +17,7 @@ import { dispatchAssetRoute } from './asset-routes.js';
 import { dispatchModeRoute } from './mode-routes.js';
 import { dispatchBriefRoute } from './brief-routes.js';
 import { dispatchShotProductionRoute } from './shot-production-routes.js';
+import { dispatchRepresentativeRoute } from './representative-routes.js';
 
 interface RouteResult {
   status: number;
@@ -151,6 +152,9 @@ export async function dispatchRoute(
   const shotProductionResult = await dispatchShotProductionRoute(
     request, store, method, pathname);
   if (shotProductionResult) return shotProductionResult;
+  const representativeResult = await dispatchRepresentativeRoute(
+    request, store, method, pathname);
+  if (representativeResult) return representativeResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

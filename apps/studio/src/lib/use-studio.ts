@@ -111,6 +111,36 @@ export function useStudio() {
     }
   }, []);
 
+  const updateActual = useCallback(async (
+    action: () => Promise<ProjectSnapshot['shot_actuals'][number]>,
+    successText: string,
+  ) => {
+    setBusy(true);
+    try {
+      const actual = await action();
+      setSnapshot((current) => current ? { ...current,
+        shot_actuals: current.shot_actuals.map((item) =>
+          item.id === actual.id ? actual : item) } : current);
+      setNotice({ tone: 'success', text: successText });
+      return true;
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeError(error) });
+      return false;
+    } finally { setBusy(false); }
+  }, []);
+
+  const markRepresentative = useCallback((actualId: string,
+    representative: boolean) => updateActual(
+      () => api.markRepresentative(actualId, representative),
+      representative ? '已标记代表 Take，等待导演批准' : '已撤销代表 Take',
+    ), [updateActual]);
+
+  const reviewRepresentative = useCallback((actualId: string,
+    status: 'approved' | 'rejected') => updateActual(
+      () => api.reviewRepresentative(actualId, status),
+      status === 'approved' ? '代表 Take 已批准，批量门禁已打开' : '代表 Take 已拒绝',
+    ), [updateActual]);
+
   return {
     projects,
     snapshot,
@@ -123,6 +153,8 @@ export function useStudio() {
     addProject,
     addShot,
     updateShot,
+    markRepresentative,
+    reviewRepresentative,
     dismissNotice: () => setNotice(null),
   };
 }

@@ -90,6 +90,7 @@ function completeJob(
     steps: 28,
     idempotency_key: idempotencyKey,
     input_bindings: [],
+    gate_override_reason: 'Store integration repeated generation.',
   });
   const claimed = store.claimH3Job(draft.id);
   expect(claimed.attempt).toBe(1);
@@ -183,6 +184,7 @@ describe('ProjectStore', () => {
       steps: 20,
       idempotency_key: 'legacy-active-job',
       input_bindings: [],
+      gate_override_reason: 'Store integration repeated generation.',
     });
     const activeClaim = first.claimH3Job(activeDraft.id);
     first.markH3JobQueued(
@@ -291,7 +293,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(11);
+    ).toBe(12);
     migratedVersion.close();
   });
 
@@ -321,6 +323,7 @@ describe('ProjectStore', () => {
       steps: 28,
       idempotency_key: 'shot-1-attempt-1',
       input_bindings: [],
+      gate_override_reason: 'Store integration repeated generation.',
     });
     expect(sameJob.id).toBe(firstJob.id);
     try {
@@ -334,6 +337,7 @@ describe('ProjectStore', () => {
         steps: 28,
         idempotency_key: 'shot-1-attempt-1',
         input_bindings: [],
+        gate_override_reason: 'Store integration repeated generation.',
       });
       throw new Error('Expected conflicting idempotency input to fail');
     } catch (error) {

@@ -52,6 +52,7 @@ export function createH3Job(
       }
       return existing;
     }
+    enforceRepresentativeGate(db, shotPlanId, input.gate_override_reason);
     const lockSnapshot = buildJobLockSnapshot(db, shot.project_id);
     const compiled = compileShotBindings(db, shotPlanId);
     if (input.mode !== 'v2v' && input.mode !== 'rv2v') {
@@ -73,9 +74,10 @@ export function createH3Job(
         duration_seconds, seed, steps, input_bindings_json, idempotency_key,
         attempt, status, provider_job_id, output_asset_id, error_code,
         error_message, created_at, updated_at, completed_at, lease_expires_at,
-        heartbeat_at, lock_snapshot_json, compiled_bindings_json)
+        heartbeat_at, lock_snapshot_json, compiled_bindings_json,
+        gate_override_reason)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', NULL, NULL,
-               NULL, NULL, ?, ?, NULL, NULL, NULL, ?, ?)`,
+               NULL, NULL, ?, ?, NULL, NULL, NULL, ?, ?, ?)`,
     ).run(
       id,
       shot.project_id,
@@ -93,6 +95,7 @@ export function createH3Job(
       now,
       JSON.stringify(lockSnapshot),
       JSON.stringify(compiled.bindings),
+      input.gate_override_reason ?? null,
     );
     appendJobEvent(db, id, null, 'draft', 'Job created', now);
     db.prepare('UPDATE projects SET updated_at = ? WHERE id = ?').run(
@@ -113,7 +116,21 @@ function jobInputFingerprint(input: CreateH3JobInput | H3Job): string {
     seed: input.seed,
     steps: input.steps,
     input_bindings: input.input_bindings,
+    gate_override_reason: input.gate_override_reason ?? null,
   });
+}
+
+function enforceRepresentativeGate(db: Database.Database, shotPlanId: string,
+  overrideReason: string | null | undefined): void {
+  const count = db.prepare('SELECT COUNT(*) AS count FROM h3_jobs WHERE shot_plan_id = ?')
+    .get(shotPlanId) as { count: number };
+  if (count.count === 0 || overrideReason) return;
+  const representative = db.prepare(`SELECT id FROM shot_actuals
+    WHERE shot_plan_id = ? AND is_representative = 1
+      AND representative_status = 'approved'`).get(shotPlanId);
+  if (!representative) throw new StoreError('TAKE_GATE_BLOCKED',
+    'Approve a representative take or provide gate_override_reason',
+    { shot_plan_id: shotPlanId });
 }
 
 export function claimH3Job(

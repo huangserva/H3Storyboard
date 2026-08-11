@@ -43,6 +43,7 @@ const jobFields = {
   steps: z.number().int().min(1).max(100),
   idempotency_key: NonEmptyTextSchema.min(8).max(200),
   input_bindings: z.array(AssetBindingSchema),
+  gate_override_reason: NonEmptyTextSchema.max(1_000).nullable().optional(),
 };
 
 const jobModeSchemas = [
@@ -94,6 +95,7 @@ export const H3JobSchema = z.object({
   completed_at: TimestampSchema.nullable(),
   lock_snapshot: JobLockSnapshotSchema.nullable(),
   compiled_bindings: z.array(CompiledBindingSchema).nullable(),
+  gate_override_reason: NonEmptyTextSchema.max(1_000).nullable(),
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 

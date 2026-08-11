@@ -677,7 +677,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(11);
+    expect(schemaVersion.version).toBe(12);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -1055,7 +1055,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(11);
+    expect(schemaVersion.version).toBe(12);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {
@@ -1271,6 +1271,96 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .find(({ id }) => id === job.id);
     expect(persisted?.compiled_bindings).toEqual(compiled.bindings);
   });
+
+  test('gates repeated jobs on an explicitly approved representative take', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+    const project = ProjectSchema.parse((await (await postJson(
+      `${api.origin}/api/projects`, { title: 'Representative gate',
+        script_title: 'Representative gate script', script_content:
+          'A complete shot establishes the quality baseline before repeated generation.' },
+    )).json() as { data: unknown }).data);
+    const shot = ShotPlanSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/shots`, validShotInput(),
+    )).json() as { data: unknown }).data);
+    await prepareApiGenerationContext(api.origin, project.id, []);
+    const firstJob = H3JobSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'representative-first', [], null),
+    )).json() as { data: unknown }).data);
+    const blocked = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'representative-blocked', [], null));
+    await expectError(blocked, 409, 'TAKE_GATE_BLOCKED');
+    const overrideReason = 'Director requests a diagnostic comparison before approval.';
+    const overrideJob = H3JobSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'representative-override', [], overrideReason),
+    )).json() as { data: unknown }).data);
+    expect(overrideJob.gate_override_reason).toBe(overrideReason);
+
+    const firstOutput = await createAssetViaApi(api.origin, project.id, {
+      kind: 'video', uri: 'outputs/representative-first.mp4', content_hash: null,
+    });
+    const worker = openProjectStore(databasePath);
+    completeJobWithStore(worker, firstJob.id, firstOutput.id, 'rep-first-provider');
+    worker.close();
+    const firstActual = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/actuals`, { job_id: firstJob.id,
+        output_asset_id: firstOutput.id, observed_description: 'Baseline take.',
+        deviation_notes: '', qc_verdict: 'pending' },
+    )).json() as { data: unknown }).data);
+    expect(firstActual).toMatchObject({ qc_verdict: 'pending',
+      is_representative: false, representative_status: 'none' });
+    const marked = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/actuals/${firstActual.id}/representative`,
+      { representative: true },
+    )).json() as { data: unknown }).data);
+    expect(marked).toMatchObject({ qc_verdict: 'pending',
+      is_representative: true, representative_status: 'pending' });
+    const representativeApproved = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/actuals/${firstActual.id}/representative/review`,
+      { representative_status: 'approved' },
+    )).json() as { data: unknown }).data);
+    expect(representativeApproved.qc_verdict).toBe('pending');
+    expect(representativeApproved.approved_at).not.toBeNull();
+    const duplicateRepresentativeReview = await postJson(
+      `${api.origin}/api/actuals/${firstActual.id}/representative/review`,
+      { representative_status: 'rejected' });
+    await expectError(duplicateRepresentativeReview, 409,
+      'TAKE_REPRESENTATIVE_STATUS_INVALID');
+    expect((await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'representative-open-gate', [], null))).status).toBe(201);
+    const qcApproved = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/actuals/${firstActual.id}/review`,
+      { qc_verdict: 'approved' },
+    )).json() as { data: unknown }).data);
+    expect(qcApproved.representative_status).toBe('approved');
+
+    const secondOutput = await createAssetViaApi(api.origin, project.id, {
+      kind: 'video', uri: 'outputs/representative-second.mp4', content_hash: null,
+    });
+    const secondWorker = openProjectStore(databasePath);
+    completeJobWithStore(secondWorker, overrideJob.id, secondOutput.id,
+      'rep-second-provider');
+    secondWorker.close();
+    const secondActual = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/actuals`, { job_id: overrideJob.id,
+        output_asset_id: secondOutput.id, observed_description: 'Comparison take.',
+        deviation_notes: '', qc_verdict: 'pending' },
+    )).json() as { data: unknown }).data);
+    const conflict = await postJson(
+      `${api.origin}/api/actuals/${secondActual.id}/representative`,
+      { representative: true });
+    await expectError(conflict, 409, 'TAKE_REPRESENTATIVE_CONFLICT');
+    expect((await postJson(
+      `${api.origin}/api/actuals/${firstActual.id}/representative`,
+      { representative: false })).status).toBe(200);
+    const transferred = ShotActualSchema.parse((await (await postJson(
+      `${api.origin}/api/actuals/${secondActual.id}/representative`,
+      { representative: true },
+    )).json() as { data: unknown }).data);
+    expect(transferred.representative_status).toBe('pending');
+  });
 });
 
 function productionCapability() {
@@ -1393,6 +1483,7 @@ function h3JobInput(
   mode: string,
   idempotencyKey: string,
   inputBindings: readonly unknown[],
+  gateOverrideReason: string | null = 'Integration test repeated generation.',
 ): Record<string, unknown> {
   return {
     mode,
@@ -1404,7 +1495,18 @@ function h3JobInput(
     steps: 20,
     idempotency_key: idempotencyKey,
     input_bindings: inputBindings,
+    ...(gateOverrideReason === null ? {} : {
+      gate_override_reason: gateOverrideReason,
+    }),
   };
+}
+
+function completeJobWithStore(store: ReturnType<typeof openProjectStore>,
+  jobId: string, outputAssetId: string, providerJobId: string): void {
+  const claimed = store.claimH3Job(jobId);
+  store.markH3JobQueued(jobId, claimed.lease_token!, providerJobId);
+  store.markH3JobRunning(jobId, claimed.lease_token!);
+  store.completeH3Job(jobId, claimed.lease_token!, outputAssetId);
 }
 
 async function getSnapshot(

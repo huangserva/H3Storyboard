@@ -216,6 +216,7 @@ describe('durable H3 job leases', () => {
       seed: 8,
       steps: 20,
       idempotency_key: 'input-cannot-be-output',
+      gate_override_reason: 'Lineage test requires an additional job.',
       input_bindings: [
         {
           asset_id: inputVideo.id,
@@ -322,6 +323,7 @@ function createDraft(store: ProjectStore, shotId: string, key: string) {
     steps: 20,
     idempotency_key: key,
     input_bindings: [],
+    gate_override_reason: 'Lease recovery requires repeated draft jobs.',
   });
 }
 

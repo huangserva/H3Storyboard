@@ -16,7 +16,7 @@
 - [x] Asset lifecycle (`candidate` / `approved` / `archived`), stable revisions, replacement lineage, and an authoritative current-assets manifest.
 - [x] Per-shot semantic reference requirements compiled into exact ordered H3 bindings; reject both missing and unrelated inputs.
 - [x] Explicit opening and ending state for character position, appearance state, prop custody/damage, scene state, and sound handoff.
-- [ ] Representative-take approval gate before any batch submission.
+- [x] Representative-take approval gate before any repeated-shot or future batch submission, with an auditable override reason.
 - [x] Resolve the camera-shot versus multi-shot generation-segment boundary before Protocol 1.1 migration (ADR: one `ShotPlan` is one generation segment).
 
 ## M1B — single-shot H3 loop
