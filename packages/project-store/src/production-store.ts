@@ -40,12 +40,19 @@ export class ProductionStore {
     return this.database.transaction(() => {
       requireProject(this.database, projectId);
       requireGenerationUnlocked(this.database, projectId);
-      if (!this.database.prepare('SELECT id FROM modes WHERE key = ?')
-        .get(input.mode_key)) {
+      const mode = this.database.prepare(
+        'SELECT validation_status FROM modes WHERE key = ?')
+        .get(input.mode_key) as { validation_status: string } | undefined;
+      if (!mode) {
         throw new StoreError('BRIEF_MODE_NOT_FOUND', 'Mode does not exist', {
           mode_key: input.mode_key,
         });
       }
+      // Candidate remains usable until M1B produces provider validation evidence.
+      if (mode.validation_status === 'blocked') throw new StoreError(
+        'MODE_BLOCKED', 'Blocked modes cannot create production briefs', {
+          mode_key: input.mode_key,
+        });
       const latest = this.database.prepare(
         `SELECT MAX(brief_version) AS version FROM production_briefs
          WHERE project_id = ?`,

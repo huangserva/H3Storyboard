@@ -21,6 +21,7 @@ import {
   validateAssetBindings,
   validateContinuityDependencies,
 } from './store-guards.js';
+import { requireGenerationUnlocked } from './generation-locks.js';
 
 export function createShotPlan(
   db: Database.Database,
@@ -91,6 +92,7 @@ export function updateShotPlan(db: Database.Database,
   const input = parseInput(UpdateShotPlanInputSchema, rawInput);
   return db.transaction(() => {
     const existing = requireShot(db, input.shot_plan_id);
+    requireGenerationUnlocked(db, existing.project_id);
     const now = new Date().toISOString();
     db.prepare(`UPDATE shot_plans SET semantic_references_json = ?,
       opening_state_json = ?, ending_state_json = ?, updated_at = ? WHERE id = ?`)

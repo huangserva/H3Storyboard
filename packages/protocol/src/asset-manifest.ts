@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { IdSchema, TimestampSchema } from './common.js';
+import { IdSchema, RelativeAssetPathSchema, TimestampSchema } from './common.js';
 
 export const UpdateAssetInputSchema = z
   .object({
     asset_id: IdSchema,
-    uri: z.string().trim().min(1).max(2_000).optional(),
+    uri: RelativeAssetPathSchema.max(2_000).optional(),
     content_hash: z.string().trim().min(1).nullable().optional(),
     status: z.enum(['candidate', 'approved', 'archived']).optional(),
   })

@@ -59,9 +59,9 @@ export function createAsset(db: Database.Database, projectId: string,
     }
     if (input.replaces_asset_id !== null) {
       const source = requireRelatedAsset(db, projectId, input.replaces_asset_id);
-      if (source.status === 'archived' || source.kind !== input.kind) {
+      if (source.status !== 'approved' || source.kind !== input.kind) {
         throw new StoreError('ASSET_REPLACEMENT_INVALID',
-          'Replacement source must be active and have the same kind', {
+          'Replacement source must be approved and have the same kind', {
             asset_id: input.replaces_asset_id,
           });
       }
@@ -80,11 +80,6 @@ export function createAsset(db: Database.Database, projectId: string,
     ).run(id, projectId, input.kind, name, relativePath, uri,
       input.content_hash ?? '', input.status, input.replaces_asset_id,
       input.derived_from_asset_id, input.derivation_kind, now, now);
-    if (input.replaces_asset_id !== null) {
-      db.prepare(
-        `UPDATE assets SET status = 'archived', updated_at = ? WHERE id = ?`,
-      ).run(now, input.replaces_asset_id);
-    }
     return mapAsset(db.prepare('SELECT * FROM assets WHERE id = ?').get(id));
   })();
 }
@@ -120,6 +115,17 @@ export function updateAsset(db: Database.Database, projectId: string,
     const hash = input.content_hash === undefined
       ? existing.content_hash : input.content_hash;
     const now = new Date().toISOString();
+    if (existing.status === 'candidate' && nextStatus === 'approved' &&
+      existing.replaces_asset_id !== null) {
+      const source = requireRelatedAsset(db, projectId, existing.replaces_asset_id);
+      if (source.status !== 'approved' || source.kind !== existing.kind) {
+        throw new StoreError('ASSET_REPLACEMENT_INVALID',
+          'Replacement source must still be approved when its replacement is approved',
+          { asset_id: existing.replaces_asset_id });
+      }
+      db.prepare(`UPDATE assets SET status = 'archived', updated_at = ?
+        WHERE id = ? AND status = 'approved'`).run(now, existing.replaces_asset_id);
+    }
     db.prepare(
       `UPDATE assets SET uri = ?, relative_path = ?, content_hash = ?,
        status = ?, updated_at = ? WHERE id = ? AND project_id = ?`,

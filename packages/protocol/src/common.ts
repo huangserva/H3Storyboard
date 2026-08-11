@@ -33,7 +33,7 @@ export const AssetDerivationKindSchema = z.enum([
   'frame_extract',
 ]);
 
-const RelativeAssetPathSchema = NonEmptyTextSchema.refine(
+export const RelativeAssetPathSchema = NonEmptyTextSchema.refine(
   (value) => {
     const segments = value.split(/[\\/]+/);
     return (
@@ -69,6 +69,12 @@ function validateAssetDerivation(
       message: 'Assets require uri or relative_path',
       path: ['uri'],
     });
+  }
+  if (!asset.relative_path && asset.uri &&
+    !RelativeAssetPathSchema.safeParse(asset.uri).success) {
+    context.addIssue({ code: 'custom',
+      message: 'URI fallback must be a project-relative asset path',
+      path: ['uri'] });
   }
   const hasSource = asset.derived_from_asset_id !== null;
   const hasKind = asset.derivation_kind !== null;

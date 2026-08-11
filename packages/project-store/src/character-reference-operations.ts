@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
 import { parseInput } from './input.js';
 import { mapCharacterReference } from './row-mappers.js';
+import { requireGenerationUnlocked } from './generation-locks.js';
 
 function requireCharacter(
   db: Database.Database,
@@ -93,6 +94,7 @@ export function createCharacterReference(db: Database.Database, projectId: strin
   const input = parseInput(CreateCharacterReferenceInputSchema, rawInput);
   return db.transaction(() => {
     requireCharacter(db, projectId, characterId);
+    requireGenerationUnlocked(db, projectId);
     validateDerivedFrom(db, projectId, characterId, input.derived_from);
     validateAssetReference(db, projectId, input.asset_id, input.kind);
     const id = randomUUID();
@@ -114,6 +116,7 @@ export function updateCharacterReference(db: Database.Database, projectId: strin
   const input = parseInput(UpdateCharacterReferenceInputSchema, rawInput);
   return db.transaction(() => {
     requireCharacter(db, projectId, characterId);
+    requireGenerationUnlocked(db, projectId);
     const row = db.prepare(
       'SELECT * FROM character_references WHERE id = ? AND character_id = ?',
     ).get(input.reference_id, characterId);

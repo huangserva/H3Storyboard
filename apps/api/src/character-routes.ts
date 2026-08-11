@@ -24,10 +24,10 @@ export async function dispatchCharacterRoute(
   const characterMatch = CHARACTERS.exec(pathname);
   if (characterMatch) {
     const projectId = decodeParam(characterMatch[1] ?? '', 'project_id');
-    if (method === 'GET') return { status: 200, body: store.listCharacters(projectId) };
-    if (method === 'POST') return { status: 201, body: store.createCharacter(
+    if (method === 'GET') return { status: 200, body: store.characters.list(projectId) };
+    if (method === 'POST') return { status: 201, body: store.characters.create(
       projectId, CreateCharacterInputSchema.parse(await readJson(request))) };
-    return { status: 200, body: store.updateCharacter(
+    return { status: 200, body: store.characters.update(
       projectId, UpdateCharacterInputSchema.parse(await readJson(request))) };
   }
   const referenceMatch = REFERENCES.exec(pathname);
@@ -35,11 +35,11 @@ export async function dispatchCharacterRoute(
   const projectId = decodeParam(referenceMatch[1] ?? '', 'project_id');
   const characterId = decodeParam(referenceMatch[2] ?? '', 'character_id');
   if (method === 'GET') return { status: 200,
-    body: store.listCharacterReferences(projectId, characterId) };
+    body: store.characters.listReferences(projectId, characterId) };
   if (method === 'POST') return { status: 201,
-    body: store.createCharacterReference(projectId, characterId,
+    body: store.characters.createReference(projectId, characterId,
       CreateCharacterReferenceInputSchema.parse(await readJson(request))) };
-  return { status: 200, body: store.updateCharacterReference(
+  return { status: 200, body: store.characters.updateReference(
     projectId, characterId,
     UpdateCharacterReferenceInputSchema.parse(await readJson(request))) };
 }

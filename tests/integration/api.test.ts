@@ -56,7 +56,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const health = await fetch(`${first.origin}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({
-      data: { status: 'ok', protocol_version: '1.0' },
+      data: { status: 'ok', protocol_version: '1.1' },
     });
 
     const projectResponse = await postJson(`${first.origin}/api/projects`, {
@@ -111,7 +111,6 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         },
       ],
     };
-    await prepareApiGenerationContext(first.origin, project.id, [asset.id]);
     const semanticPatch = await patchJson(`${first.origin}/api/shots/${shot.id}`, {
       semantic_references: [{ purpose: 'first_frame',
         target: { type: 'asset', asset_id: asset.id } }],
@@ -120,6 +119,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     shot = ShotPlanSchema.parse(
       (await semanticPatch.json() as { data: unknown }).data,
     );
+    await prepareApiGenerationContext(first.origin, project.id, [asset.id]);
     const jobResponses = await Promise.all(
       Array.from({ length: 20 }, () =>
         postJson(`${first.origin}/api/shots/${shot.id}/jobs`, jobInput),
@@ -278,14 +278,14 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     expect((await postJson(
       `${first.origin}/api/projects/${project.id}/manifests`, {},
     )).status).toBe(201);
-    expect((await putJson(
-      `${first.origin}/api/projects/${project.id}/generation_lock`,
-      { engaged: true, reason: 'Continue approved take' },
-    )).status).toBe(200);
     expect((await patchJson(`${first.origin}/api/shots/${continuedShot.id}`, {
       semantic_references: [{ purpose: 'first_frame',
         target: { type: 'asset', asset_id: boundary.id } }],
     })).status).toBe(200);
+    expect((await putJson(
+      `${first.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Continue approved take' },
+    )).status).toBe(200);
 
     const continuityDropped = await postJson(
       `${first.origin}/api/shots/${continuedShot.id}/jobs`,
@@ -475,9 +475,15 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
           { purpose: 'last_frame', target: { type: 'asset', asset_id: last.id } },
         ] : mode === 'r2v' ? [{ purpose: 'reference_character',
           target: { type: 'asset', asset_id: first.id } }] : [];
+      expect((await putJson(
+        `${api.origin}/api/projects/${project.id}/generation_lock`,
+        { engaged: false })).status).toBe(200);
       const semanticPatch = await patchJson(`${api.origin}/api/shots/${shot.id}`,
         { semantic_references });
       expect(semanticPatch.status).toBe(200);
+      expect((await putJson(
+        `${api.origin}/api/projects/${project.id}/generation_lock`,
+        { engaged: true, reason: `Compile ${mode} test` })).status).toBe(200);
       const response = await postJson(
         `${api.origin}/api/shots/${shot.id}/jobs`,
         h3JobInput(mode, `six-modes-${mode}`, inputBindings),
@@ -488,6 +494,8 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       );
       expect(created.mode).toBe(mode);
       expect(created.input_bindings).toEqual(inputBindings);
+      expect(created.compiled_bindings).toEqual(
+        mode === 'v2v' || mode === 'rv2v' ? null : expect.any(Array));
     }
     expect((await getSnapshot(api.origin, project.id)).h3_jobs).toHaveLength(6);
 
@@ -677,7 +685,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(12);
+    expect(schemaVersion.version).toBe(13);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -870,12 +878,21 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         'A separate complete script must not accept foreign replacement assets.' },
     )).json() as { data: unknown }).data);
 
+    const traversal = await postJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { kind: 'image', uri: '../../../etc/passwd', content_hash: null });
+    await expectError(traversal, 400, 'VALIDATION_FAILED');
+
     const master = AssetSchema.parse((await (await postJson(
       `${api.origin}/api/projects/${projectA.id}/assets`,
       { kind: 'image', uri: 'references/courier-master-v1.png',
         content_hash: null },
     )).json() as { data: unknown }).data);
     expect(master.status).toBe('candidate');
+    const traversalUpdate = await patchJson(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+      { asset_id: master.id, uri: '/tmp/escaped.png' });
+    await expectError(traversalUpdate, 400, 'VALIDATION_FAILED');
     const approvedMaster = AssetSchema.parse((await (await patchJson(
       `${api.origin}/api/projects/${projectA.id}/assets`,
       { asset_id: master.id, status: 'approved' },
@@ -897,11 +914,23 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       `${api.origin}/api/projects/${projectA.id}/assets`,
     )).json() as { data: unknown }).data);
     expect(assetsAfterReplace.find(({ id }) => id === master.id)?.status)
-      .toBe('archived');
+      .toBe('approved');
+    const candidateManifest = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await postJson(
+        `${api.origin}/api/projects/${projectA.id}/manifests`, {},
+      )).json() as { data: unknown }).data,
+    );
+    expect(candidateManifest.entries.map(({ asset_id }) => asset_id))
+      .toEqual([master.id]);
     const approvedReplacement = AssetSchema.parse((await (await patchJson(
       `${api.origin}/api/projects/${projectA.id}/assets`,
       { asset_id: replacement.id, status: 'approved' },
     )).json() as { data: unknown }).data);
+    const assetsAfterApproval = AssetSchema.array().parse((await (await fetch(
+      `${api.origin}/api/projects/${projectA.id}/assets`,
+    )).json() as { data: unknown }).data);
+    expect(assetsAfterApproval.find(({ id }) => id === master.id)?.status)
+      .toBe('archived');
 
     const characterA = CharacterSchema.parse((await (await postJson(
       `${api.origin}/api/projects/${projectA.id}/characters`,
@@ -940,7 +969,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         `${api.origin}/api/projects/${projectA.id}/manifests`, {},
       )).json() as { data: unknown }).data,
     );
-    expect(manifestV1.manifest.manifest_version).toBe(1);
+    expect(manifestV1.manifest.manifest_version).toBe(2);
     expect(manifestV1.entries.map(({ asset_id }) => asset_id))
       .toEqual([approvedReplacement.id]);
 
@@ -953,7 +982,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       { asset_id: scene.id, status: 'approved' });
     const frozenV1 = CurrentAssetsManifestSnapshotSchema.parse(
       (await (await fetch(
-        `${api.origin}/api/projects/${projectA.id}/manifests/1`,
+        `${api.origin}/api/projects/${projectA.id}/manifests/2`,
       )).json() as { data: unknown }).data,
     );
     expect(frozenV1).toEqual(manifestV1);
@@ -962,7 +991,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         `${api.origin}/api/projects/${projectA.id}/manifests`, {},
       )).json() as { data: unknown }).data,
     );
-    expect(manifestV2.manifest.manifest_version).toBe(2);
+    expect(manifestV2.manifest.manifest_version).toBe(3);
     expect(new Set(manifestV2.entries.map(({ asset_id }) => asset_id)))
       .toEqual(new Set([approvedReplacement.id, scene.id]));
     const listed = CurrentAssetsManifestSnapshotSchema.array().parse(
@@ -970,7 +999,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         `${api.origin}/api/projects/${projectA.id}/manifests`,
       )).json() as { data: unknown }).data,
     );
-    expect(listed).toEqual([manifestV1, manifestV2]);
+    expect(listed).toEqual([candidateManifest, manifestV1, manifestV2]);
 
     await patchJson(`${api.origin}/api/projects/${projectA.id}/assets`,
       { asset_id: scene.id, status: 'archived' });
@@ -1004,6 +1033,23 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     );
     expect(created).toMatchObject({ key: 'cinematic-drama',
       validation_status: 'candidate', evidence: null });
+    const modeProject = ProjectSchema.parse((await (await postJson(
+      `${first.origin}/api/projects`, { title: 'Mode policy project',
+        script_title: 'Mode policy', script_content:
+          'A complete script verifies blocked modes cannot compile or create briefs.' },
+    )).json() as { data: unknown }).data);
+    const modeShot = ShotPlanSchema.parse((await (await postJson(
+      `${first.origin}/api/projects/${modeProject.id}/shots`, validShotInput(),
+    )).json() as { data: unknown }).data);
+    const modeAsset = await createAssetViaApi(first.origin, modeProject.id, {
+      kind: 'image', uri: 'references/mode-context.png', content_hash: null,
+    });
+    await patchJson(`${first.origin}/api/projects/${modeProject.id}/assets`,
+      { asset_id: modeAsset.id, status: 'approved' });
+    await postJson(`${first.origin}/api/projects/${modeProject.id}/manifests`, {});
+    expect((await postJson(`${first.origin}/api/projects/${modeProject.id}/briefs`, {
+      mode_key: created.key, body: productionBriefBody('Candidate mode allowed'),
+    })).status).toBe(201);
 
     const duplicate = await postJson(`${first.origin}/api/modes`, {
       key: 'cinematic-drama', title: 'Duplicate', description: 'Duplicate key.',
@@ -1038,6 +1084,14 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         validation_status: 'blocked', evidence: 'Provider regression detected.' },
     )).json() as { data: unknown }).data);
     expect(blocked.validation_status).toBe('blocked');
+    const blockedBrief = await postJson(
+      `${first.origin}/api/projects/${modeProject.id}/briefs`, {
+        mode_key: created.key, body: productionBriefBody('Blocked mode rejected'),
+      });
+    await expectError(blockedBrief, 409, 'MODE_BLOCKED');
+    const blockedCompile = await postJson(
+      `${first.origin}/api/shots/${modeShot.id}/compile_bindings`, {});
+    await expectError(blockedCompile, 409, 'MODE_BLOCKED');
     const reopened = ModeSchema.parse((await (await patchJson(
       `${first.origin}/api/modes`, { mode_id: created.id,
         validation_status: 'candidate' },
@@ -1055,7 +1109,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(12);
+    expect(schemaVersion.version).toBe(13);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {
@@ -1077,7 +1131,12 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
 
     const unlockedJob = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
       h3JobInput('t2v', 'unlocked-job', []));
-    await expectError(unlockedJob, 409, 'LOCK_REQUIRED');
+    expect(unlockedJob.status).toBe(409);
+    const unlockedError = await unlockedJob.json() as ErrorEnvelope;
+    expect(unlockedError.error.code).toBe('LOCK_REQUIRED');
+    expect(unlockedError.error.message).toContain('create a production brief');
+    expect(unlockedError.error.message).toContain('freeze a current-assets manifest');
+    expect(unlockedError.error.message).toContain('engage the project generation lock');
     const missingMode = await postJson(
       `${api.origin}/api/projects/${project.id}/briefs`, {
         mode_key: 'missing-mode', body: productionBriefBody('Missing mode'),
@@ -1126,6 +1185,17 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         mode_key: 'cinematic-drama', body: productionBriefBody('Locked intent'),
       },
     )).json() as { data: unknown }).data);
+    const lockedCharacter = CharacterSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/characters`, {
+        name: 'Locked Courier', canonical_appearance:
+          'A courier with a black bob and charcoal raincoat.', seed_family: [31],
+      },
+    )).json() as { data: unknown }).data);
+    const lockedReference = CharacterReferenceSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/characters/${lockedCharacter.id}/references`,
+      { uri: asset.uri, kind: 'image', content_hash: null, asset_id: asset.id,
+        derived_from: null, sort_order: 0 },
+    )).json() as { data: unknown }).data);
     expect(briefV2.brief_version).toBe(2);
     const engaged = ProjectGenerationLockSchema.parse((await (await putJson(
       `${api.origin}/api/projects/${project.id}/generation_lock`,
@@ -1149,6 +1219,21 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const lockedManifest = await postJson(
       `${api.origin}/api/projects/${project.id}/manifests`, {});
     await expectError(lockedManifest, 409, 'LOCK_ENGAGED');
+    const lockedShot = await patchJson(`${api.origin}/api/shots/${shot.id}`, {
+      semantic_references: [],
+    });
+    await expectError(lockedShot, 409, 'LOCK_ENGAGED');
+    const lockedReferenceUpdate = await patchJson(
+      `${api.origin}/api/projects/${project.id}/characters/${lockedCharacter.id}/references`,
+      { reference_id: lockedReference.id, sort_order: 1 });
+    await expectError(lockedReferenceUpdate, 409, 'LOCK_ENGAGED');
+    const mode = ModeSchema.array().parse((await (await fetch(
+      `${api.origin}/api/modes`)).json() as { data: unknown }).data)
+      .find(({ key }) => key === 'cinematic-drama')!;
+    const lockedModeCapability = await patchJson(`${api.origin}/api/modes`, {
+      mode_id: mode.id, capability_declaration: productionCapability(),
+    });
+    await expectError(lockedModeCapability, 409, 'LOCK_ENGAGED');
 
     const firstJob = H3JobSchema.parse((await (await postJson(
       `${api.origin}/api/shots/${shot.id}/jobs`,
@@ -1224,8 +1309,6 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       { uri: portrait.uri, kind: 'image', content_hash: null,
         asset_id: portrait.id, derived_from: null, sort_order: 0 },
     )).status).toBe(201);
-    await prepareApiGenerationContext(api.origin, project.id,
-      [scene.id, portrait.id]);
     const state = { characters: [{ character_id: character.id,
       position: 'beneath the marquee', appearance_state: 'raincoat soaked' }],
       props: [], scene_state: 'wet cinema entrance at night',
@@ -1238,6 +1321,8 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
           target: { type: 'asset', asset_id: scene.id } },
       ], opening_state: state, ending_state: state,
     })).status).toBe(200);
+    await prepareApiGenerationContext(api.origin, project.id,
+      [scene.id, portrait.id]);
     const compiled = CompiledBindingsResultSchema.parse((await (await postJson(
       `${api.origin}/api/shots/${shot.id}/compile_bindings`, {},
     )).json() as { data: unknown }).data);

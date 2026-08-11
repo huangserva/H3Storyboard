@@ -159,10 +159,9 @@ describe('ProjectStore', () => {
           ordinal: 0,
         },
       ],
+      semantic_references: [{ purpose: 'first_frame',
+        target: { type: 'asset', asset_id: boundary.id } }],
     });
-    first.updateShotPlan({ shot_plan_id: continued.id, semantic_references: [{
-      purpose: 'first_frame', target: { type: 'asset', asset_id: boundary.id },
-    }] });
     const legacyContinuedJob = first.createH3Job(continued.id, {
       mode: 'i2v',
       provider: 'local_comfyui',
@@ -197,6 +196,9 @@ describe('ProjectStore', () => {
     stores.splice(stores.indexOf(first), 1);
 
     const raw = new Database(databasePath);
+    raw.prepare(`UPDATE shot_plans SET semantic_references_json = '[]'
+      WHERE id = ?`).run(continued.id);
+    raw.prepare('DELETE FROM schema_version WHERE version = 13').run();
     const stored = raw
       .prepare(
         `SELECT continuity_dependencies_json FROM shot_plans WHERE id = ?`,
@@ -283,6 +285,7 @@ describe('ProjectStore', () => {
       snapshot.h3_jobs.find(({ id }) => id === legacyContinuedJob.id)
         ?.input_bindings,
     ).toEqual(snapshot.shot_plans[1]?.reference_bindings);
+    expect(snapshot.shot_plans[1]?.semantic_references).toEqual([]);
     expect(
       reopened
         .listH3JobEvents(activeDraft.id)
@@ -293,8 +296,37 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(12);
+    ).toBe(13);
     migratedVersion.close();
+  });
+
+  it('backfills legacy image bindings into semantic references in migration v13', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'h3-store-v13-'));
+    directories.push(directory);
+    const databasePath = join(directory, 'project.db');
+    const first = new ProjectStore(databasePath);
+    const project = first.createProject({ title: 'Legacy image binding',
+      script_title: 'Legacy binding script', script_content:
+        'A complete legacy script has a first-frame binding before semantic references.' });
+    const image = first.createAsset(project.id, { kind: 'image',
+      uri: 'references/legacy-first.png', content_hash: null });
+    const shot = first.createShotPlan(project.id, {
+      ...createShotInput('Legacy image shot'),
+      reference_bindings: [{ asset_id: image.id, asset_kind: 'image',
+        role: 'first_frame', ordinal: 0 }],
+    });
+    first.close();
+    const raw = new Database(databasePath);
+    raw.prepare(`UPDATE shot_plans SET semantic_references_json = '[]'
+      WHERE id = ?`).run(shot.id);
+    raw.prepare('DELETE FROM schema_version WHERE version = 13').run();
+    raw.close();
+
+    const reopened = new ProjectStore(databasePath);
+    stores.push(reopened);
+    expect(reopened.getProjectSnapshot(project.id).shot_plans[0]
+      ?.semantic_references).toEqual([{ purpose: 'first_frame',
+        target: { type: 'asset', asset_id: image.id } }]);
   });
 
   it('keeps every generated attempt and reviews a take only once', () => {
@@ -533,9 +565,14 @@ describe('ProjectStore', () => {
         },
       ],
     });
+    store.production.updateLock(project.id, { engaged: false });
     store.updateShotPlan({ shot_plan_id: continued.id, semantic_references: [{
       purpose: 'first_frame', target: { type: 'asset', asset_id: boundaryFrame.id },
     }] });
+    store.production.updateLock(project.id, {
+      engaged: true,
+      reason: 'Store integration test',
+    });
     expect(continued.continuity_dependencies[0]?.source_take_id).toBe(take.id);
     expect(() =>
       store.createH3Job(continued.id, {

@@ -59,4 +59,41 @@ describe('compileBindings', () => {
         { code: 'MODE_CAPABILITY_MISMATCH' }));
     expect(BindingCompilerError).toBeDefined();
   });
+
+  it.each([
+    [[direct('last_frame', 'a')], 'last_frame requires first_frame'],
+    [[direct('reference_target_state', 'a')],
+      'reference_target_state requires first_frame'],
+    [[direct('first_frame', 'a'), direct('last_frame', 'b'),
+      direct('reference_style', 'c')], 'Frame interpolation cannot include'],
+    [[direct('first_frame', 'a'), direct('last_frame', 'b'),
+      direct('reference_target_state', 'c')], 'exactly one ending input'],
+  ])('rejects ambiguous frame combinations %#', (semantic_references, message) => {
+    expect(() => compileBindings({ shot: { semantic_references },
+      manifest_asset_ids: ['a', 'b', 'c'],
+      assets: [asset('a'), asset('b'), asset('c')], character_references: [],
+      capability: capability(['t2v', 'i2v', 'fl2v', 'r2v']) }))
+      .toThrowError(expect.objectContaining({ code: 'BINDING_INVALID_COMBINATION',
+        message: expect.stringContaining(message) }));
+  });
+
+  it('rejects non-image semantic assets during compilation', () => {
+    expect(() => compileBindings({ shot: { semantic_references: [
+      direct('first_frame', 'video') ] }, manifest_asset_ids: ['video'],
+      assets: [{ ...asset('video'), kind: 'video' }], character_references: [],
+      capability: capability(['i2v']) })).toThrowError(expect.objectContaining(
+        { code: 'BINDING_KIND_MISMATCH' }));
+  });
+
+  it('skips archived character references in favor of an approved manifest asset', () => {
+    const result = compileBindings({ shot: { semantic_references: [{
+      purpose: 'reference_character', target: { type: 'character',
+        character_id: 'character' } }] }, manifest_asset_ids: ['old', 'current'],
+      assets: [{ ...asset('old'), status: 'archived' }, asset('current')],
+      character_references: [
+        { character_id: 'character', asset_id: 'old', sort_order: 0 },
+        { character_id: 'character', asset_id: 'current', sort_order: 1 },
+      ] as CharacterReference[], capability: capability(['r2v']) });
+    expect(result.bindings[0]?.asset_id).toBe('current');
+  });
 });

@@ -2,10 +2,6 @@ import type {
   Asset,
   CurrentAssetsManifestSnapshot,
   CanvasNode,
-  Character,
-  CharacterReference,
-  CreateCharacterInput,
-  CreateCharacterReferenceInput,
   CreateCanvasNodeInput,
   CreateAssetInput,
   CreateH3JobInput,
@@ -17,8 +13,6 @@ import type {
   ProjectSnapshot,
   ReviewShotActualInput,
   UpdateCanvasNodeInput,
-  UpdateCharacterInput,
-  UpdateCharacterReferenceInput,
   UpdateAssetInput,
   UpdateShotPlanInput,
   JobEvent,
@@ -38,16 +32,7 @@ import {
   listCanvasNodes,
   updateCanvasNode,
 } from './canvas-operations.js';
-import {
-  createCharacter,
-  listCharacters,
-  updateCharacter,
-} from './character-operations.js';
-import {
-  createCharacterReference,
-  listCharacterReferences,
-  updateCharacterReference,
-} from './character-reference-operations.js';
+import { CharacterStore } from './character-store.js';
 import {
   claimH3Job,
   createH3Job,
@@ -88,6 +73,7 @@ export class ProjectStore {
   readonly modes: ModeStore;
   readonly production: ProductionStore;
   readonly takes: TakeStore;
+  readonly characters: CharacterStore;
   #closed = false;
   constructor(databasePath: string) {
     if (databasePath !== ':memory:') {
@@ -97,6 +83,7 @@ export class ProjectStore {
     this.modes = new ModeStore(this.#database);
     this.production = new ProductionStore(this.#database);
     this.takes = new TakeStore(this.#database);
+    this.characters = new CharacterStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
     this.#database.pragma('journal_mode = WAL');
@@ -161,41 +148,6 @@ export class ProjectStore {
     input: UpdateCanvasNodeInput,
   ): CanvasNode {
     return updateCanvasNode(this.#database, projectId, input);
-  }
-
-  listCharacters(projectId: string): Character[] {
-    return listCharacters(this.#database, projectId);
-  }
-
-  createCharacter(projectId: string, input: CreateCharacterInput): Character {
-    return createCharacter(this.#database, projectId, input);
-  }
-
-  updateCharacter(projectId: string, input: UpdateCharacterInput): Character {
-    return updateCharacter(this.#database, projectId, input);
-  }
-
-  listCharacterReferences(
-    projectId: string,
-    characterId: string,
-  ): CharacterReference[] {
-    return listCharacterReferences(this.#database, projectId, characterId);
-  }
-
-  createCharacterReference(
-    projectId: string,
-    characterId: string,
-    input: CreateCharacterReferenceInput,
-  ): CharacterReference {
-    return createCharacterReference(this.#database, projectId, characterId, input);
-  }
-
-  updateCharacterReference(
-    projectId: string,
-    characterId: string,
-    input: UpdateCharacterReferenceInput,
-  ): CharacterReference {
-    return updateCharacterReference(this.#database, projectId, characterId, input);
   }
 
   createShotPlan(projectId: string, input: CreateShotPlanInput): ShotPlan {

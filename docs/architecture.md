@@ -49,6 +49,30 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. Protocol 1.1 must preserve an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
+## Protocol 1.1 module ownership
+
+```text
+packages/protocol
+  schemas + snake_case HTTP contract + exported production error codes
+packages/project-store
+  ProjectStore lifecycle facade
+    +-- ModeStore         global policy registry
+    +-- ProductionStore   briefs, locks, dry-run compilation
+    +-- CharacterStore    character identity and reference lineage
+    +-- TakeStore         representative selection/review
+  domain operations       assets/manifests, shots, jobs, migrations
+packages/h3-provider
+  pure binding compiler + exact submitted-input audit
+apps/api
+  small domain route dispatchers; no domain-policy reimplementation
+apps/studio
+  director UI consuming only Protocol 1.1 API shapes
+```
+
+Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
+
+Migrations v7–v13 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics.
+
 ## Initial deployment
 
 M0 runs as a local web application on Node 22. The API binds to `127.0.0.1` only and stores data under the user's home directory by default; `H3_STORYBOARD_DB` accepts an explicit path. Desktop packaging is deferred until the workflow and storage contract are stable.

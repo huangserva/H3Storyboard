@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
 import { parseInput } from './input.js';
 import { mapMode } from './row-mappers.js';
+import { requireAllGenerationUnlocked } from './generation-locks.js';
 
 const transitions: Readonly<Record<ModeValidationStatus, ModeValidationStatus>> = {
   candidate: 'validated',
@@ -51,6 +52,9 @@ export function updateMode(db: Database.Database, rawInput: UpdateModeInput): Mo
       mode_id: input.mode_id,
     });
     const existing = mapMode(row);
+    if (input.capability_declaration !== undefined) {
+      requireAllGenerationUnlocked(db);
+    }
     const nextStatus = input.validation_status ?? existing.validation_status;
     const changingStatus = nextStatus !== existing.validation_status;
     if (changingStatus && transitions[existing.validation_status] !== nextStatus) {

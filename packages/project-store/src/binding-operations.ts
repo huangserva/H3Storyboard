@@ -15,8 +15,18 @@ export function compileShotBindings(db: Database.Database,
     WHERE project_id = ? ORDER BY brief_version DESC LIMIT 1`).get(
       shot.project_id) as { mode_key: string } | undefined;
   if (!brief) throw new StoreError('BRIEF_REQUIRED', 'Production brief is required');
-  const mode = db.prepare('SELECT capability_declaration_json FROM modes WHERE key = ?')
-    .get(brief.mode_key) as { capability_declaration_json: string } | undefined;
+  const mode = db.prepare(`SELECT capability_declaration_json, validation_status
+    FROM modes WHERE key = ?`).get(brief.mode_key) as {
+      capability_declaration_json: string;
+      validation_status: string;
+    } | undefined;
+  if (!mode) throw new StoreError('BRIEF_MODE_NOT_FOUND',
+    'Production brief mode does not exist', { mode_key: brief.mode_key });
+  // Candidate remains usable until M1B produces provider validation evidence.
+  if (mode.validation_status === 'blocked') throw new StoreError('MODE_BLOCKED',
+    'Blocked modes cannot compile generation bindings', {
+      mode_key: brief.mode_key,
+    });
   const manifest = db.prepare(`SELECT id FROM current_assets_manifests
     WHERE project_id = ? ORDER BY manifest_version DESC LIMIT 1`).get(
       shot.project_id) as { id: string } | undefined;
@@ -29,7 +39,7 @@ export function compileShotBindings(db: Database.Database,
     character_references: db.prepare(`SELECT cr.* FROM character_references cr
       JOIN characters c ON c.id = cr.character_id WHERE c.project_id = ?`)
       .all(shot.project_id).map(mapCharacterReference),
-    capability: JSON.parse(mode?.capability_declaration_json ?? '{}') as
+    capability: JSON.parse(mode.capability_declaration_json) as
       CompileBindingsInput['capability'] };
   try { return compileBindings(input); }
   catch (error) {

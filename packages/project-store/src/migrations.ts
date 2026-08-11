@@ -13,8 +13,9 @@ import { createModes } from './migration-v9.js';
 import { createProductionContext } from './migration-v10.js';
 import { addSemanticBindings } from './migration-v11.js';
 import { addRepresentativeTakeGate } from './migration-v12.js';
+import { backfillSemanticReferences } from './migration-v13.js';
 
-const CURRENT_SCHEMA_VERSION = 12;
+const CURRENT_SCHEMA_VERSION = 13;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -288,6 +289,12 @@ export function migrateDatabase(db: Database.Database): void {
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(12, new Date().toISOString());
+    }
+    if (!appliedVersions.has(13)) {
+      backfillSemanticReferences(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(13, new Date().toISOString());
     }
   })();
 }

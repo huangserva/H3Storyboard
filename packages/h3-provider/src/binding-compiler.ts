@@ -6,6 +6,8 @@ import type {
 export type BindingCompilerErrorCode =
   | 'BINDING_MISSING_INPUT'
   | 'BINDING_UNRELATED_INPUT'
+  | 'BINDING_INVALID_COMBINATION'
+  | 'BINDING_KIND_MISMATCH'
   | 'MODE_CAPABILITY_MISMATCH';
 
 export class BindingCompilerError extends Error {
@@ -54,16 +56,21 @@ const priority = (reference: SemanticReference, index: number) =>
 export function compileBindings(input: CompileBindingsInput): CompiledBindingsResult {
   const manifest = new Set(input.manifest_asset_ids);
   const assets = new Map(input.assets.map((asset) => [asset.id, asset]));
+  validateReferenceCombination(input.shot.semantic_references);
   const ordered = input.shot.semantic_references.map((reference, index) =>
     ({ reference, index })).sort((a, b) =>
       priority(a.reference, a.index) - priority(b.reference, b.index));
   const bindings = ordered.map(({ reference }, slotIndex) => {
-    const assetId = resolveAsset(reference, input.character_references, manifest);
+    const assetId = resolveAsset(reference, input.character_references,
+      manifest, assets);
     const asset = assetId ? assets.get(assetId) : undefined;
     if (!asset || asset.status !== 'approved' || !manifest.has(asset.id)) {
       throw new BindingCompilerError('BINDING_MISSING_INPUT',
         `No approved manifest asset resolves ${reference.purpose}`);
     }
+    if (asset.kind !== 'image') throw new BindingCompilerError(
+      'BINDING_KIND_MISMATCH',
+      `${reference.purpose} requires an image asset, received ${asset.kind}`);
     return { slot_index: slotIndex, purpose: reference.purpose,
       asset_id: asset.id, uri: asset.uri };
   });
@@ -80,11 +87,40 @@ export function compileBindings(input: CompileBindingsInput): CompiledBindingsRe
   return { generation_mode: generationMode, bindings };
 }
 
+function validateReferenceCombination(references: readonly SemanticReference[]): void {
+  const purposes = references.map(({ purpose }) => purpose);
+  const count = (purpose: SemanticReference['purpose']) =>
+    purposes.filter((value) => value === purpose).length;
+  if (count('first_frame') > 1 || count('last_frame') > 1 ||
+    count('reference_target_state') > 1) {
+    throw new BindingCompilerError('BINDING_INVALID_COMBINATION',
+      'Frame interpolation accepts one first_frame and exactly one ending input');
+  }
+  const hasFirst = purposes.includes('first_frame');
+  const hasLast = purposes.includes('last_frame');
+  const hasTarget = purposes.includes('reference_target_state');
+  if ((hasLast || hasTarget) && !hasFirst) {
+    const ending = hasLast ? 'last_frame' : 'reference_target_state';
+    throw new BindingCompilerError('BINDING_INVALID_COMBINATION',
+      `${ending} requires first_frame`);
+  }
+  if (hasLast && hasTarget) throw new BindingCompilerError(
+    'BINDING_INVALID_COMBINATION',
+    'Frame interpolation requires exactly one ending input: last_frame or reference_target_state');
+  const hasGeneralReference = purposes.some((purpose) =>
+    purpose.startsWith('reference_') && purpose !== 'reference_target_state');
+  if ((hasLast || hasTarget) && hasGeneralReference) throw new BindingCompilerError(
+    'BINDING_INVALID_COMBINATION',
+    'Frame interpolation cannot include additional reference inputs');
+}
+
 function resolveAsset(reference: SemanticReference,
-  characterReferences: readonly CharacterReference[], manifest: Set<string>) {
+  characterReferences: readonly CharacterReference[], manifest: Set<string>,
+  assets: ReadonlyMap<string, Asset>) {
   if (reference.target.type === 'asset') return reference.target.asset_id;
   const characterId = reference.target.character_id;
   return characterReferences.filter(({ character_id, asset_id }) =>
     character_id === characterId && asset_id !== null &&
-    manifest.has(asset_id)).sort((a, b) => a.sort_order - b.sort_order)[0]?.asset_id;
+    manifest.has(asset_id) && assets.get(asset_id)?.status === 'approved')
+    .sort((a, b) => a.sort_order - b.sort_order)[0]?.asset_id;
 }

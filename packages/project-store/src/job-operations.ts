@@ -54,8 +54,9 @@ export function createH3Job(
     }
     enforceRepresentativeGate(db, shotPlanId, input.gate_override_reason);
     const lockSnapshot = buildJobLockSnapshot(db, shot.project_id);
-    const compiled = compileShotBindings(db, shotPlanId);
+    let compiledBindings = null;
     if (input.mode !== 'v2v' && input.mode !== 'rv2v') {
+      const compiled = compileShotBindings(db, shotPlanId);
       if (compiled.generation_mode !== input.mode) throw new StoreError(
         'MODE_CAPABILITY_MISMATCH', 'Job mode differs from compiled generation mode');
       try { validateCompiledInputs(compiled, input.input_bindings); }
@@ -64,6 +65,7 @@ export function createH3Job(
           error.code, error.message, { shot_plan_id: shotPlanId });
         throw error;
       }
+      compiledBindings = compiled.bindings;
     }
 
     const id = randomUUID();
@@ -94,7 +96,7 @@ export function createH3Job(
       now,
       now,
       JSON.stringify(lockSnapshot),
-      JSON.stringify(compiled.bindings),
+      compiledBindings === null ? null : JSON.stringify(compiledBindings),
       input.gate_override_reason ?? null,
     );
     appendJobEvent(db, id, null, 'draft', 'Job created', now);
