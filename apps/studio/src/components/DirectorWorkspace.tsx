@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { ProjectSnapshot, ShotPlan } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
 import { InfiniteCanvas } from './InfiniteCanvas.js';
 import { PlannedShotPanel } from './PlannedShotPanel.js';
 import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
+
+const ProductionBriefPanel = lazy(async () => {
+  const module = await import('./ProductionBriefPanel.js');
+  return { default: module.ProductionBriefPanel };
+});
 
 interface DirectorWorkspaceProps {
   snapshot: ProjectSnapshot | null;
@@ -22,6 +27,7 @@ export function DirectorWorkspace({
   onSelectShot,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'director' | 'canvas'>('canvas');
+  const [productionOpen, setProductionOpen] = useState(false);
   const actuals = snapshot?.shot_actuals.filter(
     (actual) => actual.shot_plan_id === selectedShot?.id,
   ) ?? [];
@@ -60,6 +66,8 @@ export function DirectorWorkspace({
             <button data-active={view === 'canvas'} onClick={() => setView('canvas')} type="button">画布</button>
             <button data-active={view === 'director'} onClick={() => setView('director')} type="button">计划 / 实测</button>
           </div>
+          <button className="button compact" type="button"
+            onClick={() => setProductionOpen(true)}>BRIEF / LOCK</button>
           <button className="button button-primary compact" disabled={busy} onClick={onNewShot} type="button">＋ 新增计划镜头</button>
         </div>
       </header>
@@ -75,6 +83,10 @@ export function DirectorWorkspace({
         <ReferencePanel shot={selectedShot} />
       </div>}
       {view === 'director' ? <TaskDrawer actual={currentActual} shot={selectedShot} /> : null}
+      {productionOpen ? <Suspense fallback={<div className="progress-bar" />}>
+        <ProductionBriefPanel projectId={snapshot.project.id}
+          onClose={() => setProductionOpen(false)} />
+      </Suspense> : null}
     </section>
   );
 }

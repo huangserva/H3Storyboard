@@ -12,8 +12,8 @@
 ## M1A — director-ready production contract
 
 - [x] Extensible production Mode registry with `candidate` / `validated` / `blocked` capability status; no hard-coded production-policy enum.
-- [ ] Versioned production brief, text style lock, project generation locks, and immutable lock snapshot on each job.
-- [ ] Asset lifecycle (`candidate` / `approved` / `archived`), stable revisions, replacement lineage, and an authoritative current-assets manifest.
+- [x] Versioned production brief, text style lock, project generation locks, and immutable lock snapshot on each job.
+- [x] Asset lifecycle (`candidate` / `approved` / `archived`), stable revisions, replacement lineage, and an authoritative current-assets manifest.
 - [ ] Per-shot semantic reference requirements compiled into exact ordered H3 bindings; reject both missing and unrelated inputs.
 - [ ] Explicit opening and ending state for character position, appearance state, prop custody/damage, scene state, and sound handoff.
 - [ ] Representative-take approval gate before any batch submission.

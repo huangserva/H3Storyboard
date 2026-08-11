@@ -11,6 +11,8 @@ import {
   CurrentAssetsManifestSnapshotSchema,
   H3JobSchema,
   ModeSchema,
+  ProductionBriefSchema,
+  ProjectGenerationLockSchema,
   ProjectSchema,
   ProjectSnapshotSchema,
   ShotActualSchema,
@@ -108,6 +110,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
         },
       ],
     };
+    await prepareApiGenerationContext(first.origin, project.id, [asset.id]);
     const jobResponses = await Promise.all(
       Array.from({ length: 20 }, () =>
         postJson(`${first.origin}/api/shots/${shot.id}/jobs`, jobInput),
@@ -436,6 +439,9 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       ],
     ] as const;
 
+    await prepareApiGenerationContext(api.origin, project.id,
+      [first.id, last.id, motion.id]);
+
     for (const [mode, inputBindings] of cases) {
       const response = await postJson(
         `${api.origin}/api/shots/${shot.id}/jobs`,
@@ -476,6 +482,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const foreignShot = ShotPlanSchema.parse(
       (await foreignShotResponse.json() as { data: unknown }).data,
     );
+    await prepareApiGenerationContext(api.origin, foreignProject.id, []);
     const foreignBinding = await postJson(
       `${api.origin}/api/shots/${foreignShot.id}/jobs`,
       h3JobInput('i2v', 'foreign-reference', [imageBinding]),
@@ -635,7 +642,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(9);
+    expect(schemaVersion.version).toBe(10);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -1013,9 +1020,189 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(9);
+    expect(schemaVersion.version).toBe(10);
+  });
+
+  test('versions production briefs and freezes immutable job lock snapshots', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+    await postJson(`${api.origin}/api/modes`, {
+      key: 'cinematic-drama', title: 'Cinematic Drama',
+      description: 'Production intent policy.',
+      capability_declaration: productionCapability(),
+    });
+    const project = ProjectSchema.parse((await (await postJson(
+      `${api.origin}/api/projects`, { title: 'Locked production',
+        script_title: 'Production lock', script_content:
+        'A complete script establishes the production lock snapshot test.' },
+    )).json() as { data: unknown }).data);
+    const shot = ShotPlanSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/shots`, validShotInput(),
+    )).json() as { data: unknown }).data);
+
+    const unlockedJob = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'unlocked-job', []));
+    await expectError(unlockedJob, 409, 'LOCK_REQUIRED');
+    const missingMode = await postJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        mode_key: 'missing-mode', body: productionBriefBody('Missing mode'),
+      });
+    await expectError(missingMode, 422, 'BRIEF_MODE_NOT_FOUND');
+
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Missing brief check' });
+    const missingBrief = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'missing-brief', []));
+    await expectError(missingBrief, 409, 'BRIEF_REQUIRED');
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: false });
+
+    const briefV1 = ProductionBriefSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        mode_key: 'cinematic-drama', body: productionBriefBody('First intent'),
+      },
+    )).json() as { data: unknown }).data);
+    expect(briefV1.brief_version).toBe(1);
+    const immutableBrief = await patchJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        brief_id: briefV1.id, body: productionBriefBody('Mutation'),
+      });
+    await expectError(immutableBrief, 404, 'ROUTE_NOT_FOUND');
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Missing manifest check' });
+    const missingManifest = await postJson(`${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'missing-manifest', []));
+    await expectError(missingManifest, 409, 'MANIFEST_REQUIRED');
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: false });
+
+    const asset = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image', uri: 'references/locked-context.png', content_hash: null,
+    });
+    await patchJson(`${api.origin}/api/projects/${project.id}/assets`,
+      { asset_id: asset.id, status: 'approved' });
+    const manifestV1 = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await postJson(
+        `${api.origin}/api/projects/${project.id}/manifests`, {},
+      )).json() as { data: unknown }).data,
+    );
+    const briefV2 = ProductionBriefSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        mode_key: 'cinematic-drama', body: productionBriefBody('Locked intent'),
+      },
+    )).json() as { data: unknown }).data);
+    expect(briefV2.brief_version).toBe(2);
+    const engaged = ProjectGenerationLockSchema.parse((await (await putJson(
+      `${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Representative generation batch' },
+    )).json() as { data: unknown }).data);
+    expect(engaged).toMatchObject({ engaged: true,
+      reason: 'Representative generation batch' });
+    const alreadyEngaged = await putJson(
+      `${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Duplicate engage' });
+    await expectError(alreadyEngaged, 409, 'LOCK_ALREADY_ENGAGED');
+    const lockedBrief = await postJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        mode_key: 'cinematic-drama', body: productionBriefBody('Forbidden'),
+      });
+    await expectError(lockedBrief, 409, 'LOCK_ENGAGED');
+    const lockedAsset = await patchJson(
+      `${api.origin}/api/projects/${project.id}/assets`,
+      { asset_id: asset.id, status: 'archived' });
+    await expectError(lockedAsset, 409, 'LOCK_ENGAGED');
+    const lockedManifest = await postJson(
+      `${api.origin}/api/projects/${project.id}/manifests`, {});
+    await expectError(lockedManifest, 409, 'LOCK_ENGAGED');
+
+    const firstJob = H3JobSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'locked-job-v1', []),
+    )).json() as { data: unknown }).data);
+    expect(firstJob.lock_snapshot).toEqual({
+      brief_version: briefV2.brief_version,
+      manifest_version: manifestV1.manifest.manifest_version,
+      mode_key: 'cinematic-drama', locked_at: engaged.engaged_at,
+    });
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: false });
+
+    const briefV3 = ProductionBriefSchema.parse((await (await postJson(
+      `${api.origin}/api/projects/${project.id}/briefs`, {
+        mode_key: 'cinematic-drama', body: productionBriefBody('Next intent'),
+      },
+    )).json() as { data: unknown }).data);
+    const nextAsset = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image', uri: 'references/next-context.png', content_hash: null,
+    });
+    await patchJson(`${api.origin}/api/projects/${project.id}/assets`,
+      { asset_id: nextAsset.id, status: 'approved' });
+    const manifestV2 = CurrentAssetsManifestSnapshotSchema.parse(
+      (await (await postJson(
+        `${api.origin}/api/projects/${project.id}/manifests`, {},
+      )).json() as { data: unknown }).data,
+    );
+    await putJson(`${api.origin}/api/projects/${project.id}/generation_lock`,
+      { engaged: true, reason: 'Next batch' });
+    const secondJob = H3JobSchema.parse((await (await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('t2v', 'locked-job-v2', []),
+    )).json() as { data: unknown }).data);
+    expect(secondJob.lock_snapshot).toMatchObject({ brief_version: 3,
+      manifest_version: 2, mode_key: 'cinematic-drama' });
+    expect(briefV3.brief_version).toBe(3);
+    expect(manifestV2.manifest.manifest_version).toBe(2);
+    const persistedFirst = (await getSnapshot(api.origin, project.id)).h3_jobs
+      .find(({ id }) => id === firstJob.id);
+    expect(persistedFirst?.lock_snapshot).toEqual(firstJob.lock_snapshot);
+    const briefs = ProductionBriefSchema.array().parse((await (await fetch(
+      `${api.origin}/api/projects/${project.id}/briefs`,
+    )).json() as { data: unknown }).data);
+    expect(briefs.map(({ brief_version }) => brief_version)).toEqual([1, 2, 3]);
   });
 });
+
+function productionCapability() {
+  return { generation_modes: ['i2v', 'fl2v'],
+    duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
+      max_width: 480, min_height: 864, max_height: 864 },
+    lora_profile_requirements: [], provider_requirements: ['local_comfyui'],
+    extensions: {} };
+}
+
+function productionBriefBody(logline: string) {
+  return { logline, style_notes: 'Rain-soaked cinematic drama.',
+    text_style_lock: 'On-screen text uses restrained ivory sans serif.',
+    hard_rules: ['Never overwrite planned shots.', 'Use approved assets only.'] };
+}
+
+async function prepareApiGenerationContext(origin: string, projectId: string,
+  assetIds: string[]): Promise<void> {
+  const modes = ModeSchema.array().parse((await (await fetch(
+    `${origin}/api/modes`,
+  )).json() as { data: unknown }).data);
+  if (!modes.some(({ key }) => key === 'test-production')) {
+    await postJson(`${origin}/api/modes`, { key: 'test-production',
+      title: 'Test Production', description: 'Test production policy.',
+      capability_declaration: productionCapability() });
+  }
+  const approvedIds = [...assetIds];
+  if (approvedIds.length === 0) {
+    approvedIds.push((await createAssetViaApi(origin, projectId, {
+      kind: 'image', uri: `context/${projectId}.png`, content_hash: null,
+    })).id);
+  }
+  for (const assetId of approvedIds) {
+    await patchJson(`${origin}/api/projects/${projectId}/assets`,
+      { asset_id: assetId, status: 'approved' });
+  }
+  await postJson(`${origin}/api/projects/${projectId}/manifests`, {});
+  await postJson(`${origin}/api/projects/${projectId}/briefs`, {
+    mode_key: 'test-production', body: productionBriefBody('Test intent'),
+  });
+  await putJson(`${origin}/api/projects/${projectId}/generation_lock`,
+    { engaged: true, reason: 'Test generation context' });
+}
 
 function validShotInput(): Record<string, unknown> {
   return {
@@ -1071,6 +1258,11 @@ async function patchJson(url: string, body: unknown): Promise<Response> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+async function putJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, { method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body) });
 }
 
 async function createAssetViaApi(

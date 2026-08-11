@@ -6,6 +6,8 @@ import {
   H3JobSchema,
   JobEventSchema,
   ModeSchema,
+  ProductionBriefSchema,
+  ProjectGenerationLockSchema,
   ProjectSchema,
   ScriptVersionSchema,
   ShotActualSchema,
@@ -17,6 +19,8 @@ import {
   type H3Job,
   type JobEvent,
   type Mode,
+  type ProductionBrief,
+  type ProjectGenerationLock,
   type Project,
   type ScriptVersion,
   type ShotActual,
@@ -125,6 +129,25 @@ export function mapH3Job(row: unknown): H3Job {
   return decode(H3JobSchema, {
     ...record,
     input_bindings: jsonColumn(record, 'input_bindings_json'),
+    lock_snapshot: record.lock_snapshot_json === null ||
+      record.lock_snapshot_json === undefined
+      ? null : jsonColumn(record, 'lock_snapshot_json'),
+  });
+}
+
+export function mapProductionBrief(row: unknown): ProductionBrief {
+  const record = objectRow(row);
+  return decode(ProductionBriefSchema, {
+    ...record,
+    body: jsonColumn(record, 'body_json'),
+  });
+}
+
+export function mapGenerationLock(row: unknown): ProjectGenerationLock {
+  const record = objectRow(row);
+  return decode(ProjectGenerationLockSchema, {
+    ...record,
+    engaged: record.engaged === 1,
   });
 }
 

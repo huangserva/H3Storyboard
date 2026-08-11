@@ -288,7 +288,27 @@ function seedShot(store: ProjectStore): { projectId: string; shotId: string } {
     costume_state: {},
     reference_bindings: [],
   });
+  seedProductionContext(store, project.id);
   return { projectId: project.id, shotId: shot.id };
+}
+
+function seedProductionContext(store: ProjectStore, projectId: string): void {
+  store.modes.create({ key: 'lease-recovery', title: 'Lease Recovery',
+    description: 'Production policy used by lease recovery tests.',
+    capability_declaration: { generation_modes: ['i2v'],
+      duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
+        max_width: 480, min_height: 864, max_height: 864 },
+      lora_profile_requirements: [], provider_requirements: ['local_comfyui'],
+      extensions: {} } });
+  const asset = store.createAsset(projectId, { kind: 'image',
+    uri: `context/${projectId}.png`, content_hash: null });
+  store.updateAsset(projectId, { asset_id: asset.id, status: 'approved' });
+  store.freezeCurrentAssetsManifest(projectId);
+  store.production.createBrief(projectId, { mode_key: 'lease-recovery',
+    body: { logline: 'Lease recovery intent', style_notes: 'Stable test style.',
+      text_style_lock: null, hard_rules: ['Recover jobs exactly once.'] } });
+  store.production.updateLock(projectId,
+    { engaged: true, reason: 'Lease recovery test' });
 }
 
 function createDraft(store: ProjectStore, shotId: string, key: string) {

@@ -7,6 +7,7 @@ import {
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
+import { requireGenerationUnlocked } from './generation-locks.js';
 import { parseInput } from './input.js';
 
 function requireProject(db: Database.Database, projectId: string): void {
@@ -32,6 +33,7 @@ export function freezeCurrentAssetsManifest(db: Database.Database,
   projectId: string): CurrentAssetsManifestSnapshot {
   return db.transaction(() => {
     requireProject(db, projectId);
+    requireGenerationUnlocked(db, projectId);
     const assets = db.prepare(
       `SELECT id FROM assets WHERE project_id = ? AND status = 'approved'
        ORDER BY id`,

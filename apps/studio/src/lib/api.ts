@@ -10,11 +10,15 @@ import type {
   CurrentAssetsManifestSnapshot,
   CreateModeInput,
   Mode,
+  ProductionBrief,
+  ProjectGenerationLock,
   Project,
   ProjectSnapshot,
   UpdateCanvasNodeInput,
   UpdateAssetInput,
   UpdateModeInput,
+  CreateProductionBriefInput,
+  UpdateProjectGenerationLockInput,
   UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 
@@ -195,4 +199,34 @@ export async function updateMode(input: UpdateModeInput): Promise<Mode> {
   return request<Mode>('/api/modes', {
     method: 'PATCH', body: JSON.stringify(input),
   });
+}
+
+export async function listProductionBriefs(
+  projectId: string,
+): Promise<ProductionBrief[]> {
+  return request<ProductionBrief[]>(`/api/projects/${projectId}/briefs`);
+}
+
+export async function createProductionBrief(projectId: string,
+  input: CreateProductionBriefInput): Promise<ProductionBrief> {
+  return request<ProductionBrief>(`/api/projects/${projectId}/briefs`, {
+    method: 'POST', body: JSON.stringify(input),
+  });
+}
+
+export async function getGenerationLock(
+  projectId: string,
+): Promise<ProjectGenerationLock> {
+  return request<ProjectGenerationLock>(
+    `/api/projects/${projectId}/generation_lock`,
+  );
+}
+
+export async function updateGenerationLock(projectId: string,
+  input: UpdateProjectGenerationLockInput): Promise<ProjectGenerationLock> {
+  return request<ProjectGenerationLock>(
+    `/api/projects/${projectId}/generation_lock`, {
+      method: 'PUT', body: JSON.stringify(input),
+    },
+  );
 }

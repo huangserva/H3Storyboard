@@ -8,6 +8,7 @@ import {
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
+import { requireGenerationUnlocked } from './generation-locks.js';
 import { parseInput } from './input.js';
 import { mapAsset } from './row-mappers.js';
 
@@ -46,6 +47,9 @@ export function createAsset(db: Database.Database, projectId: string,
   const input = parseInput(CreateAssetInputSchema, rawInput);
   return db.transaction(() => {
     requireProject(db, projectId);
+    if (input.replaces_asset_id !== null) {
+      requireGenerationUnlocked(db, projectId);
+    }
     if (input.derived_from_asset_id !== null) {
       const source = requireRelatedAsset(db, projectId, input.derived_from_asset_id);
       if (source.kind !== 'video') throw new StoreError('ASSET_DERIVATION_INVALID',
@@ -96,6 +100,9 @@ export function updateAsset(db: Database.Database, projectId: string,
       project_id: projectId, asset_id: input.asset_id,
     });
     const existing = mapAsset(row);
+    if (input.status !== undefined && input.status !== existing.status) {
+      requireGenerationUnlocked(db, projectId);
+    }
     if (existing.status === 'archived') throw new StoreError(
       'ASSET_ARCHIVED', 'Archived asset is immutable', { asset_id: existing.id });
     if ((input.uri !== undefined || input.content_hash !== undefined) &&

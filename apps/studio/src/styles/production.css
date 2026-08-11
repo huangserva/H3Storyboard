@@ -1,0 +1,35 @@
+.production-panel { background: rgba(13,16,15,.98); border-left: 1px solid var(--line);
+  bottom: 0; box-shadow: var(--shadow); display: flex; flex-direction: column;
+  overflow-y: auto; position: fixed; right: 0; top: 0; width: 420px; z-index: 40; }
+.production-panel > header, .production-panel > header > div, .generation-lock header,
+.generation-lock header > div, .brief-current > header, .brief-current > header > div {
+  display: flex; }
+.production-panel > header { align-items: center; border-bottom: 1px solid var(--line);
+  justify-content: space-between; padding: 15px; }
+.production-panel > header > div, .generation-lock header > div,
+.brief-current > header > div { align-items: flex-start; flex-direction: column; gap: 5px; }
+.production-panel button { background: transparent; color: var(--muted); cursor: pointer;
+  font: 650 8px/1 var(--mono); padding: 8px; }
+.production-panel button:hover:not(:disabled) { color: var(--acid); }
+.generation-lock { background: var(--ink-2); border-bottom: 1px solid var(--line); padding: 13px; }
+.generation-lock[data-engaged="true"] { box-shadow: inset 3px 0 var(--danger); }
+.generation-lock header { align-items: center; justify-content: space-between; }
+.generation-lock strong { color: var(--acid); font: 700 9px/1 var(--mono); }
+.generation-lock[data-engaged="true"] strong { color: var(--danger); }
+.generation-lock small { color: var(--faint); font: 600 7px/1.4 var(--mono); }
+.generation-lock input { box-sizing: border-box; margin-top: 10px; width: 100%; }
+.brief-current { border-bottom: 1px solid var(--line); padding: 14px; }
+.brief-current > header { align-items: center; justify-content: space-between; }
+.brief-current p { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.brief-current small { color: var(--faint); font: 600 7px/1 var(--mono); }
+.brief-current blockquote { border-left: 2px solid var(--planned); color: var(--muted);
+  font-size: 9px; margin: 12px 0 0; padding-left: 9px; }
+.brief-form { display: grid; gap: 10px; padding: 14px; }
+.brief-form label { display: grid; gap: 5px; }
+.brief-form label span { color: var(--faint); font: 650 7px/1 var(--mono); }
+.brief-form input, .brief-form select, .brief-form textarea, .generation-lock input {
+  background: var(--ink-0); border: 1px solid var(--line); border-radius: 3px;
+  font: 600 9px/1.45 var(--mono); padding: 8px; }
+.brief-form textarea { min-height: 62px; resize: vertical; }
+.production-error { color: var(--danger); font: 600 8px/1.5 var(--mono); margin: 0; padding: 9px 13px; }
+@media (max-width:720px) { .production-panel { width: 100%; } }

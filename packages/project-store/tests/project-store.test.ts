@@ -22,11 +22,38 @@ function newStore(): ProjectStore {
 }
 
 function createProject(store: ProjectStore, title = '雨夜归途') {
-  return store.createProject({
+  const project = store.createProject({
     title,
     script_title: '完整剧本 v1',
     script_content: '雨落在站台上。阿澄走出末班车，远处的灯依次熄灭。',
   });
+  seedProductionContext(store, project.id);
+  return project;
+}
+
+function seedProductionContext(store: ProjectStore, projectId: string): void {
+  if (!store.modes.list().some(({ key }) => key === 'test-production')) {
+    store.modes.create({ key: 'test-production', title: 'Test Production',
+      description: 'Production policy used by store integration tests.',
+      capability_declaration: testCapability() });
+  }
+  const asset = store.createAsset(projectId, { kind: 'image',
+    uri: `context/${projectId}.png`, content_hash: null });
+  store.updateAsset(projectId, { asset_id: asset.id, status: 'approved' });
+  store.freezeCurrentAssetsManifest(projectId);
+  store.production.createBrief(projectId, { mode_key: 'test-production',
+    body: { logline: 'Test intent', style_notes: 'Stable integration style.',
+      text_style_lock: null, hard_rules: ['Preserve planned and actual records.'] } });
+  store.production.updateLock(projectId,
+    { engaged: true, reason: 'Store integration test' });
+}
+
+function testCapability() {
+  return { generation_modes: ['i2v', 'fl2v'] as const,
+    duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 480,
+      max_width: 480, min_height: 864, max_height: 864 },
+    lora_profile_requirements: [], provider_requirements: ['local_comfyui'] as const,
+    extensions: {} };
 }
 
 function createShot(store: ProjectStore, projectId: string, title = '站台') {
@@ -254,7 +281,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(9);
+    ).toBe(10);
     migratedVersion.close();
   });
 

@@ -6,6 +6,7 @@ import {
   NonEmptyTextSchema,
   TimestampSchema,
 } from './common.js';
+import { JobLockSnapshotSchema } from './production-brief.js';
 
 export const H3ModeSchema = z.enum([
   't2v',
@@ -90,6 +91,7 @@ export const H3JobSchema = z.object({
   created_at: TimestampSchema,
   updated_at: TimestampSchema,
   completed_at: TimestampSchema.nullable(),
+  lock_snapshot: JobLockSnapshotSchema.nullable(),
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 

@@ -13,6 +13,7 @@ import './styles/canvas.css';
 import './styles/characters.css';
 import './styles/assets.css';
 import './styles/modes.css';
+import './styles/production.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');
