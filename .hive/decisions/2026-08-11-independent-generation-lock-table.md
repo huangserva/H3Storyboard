@@ -1,7 +1,7 @@
 # 决策：项目生成锁使用独立单行表
 
 **日期**: 2026-08-11
-**状态**: 提案中
+**状态**: accepted（orch 架构 review 通过 2026-08-11）
 **关联**: plan.md → M1A · 导演级生产契约
 
 ## 背景
@@ -20,4 +20,4 @@ M1A-4 要给每个项目增加可 engage/release 的生成冻结状态，并记�
 - 本轮只保留最近一次 engage/release 状态，不提供完整锁事件历史；如需审计链应另建 append-only lock events。
 
 ## 结果（后写）
-v10、锁内写入拦截、job snapshot 和真实 HTTP+SQLite 测试已实现；等待架构 review 后决定是否转为已采纳。
+v10、锁内写入拦截、job snapshot 和真实 HTTP+SQLite 测试已实现（commit 33d9845，41 tests 过）。orch review 通过。lock_events 审计链暂不建：当前锁状态 + job 快照已满足追溯需求，真实审计需求出现时再加 append-only 事件表。
