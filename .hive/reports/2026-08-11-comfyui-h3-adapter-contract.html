@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M1B-1 · ComfyUI H3 Adapter Contract</title>
+  <style>
+    :root { color-scheme:dark; --bg:#081014; --panel:#111c22; --ink:#eef7f6; --muted:#9bb0b2; --line:#294049; --mint:#78e0b4; --cyan:#76d7e8; --amber:#efbc72; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 82% 0,#143b45 0,transparent 34rem),var(--bg); color:var(--ink); font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1080px,calc(100% - 32px)); margin:44px auto 70px; }
+    h1 { margin:.15em 0; font-size:clamp(36px,6vw,66px); line-height:1.04; letter-spacing:-.04em; }
+    h2 { margin-top:38px; font-size:23px; }
+    p { max-width:880px; }
+    .eyebrow { color:var(--cyan); text-transform:uppercase; letter-spacing:.15em; font-size:12px; }
+    .lede { color:var(--muted); font-size:19px; }
+    .gate { padding:20px 22px; border:1px solid #356c64; border-radius:16px; background:#0d2521; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    .card { padding:19px; border:1px solid var(--line); border-radius:15px; background:linear-gradient(145deg,#16242a,#0d161b); }
+    .card h3 { margin:0 0 7px; font-size:18px; }
+    code { color:#b9f4d6; }
+    table { width:100%; border-collapse:collapse; background:#0e181d; }
+    th,td { padding:12px 13px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--cyan); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+    .ok { color:var(--mint); } .warn { color:var(--amber); }
+    footer { margin-top:40px; padding-top:17px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media(max-width:760px) { .grid { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">H3Storyboard · M1B-1 · 2026-08-11</div>
+  <h1>Adapter 契约已落地，<br>但没有冒充真实出片。</h1>
+  <p class="lede">已把 h3-film-studio 的实跑 Python 契约移植为 TypeScript：上传、提交、有限轮询、输出 URL、零字节下载保护、显存释放钩子，以及确定性 H3 I2V graph。GPU 正被其他任务占用，本轮严格只读探测。</p>
+  <p class="gate"><strong>证据等级：</strong><span class="ok">11 个所需节点全部 present</span>，说明 ComfyUI 0.30 的能力声明完整；它不等于 model/LoRA/显存/成片质量已经端到端验证。真实 POST `/prompt` 留给 M1B-3 的协调窗口。</p>
+
+  <h2>交付面</h2>
+  <section class="grid">
+    <article class="card"><h3>HTTP contract</h3><p><code>uploadImage</code>、<code>submitPrompt</code>、<code>pollHistory</code>、<code>viewUrl</code>、<code>downloadOutput</code>、<code>free</code> 全部走注入 fetch；stub 用真实随机端口 HTTP server。</p></article>
+    <article class="card"><h3>H3 graph</h3><p>Director I2V graph 固化 loader、LoRA 链、seed、24fps、宽高帧数、timeline、Create/SaveVideo；Turbo 和音频均为显式参数。</p></article>
+    <article class="card"><h3>输入铁律</h3><p>尺寸 `%32`、帧数 `17k+5`、中文 <code>Audio:</code> 行阻断；未用 <code>「」</code> 的中文台词给 warning，不静默修改 prompt。</p></article>
+  </section>
+
+  <h2>只读节点证据</h2>
+  <table>
+    <thead><tr><th>能力组</th><th>节点</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>H3 core</td><td>MiniMaxH3ImageToVideo · MiniMaxH3ReferenceToVideo · EmptyMiniMaxH3LatentAV</td><td class="ok">present</td></tr>
+      <tr><td>Director</td><td>MiniMaxH3Director · UNETLoader · CLIPLoader · VAELoader · LoraLoaderModelOnly</td><td class="ok">present</td></tr>
+      <tr><td>I/O</td><td>LoadImage · CreateVideo · SaveVideo</td><td class="ok">present</td></tr>
+    </tbody>
+  </table>
+
+  <h2>失败路径已变成契约</h2>
+  <table>
+    <thead><tr><th>风险</th><th>稳定结果</th></tr></thead>
+    <tbody>
+      <tr><td>submit 4xx / 非法 JSON / node_errors</td><td><code>H3_COMFY_HTTP_ERROR</code> / <code>H3_COMFY_PROTOCOL_ERROR</code></td></tr>
+      <tr><td>history 永远没有 prompt</td><td><code>H3_COMFY_TIMEOUT</code>，interval 与 attempts 可配</td></tr>
+      <tr><td>completed 但 outputs 空、或无媒体 item</td><td><code>H3_COMFY_OUTPUT_MISSING</code></td></tr>
+      <tr><td>view 下载为零字节</td><td><code>H3_COMFY_EMPTY_DOWNLOAD</code></td></tr>
+      <tr><td>中文 Audio 指令被当对白念出</td><td><code>H3_PROMPT_CN_AUDIO</code>，提交前阻断</td></tr>
+    </tbody>
+  </table>
+
+  <h2>边界与下一步</h2>
+  <p class="warn">本轮没有向 8190/8188 发任何 POST：没有上传、生成或释放显存。`free()` 只在 stub 验证。M1B-2 接 worker 的 submit-once/poll-same-task/恢复；M1B-3 协调 GPU 窗口后才执行真实 graph，并用成片证据升级 Mode。</p>
+  <footer>参考：h3-film-studio @ 8693cc7 · 深读 scripts/local_providers.py:56-253 · 索引：.hive/research/2026-08-11-comfyui-h3-adapter-contract.md</footer>
+</main></body></html>
