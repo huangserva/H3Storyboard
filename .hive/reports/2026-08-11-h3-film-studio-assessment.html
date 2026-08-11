@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>h3-film-studio 对 H3Storyboard 的参考价值</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0a0f12; --panel:#141b20; --ink:#f0f4f2; --muted:#9ca9aa; --line:#29363b; --cyan:#79dbe7; --mint:#78e1b5; --amber:#f1bd70; --red:#ff897d; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 86% -5%,#17333e 0,transparent 34rem),var(--bg); color:var(--ink); font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1120px,calc(100% - 32px)); margin:46px auto 78px; }
+    h1 { max-width:920px; margin:0 0 18px; font-size:clamp(35px,6vw,70px); line-height:1.02; letter-spacing:-.045em; }
+    h2 { margin:40px 0 14px; font-size:23px; }
+    h3 { margin:0 0 8px; font-size:19px; }
+    p { max-width:900px; }
+    .eyebrow { color:var(--cyan); font-size:12px; letter-spacing:.16em; text-transform:uppercase; }
+    .lede { color:var(--muted); font-size:19px; }
+    .decision { padding:22px 24px; border:1px solid #346c64; border-radius:16px; background:#10231f; font-size:18px; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; }
+    .grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+    .card { padding:21px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(145deg,#182126,#11171b); }
+    .meta { color:var(--muted); font-size:13px; }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; background:#10171b; }
+    th,td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+    th { color:var(--cyan); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+    code { color:#b9f3d7; }
+    .take { color:var(--mint); } .gate { color:var(--amber); } .avoid { color:var(--red); }
+    ul,ol { padding-left:21px; }
+    footer { margin-top:42px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media (max-width:820px) { .grid,.grid2 { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Fourth-source reference review · 2026-08-11</div>
+  <h1>h3-film-studio 是唯一<br>真跑通过 H3 的参考。</h1>
+  <p class="lede">前三个参考回答"工作台长什么样、剧本怎么拆、生产政策怎么定"；h3-film-studio（自家项目，fork 自 xyz-video-skill）拿出了实证：本地 MiniMax-H3 + ComfyUI 端到端出片（119 秒成片、视频音频双流）。它是 M1B ComfyUI adapter 的直接蓝本，也是角色定义（Q2）的最强输入。</p>
+  <p class="decision"><strong>结论：</strong>把 h3-film-studio 里<em>被实证过的工程事实</em>——ComfyUI submit/poll 契约、H3 参数网格、三模式与 reference 用途的映射、角色 bible 三重锚、prompt 音频纪律——编译成 H3Storyboard 的协议校验规则和 provider adapter；不搬它的 skill 文档式流程（那正是 H3Storyboard 要用持久化工作台替代的部分）。</p>
+
+  <h2>它是什么</h2>
+  <p>一个 Claude skill：宿主 LLM 当导演（story → framework → storyboard 三层 JSON），Python 执行层落地（校验/参考图/生成/审查/合成）。fork 自 xyz-video-skill，把云端 Seedance 换成<strong>本地 H3（ComfyUI 8190）+ Krea2 图片（8188）</strong>。检视 commit <code>8693cc7</code>。已验证：普通剧情片冒烟（turbo 4 步 ~80s / 124 帧 / 480×864 / 双流）+ 119s 叙事成片。</p>
+
+  <h2>四条主借鉴线</h2>
+  <section class="grid2">
+    <article class="card">
+      <h3>1 · M1B adapter 蓝本 <span class="take">直接采纳</span></h3>
+      <p><code>scripts/local_providers.py</code>（314 行）就是工作的 ComfyUI 契约：<code>POST /prompt</code> 提交 graph → <code>GET /history/{pid}</code> 轮询 → 从 outputs 取 view URL 下载。含 i2v graph builder、LoRA 注入、seed 派生。M1B 的 adapter 不用从零猜，照这个契约写 TypeScript 版 + 补上 H3Storyboard 的 lease/恢复语义即可。</p>
+    </article>
+    <article class="card">
+      <h3>2 · 三模式映射被实证 <span class="take">直接采纳</span></h3>
+      <p>xyz 的 <code>video_references</code> 用途协议天然映射 H3 三模式：<code>first_frame</code>→i2v、<code>reference_character/prop/stage</code>→r2v、<code>reference_target_state</code>→fl2v。这正是 M1A "语义引用需求编译成有序 binding" 的设计——现在有了实跑证据，照此定协议枚举。</p>
+    </article>
+    <article class="card">
+      <h3>3 · 角色一致性三重锚 <span class="gate">回答 Q2</span></h3>
+      <p>实证结论：角色 bible（逐字复述的外观描述）+ 空间锚 + 同 seed 族，缺一漂移；更强的锁是 Krea i2i 从角色主图派生（denoise 0.42）。→ H3Storyboard 的角色实体最小字段：<strong>规范外观文本（可逐字注入 prompt）、参考图集、seed 族、派生血缘</strong>。服装/造型状态机可后置。</p>
+    </article>
+    <article class="card">
+      <h3>4 · INTENT 协议 ≈ production brief <span class="take">思想采纳</span></h3>
+      <p>意图保全协议 = 文件化单一真相源 + 纠正即写（用户原话）+ 动手前必读 + 交付自检门。它是 M1A "版本化 production brief + 锁快照" 的文件版原型。H3Storyboard 把它升级为 DB 实体：brief 版本化、每个 job 固化锁快照、QC 门禁对照 brief。</p>
+    </article>
+  </section>
+
+  <h2>该编译成协议校验的实证事实</h2>
+  <table>
+    <thead><tr><th>实证事实（2026-08-09 实验）</th><th>H3Storyboard 落点</th></tr></thead>
+    <tbody>
+      <tr><td>宽高必须被 32 整除（854 报错，用 864）；帧数落 17k+5 网格（124）</td><td><code>h3-provider</code> 提交前校验，稳定错误码拒绝非法尺寸/帧数</td></tr>
+      <tr><td>H3 会把 prompt 里的中文 Audio 行整句念出来（包括"全程无人声"）；台词必须写在「」内并指明说话人；Audio 行只许英文或不写</td><td>prompt 编译器 lint 规则：检测中文 Audio 行 → 阻断并报错，不靠文档自觉</td></tr>
+      <tr><td>H3 自带音频（video+audio 双流）；T8 采样 video_steps=4 / audio_steps=8，turbo 一刀切 4 步音频糊</td><td><code>ShotActual</code> 记录音频流存在性；QC 增加"听查"维度；采样参数入 Mode 能力表</td></tr>
+      <tr><td>Krea(8188) 与 H3(8190) 共享显存，切换前必须 <code>POST /free</code>，否则 OOM</td><td>task-engine 的 provider 切换钩子；worker 串行化图片/视频任务</td></tr>
+      <tr><td>偶发糊音是 seed 抽卡，同 prompt 换 seed 重跑即可</td><td>显式 rerun 已在 M1B 计划内——rerun 原因枚举加 <code>audio_garbled</code></td></tr>
+      <tr><td>母图派生多景别（一张高清母图 ffmpeg 裁切出全/中/特写）→ 视线、空间、光线天然连贯</td><td>资产血缘支持"母图→裁切派生"关系；画布 UI 可按母图聚簇分镜卡片</td></tr>
+    </tbody>
+  </table>
+
+  <h2>不搬什么</h2>
+  <ul>
+    <li><span class="avoid">skill 文档式流程本身</span> —— 无持久化、无 planned/actual 分离、pipeline 目前靠独立跑批脚本绕过（其待办自己承认）。这正是 H3Storyboard 存在的理由：给这套已验证的生成方法一个可恢复、可追溯的工作台。</li>
+    <li><span class="avoid">具体参数当常量</span> —— 480×864/24fps/turbo 4 步是当前盒子的验证点，进 Mode 能力表（candidate/validated），不硬编码。</li>
+    <li><span class="avoid">内容 profile 细节</span> —— profile 机制（不同 profile 覆盖不同 LoRA 栈与过滤开关）值得进 Mode registry 的能力维度；具体内容配置留在 skill 侧。</li>
+  </ul>
+
+  <h2>四个参考源的最终分工</h2>
+  <section class="grid">
+    <article class="card"><h3>filmstoryboard</h3><div class="meta">工作台信息架构</div><p>项目入口、素材管理、可视化分镜。</p></article>
+    <article class="card"><h3>xyz-video-* / h3-film-studio</h3><div class="meta">方法 + 实证引擎</div><p>剧本三层派生、reference 用途协议、连续性控制；h3-film-studio 加上本地 H3 实跑契约与参数网格。</p></article>
+    <article class="card"><h3>director</h3><div class="meta">生产政策</div><p>Mode 验证状态、资产生命周期、生成锁、代表 take 门禁。</p></article>
+  </section>
+
+  <footer>检视对象：github.com/huangserva/h3-film-studio @ 8693cc7（浅克隆 50 commits）· 本地 skill 目录在 user Mac（~/.claude/skills/h3-film-studio/），本机不存在 · 自家项目无许可证问题 · 关联：.hive/research/2026-08-11-h3-film-studio-assessment.md</footer>
+</main>
+</body>
+</html>

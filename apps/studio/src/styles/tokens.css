@@ -1,0 +1,26 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  --ink-0: #090b0b;
+  --ink-1: #0d100f;
+  --ink-2: #131816;
+  --ink-3: #1a201d;
+  --ink-4: #242c28;
+  --paper: #eeeade;
+  --muted: #949b95;
+  --faint: #666e69;
+  --line: rgba(238, 234, 222, 0.1);
+  --line-strong: rgba(238, 234, 222, 0.2);
+  --acid: #c9f36b;
+  --teal: #6ee7d4;
+  --amber: #f0bd67;
+  --danger: #ff796d;
+  --planned: #a9b6ff;
+  --radius-sm: 5px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --shadow: 0 20px 70px rgba(0, 0, 0, 0.42);
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}

@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/protocol" },
+    { "path": "packages/task-engine" },
+    { "path": "packages/project-store" },
+    { "path": "packages/h3-provider" },
+    { "path": "apps/api" },
+    { "path": "apps/studio" }
+  ]
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=Reverse SSH tunnel: H3Storyboard 5174 -> alibaba 127.0.0.1:5174
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=admin01
+ExecStart=/usr/bin/ssh -N -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -i /home/admin01/.ssh/ali_106.pem -p 58222 -R 127.0.0.1:5174:localhost:5174 root@106.14.227.192
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

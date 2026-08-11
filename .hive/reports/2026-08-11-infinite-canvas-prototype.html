@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>H3Storyboard 无限画布原型报告</title>
+<style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:880px;color:#202522}h1,h2{line-height:1.2}code{background:#eef1ed;padding:2px 5px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd2cc;padding:8px;text-align:left}.ok{color:#18754a}.blocked{color:#a24c12}</style></head>
+<body><h1>H3Storyboard 无限画布原型</h1><p>2026-08-11 · M2 prototype</p>
+<h2>结果</h2><ul><li class="ok">React + CSS transform 自实现平移、指针中心缩放和卡片自由拖动。</li><li class="ok">真实 API 分镜按 scene 聚簇，动态分组框展示多场景。</li><li class="ok">布局按 project 写入 localStorage，planned/actual 视图继续共存。</li><li class="ok">Vite <code>/api</code> 代理与外部 Host 已配置。</li></ul>
+<h2>选择</h2><table><tr><th>方案</th><th>判断</th></tr><tr><td>CSS transform + Pointer Events</td><td>采用；零依赖且覆盖本轮全部交互</td></tr><tr><td>React Flow 类库</td><td>暂缓；当前没有连线、端口或图算法需求</td></tr></table>
+<h2>验证</h2><p class="ok"><code>pnpm check &amp;&amp; pnpm build &amp;&amp; pnpm test</code>：35 tests passed。</p>
+<h2>部署状态</h2><p>中转机 nginx 配置测试通过，反向隧道上游返回 Studio；公网 TCP 9994 超时。</p><p class="blocked">需 user 放行阿里云安全组 9994，并以 sudo 安装仓库中的 systemd unit。</p>
+</body></html>

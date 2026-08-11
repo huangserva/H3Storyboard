@@ -1,0 +1,16 @@
+{
+  "name": "@h3storyboard/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --workspace-root check && pnpm run dev:serve",
+    "dev:serve": "tsx watch src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@h3storyboard/project-store": "workspace:*",
+    "@h3storyboard/protocol": "workspace:*",
+    "zod": "^4.1.5"
+  }
+}

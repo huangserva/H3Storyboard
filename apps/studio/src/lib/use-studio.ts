@@ -1,0 +1,112 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  CreateProjectInput,
+  CreateShotPlanInput,
+  Project,
+  ProjectSnapshot,
+} from '@h3storyboard/protocol';
+import * as api from './api.js';
+
+export interface Notice {
+  tone: 'success' | 'error';
+  text: string;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof api.ApiError) {
+    return `${error.message} · ${error.code}`;
+  }
+  return error instanceof Error ? error.message : '发生未知错误';
+}
+
+export function useStudio() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
+  const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const selectionRequest = useRef(0);
+
+  const refreshProjects = useCallback(async () => {
+    try {
+      setProjects(await api.listProjects());
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeError(error) });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshProjects();
+  }, [refreshProjects]);
+
+  const selectProject = useCallback(async (projectId: string) => {
+    const requestId = selectionRequest.current + 1;
+    selectionRequest.current = requestId;
+    setBusy(true);
+    try {
+      const next = await api.getProject(projectId);
+      if (requestId !== selectionRequest.current) return;
+      setSnapshot(next);
+      setSelectedShotId(next.shot_plans[0]?.id ?? null);
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeError(error) });
+    } finally {
+      if (requestId === selectionRequest.current) setBusy(false);
+    }
+  }, []);
+
+  const addProject = useCallback(
+    async (input: CreateProjectInput) => {
+      setBusy(true);
+      try {
+        const next = await api.createProject(input);
+        setSnapshot(next);
+        setSelectedShotId(null);
+        await refreshProjects();
+        setNotice({ tone: 'success', text: '项目已建立，脚本 V1 已锁定' });
+        return true;
+      } catch (error) {
+        setNotice({ tone: 'error', text: describeError(error) });
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refreshProjects],
+  );
+
+  const addShot = useCallback(
+    async (input: CreateShotPlanInput) => {
+      if (!snapshot) return false;
+      setBusy(true);
+      try {
+        const next = await api.createShotPlan(snapshot.project.id, input);
+        const newest = next.shot_plans.at(-1);
+        setSnapshot(next);
+        setSelectedShotId(newest?.id ?? null);
+        setNotice({ tone: 'success', text: `计划镜头 ${newest?.title ?? ''} 已保存` });
+        return true;
+      } catch (error) {
+        setNotice({ tone: 'error', text: describeError(error) });
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [snapshot],
+  );
+
+  return {
+    projects,
+    snapshot,
+    selectedShotId,
+    selectedShot: snapshot?.shot_plans.find((shot) => shot.id === selectedShotId) ?? null,
+    busy,
+    notice,
+    selectProject,
+    selectShot: setSelectedShotId,
+    addProject,
+    addShot,
+    dismissNotice: () => setNotice(null),
+  };
+}

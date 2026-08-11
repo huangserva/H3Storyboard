@@ -1,0 +1,643 @@
+import { randomUUID } from 'node:crypto';
+import Database from 'better-sqlite3';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  AssetSchema,
+  H3JobSchema,
+  ProjectSchema,
+  ProjectSnapshotSchema,
+  ShotActualSchema,
+  ShotPlanSchema,
+} from '../../packages/protocol/src/index.js';
+import { openProjectStore } from '../../packages/project-store/src/index.js';
+import { afterEach, describe, expect, test } from 'vitest';
+import {
+  createApiServer,
+  type ApiServer,
+} from '../../apps/api/src/server.js';
+
+interface ErrorEnvelope {
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+const servers = new Set<ApiServer>();
+const temporaryDirectories = new Set<string>();
+
+afterEach(async () => {
+  await Promise.all([...servers].map((server) => server.close()));
+  servers.clear();
+  await Promise.all(
+    [...temporaryDirectories].map((directory) =>
+      rm(directory, { recursive: true, force: true }),
+    ),
+  );
+  temporaryDirectories.clear();
+});
+
+describe('H3Storyboard HTTP and SQLite integration', () => {
+  test('persists the script, planned shot, asset, and draft job across a server restart', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const first = await startApi(databasePath);
+
+    const health = await fetch(`${first.origin}/api/health`);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({
+      data: { status: 'ok', protocol_version: '1.0' },
+    });
+
+    const projectResponse = await postJson(`${first.origin}/api/projects`, {
+      title: 'Night Train',
+      script_title: 'The final carriage',
+      script_content:
+        'A conductor crosses the final carriage while the city disappears into fog.',
+    });
+    expect(projectResponse.status).toBe(201);
+    const project = ProjectSchema.parse(
+      (await projectResponse.json() as { data: unknown }).data,
+    );
+
+    const shotResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/shots`,
+      validShotInput(),
+    );
+    expect(shotResponse.status).toBe(201);
+    const shot = ShotPlanSchema.parse(
+      (await shotResponse.json() as { data: unknown }).data,
+    );
+
+    const assetResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/assets`,
+      {
+        kind: 'image',
+        name: 'Conductor first frame',
+        relative_path: 'assets/conductor-first-frame.png',
+        content_hash: 'sha256:conductor-first-frame',
+      },
+    );
+    expect(assetResponse.status).toBe(201);
+    const asset = AssetSchema.parse(
+      (await assetResponse.json() as { data: unknown }).data,
+    );
+
+    const jobInput = {
+      mode: 'i2v',
+      provider: 'local_comfyui',
+      model: 'HunyuanVideo-H3',
+      prompt: 'The conductor walks through a softly swaying night carriage.',
+      duration_seconds: 8,
+      seed: 42,
+      steps: 24,
+      idempotency_key: 'night-train-shot-1-take-1',
+      input_bindings: [
+        {
+          asset_id: asset.id,
+          asset_kind: 'image',
+          role: 'first_frame',
+          ordinal: 0,
+        },
+      ],
+    };
+    const jobResponses = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        postJson(`${first.origin}/api/shots/${shot.id}/jobs`, jobInput),
+      ),
+    );
+    expect(jobResponses.every(({ status }) => status === 201)).toBe(true);
+    const jobs = await Promise.all(
+      jobResponses.map(async (response) =>
+        H3JobSchema.parse(
+          (await response.json() as { data: unknown }).data,
+        ),
+      ),
+    );
+    expect(new Set(jobs.map(({ id }) => id)).size).toBe(1);
+    const job = jobs[0]!;
+    expect(job.status).toBe('draft');
+
+    const conflictingJob = await postJson(
+      `${first.origin}/api/shots/${shot.id}/jobs`,
+      { ...jobInput, prompt: 'A conflicting request with the same key.' },
+    );
+    await expectError(conflictingJob, 409, 'IDEMPOTENCY_KEY_REUSED');
+
+    const outputResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/assets`,
+      {
+        kind: 'video',
+        name: 'Conductor take 1',
+        relative_path: 'outputs/conductor-take-1.mp4',
+        content_hash: 'sha256:conductor-take-1',
+      },
+    );
+    const output = AssetSchema.parse(
+      (await outputResponse.json() as { data: unknown }).data,
+    );
+    const worker = openProjectStore(databasePath);
+    const claimed = worker.claimH3Job(job.id);
+    worker.markH3JobQueued(job.id, claimed.lease_token!, 'provider-job-1');
+    worker.markH3JobRunning(job.id, claimed.lease_token!);
+    worker.completeH3Job(job.id, claimed.lease_token!, output.id);
+    worker.close();
+
+    const preapprovedActual = await postJson(
+      `${first.origin}/api/shots/${shot.id}/actuals`,
+      {
+        job_id: job.id,
+        output_asset_id: output.id,
+        observed_description: 'This take tries to bypass explicit review.',
+        deviation_notes: '',
+        qc_verdict: 'approved',
+      },
+    );
+    await expectError(preapprovedActual, 400, 'VALIDATION_FAILED');
+    const wrongOutputActual = await postJson(
+      `${first.origin}/api/shots/${shot.id}/actuals`,
+      {
+        job_id: job.id,
+        output_asset_id: asset.id,
+        observed_description: 'This take points at the wrong output asset.',
+        deviation_notes: '',
+        qc_verdict: 'pending',
+      },
+    );
+    await expectError(wrongOutputActual, 422, 'H3_JOB_OUTPUT_MISMATCH');
+
+    const actualResponse = await postJson(
+      `${first.origin}/api/shots/${shot.id}/actuals`,
+      {
+        job_id: job.id,
+        output_asset_id: output.id,
+        observed_description: 'The conductor crosses frame with stable identity.',
+        deviation_notes: '',
+        qc_verdict: 'pending',
+      },
+    );
+    expect(actualResponse.status).toBe(201);
+    const actual = ShotActualSchema.parse(
+      (await actualResponse.json() as { data: unknown }).data,
+    );
+    const conflictingActual = await postJson(
+      `${first.origin}/api/shots/${shot.id}/actuals`,
+      {
+        job_id: job.id,
+        output_asset_id: output.id,
+        observed_description: 'A conflicting observation for the same job.',
+        deviation_notes: '',
+        qc_verdict: 'pending',
+      },
+    );
+    await expectError(conflictingActual, 409, 'SHOT_ACTUAL_CONFLICT');
+    const reviewResponse = await postJson(
+      `${first.origin}/api/actuals/${actual.id}/review`,
+      { qc_verdict: 'approved', deviation_notes: 'Matches the plan.' },
+    );
+    expect(reviewResponse.status).toBe(200);
+    const approved = ShotActualSchema.parse(
+      (await reviewResponse.json() as { data: unknown }).data,
+    );
+    expect(approved.qc_verdict).toBe('approved');
+    const duplicateReview = await postJson(
+      `${first.origin}/api/actuals/${actual.id}/review`,
+      { qc_verdict: 'rejected' },
+    );
+    await expectError(duplicateReview, 422, 'QC_VERDICT_INVALID');
+
+    const boundaryResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/assets`,
+      {
+        kind: 'image',
+        name: 'Conductor approved last frame',
+        relative_path: 'outputs/conductor-take-1-last.png',
+        content_hash: 'sha256:conductor-take-1-last',
+        derived_from_asset_id: output.id,
+        derivation_kind: 'last_frame',
+      },
+    );
+    const boundary = AssetSchema.parse(
+      (await boundaryResponse.json() as { data: unknown }).data,
+    );
+    const continuedShotResponse = await postJson(
+      `${first.origin}/api/projects/${project.id}/shots`,
+      {
+        ...validShotInput(),
+        title: 'Carriage exit',
+        continuity_mode: 'visual_match',
+        continuity_dependencies: [
+          {
+            source_shot_plan_id: shot.id,
+            source_take_id: actual.id,
+            reference_asset_id: boundary.id,
+            boundary: 'last_frame',
+          },
+        ],
+        reference_bindings: [
+          {
+            asset_id: boundary.id,
+            asset_kind: 'image',
+            role: 'first_frame',
+            ordinal: 0,
+          },
+        ],
+      },
+    );
+    expect(continuedShotResponse.status).toBe(201);
+    const continuedShot = ShotPlanSchema.parse(
+      (await continuedShotResponse.json() as { data: unknown }).data,
+    );
+
+    const continuityDropped = await postJson(
+      `${first.origin}/api/shots/${continuedShot.id}/jobs`,
+      h3JobInput('t2v', 'continued-shot-without-boundary', []),
+    );
+    await expectError(continuityDropped, 422, 'H3_BINDINGS_INVALID');
+    const continuedJobResponse = await postJson(
+      `${first.origin}/api/shots/${continuedShot.id}/jobs`,
+      h3JobInput('i2v', 'continued-shot-with-boundary', [
+        {
+          asset_id: boundary.id,
+          asset_kind: 'image',
+          role: 'first_frame',
+          ordinal: 0,
+        },
+      ]),
+    );
+    expect(continuedJobResponse.status).toBe(201);
+    const continuedJob = H3JobSchema.parse(
+      (await continuedJobResponse.json() as { data: unknown }).data,
+    );
+    const unfinishedActual = await postJson(
+      `${first.origin}/api/shots/${continuedShot.id}/actuals`,
+      {
+        job_id: continuedJob.id,
+        output_asset_id: output.id,
+        observed_description: 'A draft job cannot become a take.',
+        deviation_notes: '',
+        qc_verdict: 'pending',
+      },
+    );
+    await expectError(unfinishedActual, 409, 'H3_JOB_NOT_COMPLETED');
+    const crossShotActual = await postJson(
+      `${first.origin}/api/shots/${continuedShot.id}/actuals`,
+      {
+        job_id: job.id,
+        output_asset_id: output.id,
+        observed_description: 'A job cannot become another shot’s take.',
+        deviation_notes: '',
+        qc_verdict: 'pending',
+      },
+    );
+    await expectError(crossShotActual, 422, 'H3_JOB_SHOT_MISMATCH');
+
+    const beforeRestart = await getSnapshot(first.origin, project.id);
+    expect(beforeRestart.script_version.status).toBe('locked');
+    expect(beforeRestart.shot_plans[0]).toEqual(shot);
+    expect(beforeRestart.shot_plans.map(({ id }) => id)).toEqual([
+      shot.id,
+      continuedShot.id,
+    ]);
+    expect(new Set(beforeRestart.assets.map(({ id }) => id))).toEqual(
+      new Set([asset.id, output.id, boundary.id]),
+    );
+    expect(beforeRestart.h3_jobs.map(({ id }) => id)).toEqual([
+      job.id,
+      continuedJob.id,
+    ]);
+    expect(beforeRestart.shot_actuals).toEqual([approved]);
+    expect(
+      beforeRestart.assets.find(({ id }) => id === output.id)?.producer_job_id,
+    ).toBe(job.id);
+
+    await closeApi(first.server);
+    const second = await startApi(databasePath);
+    const afterRestart = await getSnapshot(second.origin, project.id);
+
+    expect(afterRestart).toEqual(beforeRestart);
+    expect(afterRestart.shot_plans[0]?.prompt).toContain('locked-off camera');
+    expect(afterRestart.shot_actuals).toEqual([approved]);
+
+    const listResponse = await fetch(`${second.origin}/api/projects`);
+    expect(listResponse.status).toBe(200);
+    const listedProjects = ProjectSchema.array().parse(
+      (await listResponse.json() as { data: unknown }).data,
+    );
+    expect(listedProjects).toEqual([afterRestart.project]);
+  });
+
+  test('rejects an incomplete script and an out-of-range shot duration', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+
+    const shortScript = await postJson(`${api.origin}/api/projects`, {
+      title: 'Incomplete',
+      script_title: 'Fragment',
+      script_content: 'Too short',
+    });
+    await expectError(shortScript, 400, 'VALIDATION_FAILED');
+
+    const projectResponse = await postJson(`${api.origin}/api/projects`, {
+      title: 'Valid project',
+      script_title: 'Locked full script',
+      script_content:
+        'The complete scene establishes enough story context for a locked first version.',
+    });
+    const project = ProjectSchema.parse(
+      (await projectResponse.json() as { data: unknown }).data,
+    );
+
+    const badDuration = await postJson(
+      `${api.origin}/api/projects/${project.id}/shots`,
+      { ...validShotInput(), duration_seconds: 3 },
+    );
+    await expectError(badDuration, 400, 'VALIDATION_FAILED');
+
+    const snapshot = await getSnapshot(api.origin, project.id);
+    expect(snapshot.shot_plans).toEqual([]);
+  });
+
+  test('persists all six H3 modes and rolls back invalid or foreign bindings', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+    const projectResponse = await postJson(`${api.origin}/api/projects`, {
+      title: 'Six H3 modes',
+      script_title: 'Reference contract',
+      script_content:
+        'A complete scene exercises every H3 reference mode without changing projects.',
+    });
+    const project = ProjectSchema.parse(
+      (await projectResponse.json() as { data: unknown }).data,
+    );
+    const shotResponse = await postJson(
+      `${api.origin}/api/projects/${project.id}/shots`,
+      validShotInput(),
+    );
+    const shot = ShotPlanSchema.parse(
+      (await shotResponse.json() as { data: unknown }).data,
+    );
+    const first = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image',
+      name: 'first.png',
+      relative_path: 'refs/first.png',
+      content_hash: 'sha256:first',
+    });
+    const last = await createAssetViaApi(api.origin, project.id, {
+      kind: 'image',
+      name: 'last.png',
+      relative_path: 'refs/last.png',
+      content_hash: 'sha256:last',
+    });
+    const motion = await createAssetViaApi(api.origin, project.id, {
+      kind: 'video',
+      name: 'motion.mp4',
+      relative_path: 'refs/motion.mp4',
+      content_hash: 'sha256:motion',
+    });
+    const imageBinding = {
+      asset_id: first.id,
+      asset_kind: 'image',
+      role: 'first_frame',
+      ordinal: 0,
+    };
+    const lastBinding = {
+      asset_id: last.id,
+      asset_kind: 'image',
+      role: 'last_frame',
+      ordinal: 1,
+    };
+    const characterBinding = {
+      ...imageBinding,
+      role: 'character',
+    };
+    const motionBinding = {
+      asset_id: motion.id,
+      asset_kind: 'video',
+      role: 'motion',
+      ordinal: 0,
+    };
+    const cases = [
+      ['t2v', []],
+      ['i2v', [imageBinding]],
+      ['fl2v', [imageBinding, lastBinding]],
+      ['r2v', [characterBinding]],
+      ['v2v', [motionBinding]],
+      [
+        'rv2v',
+        [characterBinding, { ...motionBinding, ordinal: 1 }],
+      ],
+    ] as const;
+
+    for (const [mode, inputBindings] of cases) {
+      const response = await postJson(
+        `${api.origin}/api/shots/${shot.id}/jobs`,
+        h3JobInput(mode, `six-modes-${mode}`, inputBindings),
+      );
+      expect(response.status).toBe(201);
+      const created = H3JobSchema.parse(
+        (await response.json() as { data: unknown }).data,
+      );
+      expect(created.mode).toBe(mode);
+      expect(created.input_bindings).toEqual(inputBindings);
+    }
+    expect((await getSnapshot(api.origin, project.id)).h3_jobs).toHaveLength(6);
+
+    const invalidFl2v = await postJson(
+      `${api.origin}/api/shots/${shot.id}/jobs`,
+      h3JobInput('fl2v', 'invalid-fl2v', [imageBinding]),
+    );
+    await expectError(invalidFl2v, 422, 'H3_BINDINGS_INVALID');
+    expect((await getSnapshot(api.origin, project.id)).h3_jobs).toHaveLength(6);
+
+    const foreignProjectResponse = await postJson(
+      `${api.origin}/api/projects`,
+      {
+        title: 'Foreign project',
+        script_title: 'Separate script',
+        script_content:
+          'A separate complete script must not be allowed to borrow foreign assets.',
+      },
+    );
+    const foreignProject = ProjectSchema.parse(
+      (await foreignProjectResponse.json() as { data: unknown }).data,
+    );
+    const foreignShotResponse = await postJson(
+      `${api.origin}/api/projects/${foreignProject.id}/shots`,
+      validShotInput(),
+    );
+    const foreignShot = ShotPlanSchema.parse(
+      (await foreignShotResponse.json() as { data: unknown }).data,
+    );
+    const foreignBinding = await postJson(
+      `${api.origin}/api/shots/${foreignShot.id}/jobs`,
+      h3JobInput('i2v', 'foreign-reference', [imageBinding]),
+    );
+    await expectError(foreignBinding, 422, 'ASSET_PROJECT_MISMATCH');
+    expect((await getSnapshot(api.origin, foreignProject.id)).h3_jobs).toEqual(
+      [],
+    );
+  });
+
+  test('returns a stable not-found error without creating orphan records', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const api = await startApi(databasePath);
+    const missingProjectId = randomUUID();
+
+    const missingSnapshot = await fetch(
+      `${api.origin}/api/projects/${missingProjectId}`,
+    );
+    await expectError(missingSnapshot, 404, 'PROJECT_NOT_FOUND');
+
+    const orphanShot = await postJson(
+      `${api.origin}/api/projects/${missingProjectId}/shots`,
+      validShotInput(),
+    );
+    await expectError(orphanShot, 404, 'PROJECT_NOT_FOUND');
+
+    const listResponse = await fetch(`${api.origin}/api/projects`);
+    expect(await listResponse.json()).toEqual({ data: [] });
+
+    await closeApi(api.server);
+    const database = new Database(databasePath, { readonly: true });
+    const tableCounts = Object.fromEntries(
+      ['projects', 'script_versions', 'shot_plans', 'h3_jobs'].map((table) => [
+        table,
+        (database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as {
+          count: number;
+        }).count,
+      ]),
+    );
+    database.close();
+    expect(tableCounts).toEqual({
+      projects: 0,
+      script_versions: 0,
+      shot_plans: 0,
+      h3_jobs: 0,
+    });
+  });
+
+  test('closes a listener when close overlaps the initial start', async () => {
+    const databasePath = await temporaryDatabasePath();
+    const server = createApiServer({ database_path: databasePath, port: 0 });
+    servers.add(server);
+    const starting = server.start();
+    const closing = server.close();
+    const address = await starting;
+    await closing;
+    servers.delete(server);
+
+    const replacement = createApiServer({
+      database_path: databasePath,
+      port: address.port,
+    });
+    servers.add(replacement);
+    const replacementAddress = await replacement.start();
+    expect(replacementAddress.port).toBe(address.port);
+    const health = await fetch(`${replacementAddress.origin}/api/health`);
+    expect(health.status).toBe(200);
+  });
+});
+
+function validShotInput(): Record<string, unknown> {
+  return {
+    title: 'Carriage walk',
+    scene_id: 'scene-01',
+    duration_seconds: 8,
+    shot_size: 'medium wide',
+    camera_movement: 'locked-off camera with natural carriage sway',
+    action: 'The conductor crosses frame and checks the empty seats.',
+    dialogue: '',
+    sound: 'Rail rhythm and a distant signal bell.',
+    prompt:
+      'Medium-wide locked-off camera. The conductor crosses the night carriage.',
+    continuity_mode: 'independent',
+    continuity_dependencies: [],
+    costume_state: { conductor: 'navy uniform, brass buttons' },
+    reference_bindings: [],
+  };
+}
+
+async function temporaryDatabasePath(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'h3storyboard-api-'));
+  temporaryDirectories.add(directory);
+  return join(directory, 'project.db');
+}
+
+async function startApi(databasePath: string): Promise<{
+  server: ApiServer;
+  origin: string;
+}> {
+  const server = createApiServer({ database_path: databasePath, port: 0 });
+  servers.add(server);
+  const { origin } = await server.start();
+  return { server, origin };
+}
+
+async function closeApi(server: ApiServer): Promise<void> {
+  await server.close();
+  servers.delete(server);
+}
+
+async function postJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function createAssetViaApi(
+  origin: string,
+  projectId: string,
+  body: unknown,
+) {
+  const response = await postJson(
+    `${origin}/api/projects/${projectId}/assets`,
+    body,
+  );
+  expect(response.status).toBe(201);
+  return AssetSchema.parse((await response.json() as { data: unknown }).data);
+}
+
+function h3JobInput(
+  mode: string,
+  idempotencyKey: string,
+  inputBindings: readonly unknown[],
+): Record<string, unknown> {
+  return {
+    mode,
+    provider: 'local_comfyui',
+    model: 'H3-local',
+    prompt: `A valid ${mode} generation request.`,
+    duration_seconds: 6,
+    seed: 9,
+    steps: 20,
+    idempotency_key: idempotencyKey,
+    input_bindings: inputBindings,
+  };
+}
+
+async function getSnapshot(
+  origin: string,
+  projectId: string,
+): Promise<ReturnType<typeof ProjectSnapshotSchema.parse>> {
+  const response = await fetch(`${origin}/api/projects/${projectId}`);
+  expect(response.status).toBe(200);
+  return ProjectSnapshotSchema.parse(
+    (await response.json() as { data: unknown }).data,
+  );
+}
+
+async function expectError(
+  response: Response,
+  status: number,
+  code: string,
+): Promise<void> {
+  expect(response.status).toBe(status);
+  const body = await response.json() as ErrorEnvelope;
+  expect(body.error.code).toBe(code);
+  expect(body.error.message.length).toBeGreaterThan(0);
+}

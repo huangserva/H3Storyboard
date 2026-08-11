@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>H3 Storyboard：filmstoryboard 与 xyz-video-creator 对比</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0c1012; --panel:#151b1e; --ink:#edf2ed; --muted:#9eaaa5; --line:#2c3839; --mint:#75e2b5; --amber:#f0bb68; --red:#ff8276; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.68 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; background:radial-gradient(circle at 85% 0,#18332c 0,transparent 32rem),var(--bg); color:var(--ink); }
+    main { width:min(1100px,calc(100% - 32px)); margin:48px auto 80px; }
+    h1 { max-width:850px; font-size:clamp(34px,6vw,72px); line-height:1.02; letter-spacing:-.045em; margin:0 0 18px; }
+    h2 { font-size:22px; margin:42px 0 14px; }
+    p { max-width:850px; }
+    .eyebrow { color:var(--mint); letter-spacing:.16em; text-transform:uppercase; font-size:12px; }
+    .lede { color:var(--muted); font-size:19px; }
+    .decision { border:1px solid #3f715e; background:#11231e; padding:22px 24px; border-radius:16px; font-size:18px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .card { background:linear-gradient(145deg,#192124,#111719); border:1px solid var(--line); border-radius:16px; padding:22px; }
+    .card h3 { margin:0 0 5px; font-size:20px; }
+    .meta { color:var(--muted); font-size:13px; }
+    table { border-collapse:collapse; width:100%; background:#101618; border-radius:14px; overflow:hidden; }
+    th,td { border-bottom:1px solid var(--line); padding:13px 14px; vertical-align:top; text-align:left; }
+    th { color:var(--mint); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+    code { color:#b8f2d4; }
+    .take { color:var(--mint); } .avoid { color:var(--red); }
+    a { color:var(--mint); }
+    ul,ol { padding-left:21px; }
+    footer { border-top:1px solid var(--line); margin-top:42px; padding-top:18px; color:var(--muted); font-size:13px; }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Architecture decision · 2026-08-11</div>
+  <h1>不是把两个仓库缝起来，<br>而是抽取两套正确能力。</h1>
+  <p class="lede">H3 Storyboard 的产品核心，是把完整剧本、计划镜头、H3 多模态输入、生成任务和实测结果变成一条可追溯的本地工作流。</p>
+  <p class="decision"><strong>结论：</strong>建立独立项目。借鉴 <code>filmstoryboard</code> 的桌面工作台与项目工程能力，吸收 <code>xyz-video-*</code> 的叙事、参考素材与 QC 方法；协议、数据库、任务引擎和 H3 adapter 重新设计。</p>
+
+  <h2>两个项目分别擅长什么</h2>
+  <section class="grid">
+    <article class="card">
+      <h3>filmstoryboard</h3>
+      <div class="meta">Flutter / Dart · Windows desktop · SQLite/Drift</div>
+      <ul>
+        <li>已有项目入口、故事设计、拍摄脚本、分镜画板、视频分析、生成与导出等完整桌面模块。</li>
+        <li>仓库内带 H3 手册、H3 prompt adapter、本地多参考任务测试和 Windows 安装/更新链路。</li>
+        <li>强项是“可见、可点、可保存”的生产工作台，以及成熟的桌面交付经验。</li>
+      </ul>
+      <p class="avoid">不照搬：大体量 Flutter 应用边界、任务层字符串判错、Windows 专用路径假设。</p>
+    </article>
+    <article class="card">
+      <h3>xyz-video-creator / skill</h3>
+      <div class="meta">Python scripts · JSON artifacts · agent-first workflow</div>
+      <ul>
+        <li>明确以完整 narrative 为单一故事主线，再派生 framework、scenes 与 shots。</li>
+        <li><code>video_references</code> 按“角色、道具、构图、阶段、目标状态”等用途组织，不把所有图片误当关键帧。</li>
+        <li>包含角色参考、素材生成、自动粗筛、视觉裁定、pair-level 编辑决策与 FFmpeg 合成。</li>
+      </ul>
+      <p class="avoid">不照搬：文件夹即数据库、宿主 LLM 隐式状态、Seedance 专用执行细节和无 GUI 的操作负担。</p>
+    </article>
+  </section>
+
+  <h2>横向判断</h2>
+  <table>
+    <thead><tr><th>维度</th><th>filmstoryboard</th><th>xyz-video-*</th><th>H3 Storyboard 决策</th></tr></thead>
+    <tbody>
+      <tr><td>产品形态</td><td>Windows 桌面工作台</td><td>Agent skill + CLI 脚本</td><td>本地 Web 工作台，API 隔离，后续可封装桌面</td></tr>
+      <tr><td>故事结构</td><td>多个功能页，拍摄脚本较强</td><td>narrative → framework → scenes → shots</td><td class="take">完整脚本版本锁定后才能建分镜</td></tr>
+      <tr><td>参考素材</td><td>H3 多参考与上传入口已存在</td><td>用途驱动 <code>video_references</code></td><td class="take">一份有序 binding 同时驱动上传和 prompt 引用</td></tr>
+      <tr><td>结果管理</td><td>生成任务与本地结果</td><td>attempt、视觉裁定、重生成</td><td class="take">计划 ShotPlan 与实测 Take 永久分栏、只追加</td></tr>
+      <tr><td>持久化</td><td>SQLite，schema 已迭代多版</td><td>JSON/目录/checkpoint</td><td class="take">SQLite migration + 相对资产路径 + hash</td></tr>
+      <tr><td>执行</td><td>MiniMax HTTP / 本地 CLI 路径</td><td>provider 脚本 + FFmpeg</td><td>统一 submit/query/cancel adapter；任务带幂等键与 lease</td></tr>
+      <tr><td>复用风险</td><td colspan="2">检视快照均未发现明确 LICENSE；语言和状态模型不兼容</td><td class="avoid">只借方法和信息架构，不复制源码</td></tr>
+    </tbody>
+  </table>
+
+  <h2>新项目的最小闭环</h2>
+  <ol>
+    <li>创建项目并写入完整脚本版本；锁定版本。</li>
+    <li>导演台建立计划镜头，绑定用途明确的图片、视频与音频。</li>
+    <li>协议校验 H3 模式、数量上限、素材归属和幂等键后，持久化 job。</li>
+    <li>Provider adapter 提交、查询、取消；任务状态与事件先写 SQLite。</li>
+    <li>每次输出形成新的 take；QC 通过后才成为“实测分镜”，旧 take 永不覆盖。</li>
+    <li>下一镜连续性只引用已批准 take 的版本化资产，形成可分支依赖图。</li>
+  </ol>
+
+  <h2>范围裁决</h2>
+  <p><strong>M0（当前）：</strong>协议、SQLite、本地 API、计划/实测 UI、真实 HTTP+SQLite 测试。<br>
+  <strong>M1：</strong>接一个真实 H3 provider、可恢复队列、素材上传与 take 审批。<br>
+  <strong>暂不做：</strong>多人云协作、时间线剪辑、自动成片、多 provider 竞速、TTS/BGM、跨镜自动修复。</p>
+
+  <footer>
+    来源：<a href="https://github.com/luojiang419/filmstoryboard">luojiang419/filmstoryboard</a>（提交 d7572b1）与
+    <a href="https://github.com/huangserva/xyz-video-skill/tree/refactor/video-creator">huangserva/xyz-video-skill · refactor/video-creator</a>（提交 06837a0）。
+    原 <code>huangserva/xyz-video-creator</code> URL 在调研时无法匿名读取，因此 xyz 一侧以公开迁移分支为可验证依据。
+  </footer>
+</main>
+</body>
+</html>

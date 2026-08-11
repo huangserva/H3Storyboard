@@ -1,0 +1,138 @@
+.panel-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.panel-heading > div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.panel-index {
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  display: inline-flex;
+  font: 700 9px/1 var(--mono);
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+.reference-panel {
+  background: var(--ink-2);
+  border-left: 1px solid var(--line);
+  min-width: 0;
+  overflow-y: auto;
+  padding: 17px 14px;
+}
+
+.reference-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.reference-heading h2 {
+  font-size: 17px;
+  margin: 3px 0 0;
+}
+
+.reference-intro {
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 13px 0 15px;
+}
+
+.reference-slots {
+  display: grid;
+  gap: 6px;
+}
+
+.reference-slot {
+  align-items: center;
+  background: var(--ink-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 31px 1fr auto;
+  min-height: 48px;
+  padding: 7px;
+}
+
+.reference-slot[data-bound="true"] {
+  border-color: rgba(110, 231, 212, 0.3);
+}
+
+.slot-glyph {
+  align-items: center;
+  background: var(--ink-3);
+  border-radius: 3px;
+  color: var(--muted);
+  display: flex;
+  font: 600 10px/1 var(--mono);
+  height: 31px;
+  justify-content: center;
+}
+
+.reference-slot strong,
+.reference-slot small {
+  display: block;
+}
+
+.reference-slot strong {
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+
+.reference-slot small,
+.slot-state {
+  color: var(--faint);
+  font: 500 8px/1.2 var(--mono);
+}
+
+.reference-slot[data-bound="true"] .slot-state {
+  color: var(--teal);
+}
+
+.h3-readiness {
+  border-top: 1px solid var(--line);
+  margin: 15px 0 12px;
+  padding-top: 13px;
+}
+
+.h3-readiness > span,
+.h3-readiness > strong {
+  display: block;
+}
+
+.h3-readiness > span {
+  color: var(--faint);
+  font: 600 8px/1 var(--mono);
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
+
+.h3-readiness > strong {
+  font-size: 10px;
+  margin-bottom: 8px;
+}
+
+.h3-readiness > div {
+  background: var(--ink-0);
+  border-radius: 99px;
+  height: 3px;
+  overflow: hidden;
+}
+
+.h3-readiness i {
+  background: var(--acid);
+  display: block;
+  height: 100%;
+}

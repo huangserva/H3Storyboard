@@ -1,0 +1,27 @@
+# H3Storyboard engineering rules
+
+## Product truth
+
+H3Storyboard is a local-first director workbench. It keeps planned shots and generated results as separate records. The product must never overwrite a plan with an observed result or present a generated result as approved without an explicit QC verdict.
+
+## Hard rules
+
+1. Production code never contains a fallback added only to make tests pass.
+2. HTTP/JSON contracts use `snake_case`; internal-only implementation may use camelCase.
+3. IDs use `crypto.randomUUID()`.
+4. Database writes complete before any in-memory projection is changed.
+5. Every schema change is a numbered migration tracked in `schema_version`.
+6. H3 prompt references and uploaded files must share one validated binding list. Never claim a video or audio reference in a prompt when it was not uploaded.
+7. Integration tests use a real HTTP server and real SQLite database. Mocked provider tests belong under unit tests.
+8. Any UI file above 250 lines, service above 300 lines, or route module with 10 or more endpoints must be split before adding features.
+9. Errors use stable codes. Do not classify errors by matching message strings.
+10. Existing user projects and assets are append-only by default. Destructive cleanup requires explicit confirmation.
+
+## Milestone gate
+
+Before declaring a milestone complete:
+
+- `pnpm check && pnpm build && pnpm test` pass.
+- At least one real HTTP + SQLite integration test crosses the new behavior.
+- Planned-vs-actual invariants and error paths are tested.
+- Four independent reviews cover architecture, bugs, tests, and protocol alignment.

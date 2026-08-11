@@ -1,0 +1,169 @@
+@media (max-width: 1180px) {
+  .director-grid {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+
+  .drawer-content {
+    grid-template-columns: minmax(190px, 0.8fr) minmax(300px, 1.5fr);
+  }
+
+  .drawer-content > .button {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .app-header {
+    grid-template-columns: 220px 1fr auto;
+  }
+
+  .studio-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .local-status,
+  .header-project .eyebrow,
+  .legend > span {
+    display: none;
+  }
+
+  .director-grid {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .comparison-grid {
+    min-height: 520px;
+  }
+
+  .reference-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    overflow: visible;
+  }
+
+  .reference-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drawer-content {
+    grid-template-columns: 1fr;
+  }
+
+  .task-empty {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-header {
+    grid-template-columns: 1fr auto;
+    height: 64px;
+    padding: 0 12px;
+  }
+
+  .brand-lockup div span,
+  .header-project {
+    display: none;
+  }
+
+  .studio-layout {
+    display: block;
+    height: auto;
+  }
+
+  .project-rail {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    max-height: 300px;
+  }
+
+  .project-switcher {
+    padding-bottom: 10px;
+  }
+
+  .project-list {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .project-row {
+    flex: 0 0 190px;
+  }
+
+  .scene-browser {
+    padding-top: 10px;
+  }
+
+  .workbench {
+    min-height: 720px;
+  }
+
+  .workbench-toolbar {
+    padding: 0 10px;
+  }
+
+  .workbench-toolbar .eyebrow {
+    display: none;
+  }
+
+  .comparison-grid {
+    display: block;
+  }
+
+  .comparison-card {
+    min-height: 420px;
+  }
+
+  .actual-panel {
+    border-top: 1px solid var(--line);
+  }
+
+  .reference-slots,
+  .two-columns,
+  .three-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .qc-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .no-project-view {
+    min-height: 620px;
+    padding: 34px 24px;
+  }
+
+  .workflow-line {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workflow-line i {
+    height: 14px;
+    margin-left: 3px;
+    width: 1px;
+  }
+
+  .modal-backdrop,
+  .modal-backdrop.align-right {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .composer-card,
+  .shot-composer {
+    border-bottom: 0;
+    border-radius: 14px 14px 0 0;
+    height: min(92vh, 850px);
+    max-height: 92vh;
+  }
+
+  .composer-form {
+    max-height: calc(92vh - 76px);
+  }
+}

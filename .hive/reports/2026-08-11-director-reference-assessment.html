@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>director 对 H3Storyboard 的参考价值</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0a0f12; --panel:#141b20; --ink:#f0f4f2; --muted:#9ca9aa; --line:#29363b; --cyan:#79dbe7; --mint:#78e1b5; --amber:#f1bd70; --red:#ff897d; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 86% -5%,#17333e 0,transparent 34rem),var(--bg); color:var(--ink); font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1120px,calc(100% - 32px)); margin:46px auto 78px; }
+    h1 { max-width:920px; margin:0 0 18px; font-size:clamp(35px,6vw,70px); line-height:1.02; letter-spacing:-.045em; }
+    h2 { margin:40px 0 14px; font-size:23px; }
+    h3 { margin:0 0 8px; font-size:19px; }
+    p { max-width:900px; }
+    .eyebrow { color:var(--cyan); font-size:12px; letter-spacing:.16em; text-transform:uppercase; }
+    .lede { color:var(--muted); font-size:19px; }
+    .decision { padding:22px 24px; border:1px solid #346c64; border-radius:16px; background:#10231f; font-size:18px; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; }
+    .card { padding:21px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(145deg,#182126,#11171b); }
+    .meta { color:var(--muted); font-size:13px; }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; background:#10171b; }
+    th,td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+    th { color:var(--cyan); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+    code { color:#b9f3d7; }
+    .take { color:var(--mint); } .gate { color:var(--amber); } .avoid { color:var(--red); }
+    ul,ol { padding-left:21px; }
+    footer { margin-top:42px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media (max-width:820px) { .grid { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Third-source architecture review · 2026-08-11</div>
+  <h1>director 值得借，<br>但它属于导演政策层。</h1>
+  <p class="lede">前两个参考解决“工作台长什么样”和“剧本如何拆成素材”；director 补上了何时允许生成、哪些资产才算当前版本，以及创作模式如何与平台工具解耦。</p>
+  <p class="decision"><strong>结论：</strong>H3Storyboard 仍是独立的本地运行时与事实源。把 <code>director</code> 的 Mode、资产版本、生成锁、起止状态和代表片段门禁编译为协议与 UI 约束；不把它的 Seedance/CLI 规则硬写进核心。</p>
+
+  <h2>三个参考各自负责什么</h2>
+  <section class="grid">
+    <article class="card">
+      <h3>filmstoryboard</h3>
+      <div class="meta">产品与桌面工作台</div>
+      <p>项目入口、素材管理、可视化分镜、生成与导出路径，证明导演工作台需要“可见、可点、可保存”。</p>
+    </article>
+    <article class="card">
+      <h3>xyz-video-*</h3>
+      <div class="meta">剧本到镜头的方法</div>
+      <p>完整剧本、scene/shot 派生、用途驱动的参考素材、生成后裁定与重跑谱系。</p>
+    </article>
+    <article class="card">
+      <h3>director</h3>
+      <div class="meta">Mode 与生产质量门槛</div>
+      <p>Mode/style/tool 分层、资产确认与版本、当前素材清单、起止状态、代表片段先行和能力验证状态。</p>
+    </article>
+  </section>
+
+  <h2>进入 H3Storyboard 的协议能力</h2>
+  <table>
+    <thead><tr><th>director 事实</th><th>H3Storyboard 落点</th><th>必须守住的边界</th></tr></thead>
+    <tbody>
+      <tr><td>先选 Mode，再选 style 和 Tool</td><td class="take">可扩展 Mode registry，带版本与 candidate/validated 状态</td><td>Mode 不持有 CLI 命令和模型别名</td></tr>
+      <tr><td>候选资产确认后才进入正式节点</td><td class="take">Asset candidate/approved/archived + revision lineage</td><td>资产批准不同于输出 take 的 QC</td></tr>
+      <tr><td>current-assets-manifest 是唯一当前输入</td><td class="take">每个 job 固化 manifest 快照</td><td>后续换图不能重写旧任务历史</td></tr>
+      <tr><td>片段 × 可辨识元素矩阵</td><td class="take">语义 reference requirement 编译成 exact ordered binding</td><td>既拒绝漏绑，也拒绝无关素材凑数</td></tr>
+      <tr><td>每段有 opening / ending state</td><td class="take">结构化人物、服装、道具、场景与声音交接状态</td><td>下一段不能依赖“承接上一段”的隐式上下文</td></tr>
+      <tr><td>先生成代表片段再批量</td><td class="gate">批量队列前必须存在显式批准的代表 take</td><td>provider completed 不等于创作通过</td></tr>
+      <tr><td>同一任务追踪并下载落盘</td><td class="take">每次 lease 只 submit 一次；poll 同一 task，下载/校验/hash/登记后才完成</td><td>远程 URL 不是本地 canonical asset</td></tr>
+    </tbody>
+  </table>
+
+  <h2>一个必须先修正的语义缝隙</h2>
+  <p><code>director</code> 的“片段”最长 15 秒且可含 3–5 个摄影镜头；H3Storyboard M0 的 <code>ShotPlan</code> 同时承担单镜分镜和 H3 job 目标。Protocol 1.1 必须明确二者映射：单个 camera shot 继续是分镜事实，多镜生成需要显式 grouping，不能偷偷改变已有字段含义。</p>
+
+  <h2>明确不进入核心</h2>
+  <ul>
+    <li class="avoid">Seedance 2.0 Pro、720p、15 秒、3–5 镜等当前 Mode 配置。</li>
+    <li class="avoid">LibTV、Higgsfield、即梦的命令、模型映射、认证和下载细节。</li>
+    <li class="avoid">把四种 Mode 写成永久 enum；候选 Mode 也不能冒充已验证能力。</li>
+    <li class="avoid">直接复制 style、音色或媒体资产。它们属于 skill/作品包，不属于 runtime。</li>
+  </ul>
+
+  <h2>实施顺序</h2>
+  <ol>
+    <li><strong>M1A：</strong>先落 Mode、资产生命周期、manifest/lock 快照、起止状态、语义 reference requirements 与代表性门禁。</li>
+    <li><strong>Protocol 1.1：</strong>用 migration 和真实 HTTP + SQLite 测试证明旧项目可升级、旧任务不可被改写。</li>
+    <li><strong>M1B：</strong>再接真实 provider worker；adapter 读取实时 capability，不能弱化上层 contract。</li>
+    <li><strong>M2：</strong>代表 take 通过后开放批量与多模态输入审计。</li>
+  </ol>
+
+  <footer>
+    来源：本地 <code>/Users/serva/development/director</code>，提交 <code>cb7358b637c4cb2d03993a68a92e3a654a81a153</code>，MIT License。重点核对 <code>SKILL.md</code>、Cinematic Drama workflow/reference/prompt guides 及三份 tool adapter 文档。本次未复制源码或媒体。
+  </footer>
+</main>
+</body>
+</html>

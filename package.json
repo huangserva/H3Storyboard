@@ -1,0 +1,33 @@
+{
+  "name": "h3-storyboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "dev": "pnpm check && pnpm --parallel --filter @h3storyboard/api --filter @h3storyboard/studio dev:serve",
+    "dev:api": "pnpm check && pnpm --filter @h3storyboard/api dev:serve",
+    "dev:studio": "pnpm check && pnpm --filter @h3storyboard/studio dev:serve",
+    "check": "tsc -b --pretty false",
+    "build": "tsc -b --pretty false && pnpm --filter @h3storyboard/studio build",
+    "test": "tsc -b --pretty false && vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.19.0",
+    "better-sqlite3": "^13.0.3",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

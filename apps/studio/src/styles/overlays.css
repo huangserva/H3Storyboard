@@ -1,0 +1,230 @@
+.modal-backdrop {
+  align-items: center;
+  backdrop-filter: blur(14px);
+  background: rgba(4, 6, 5, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.modal-backdrop.align-right {
+  justify-content: flex-end;
+  padding: 12px;
+}
+
+.composer-card {
+  background: var(--ink-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  width: min(760px, 100%);
+}
+
+.shot-composer {
+  height: calc(100vh - 24px);
+  max-height: none;
+  width: min(620px, 100%);
+}
+
+.composer-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.composer-header h2 {
+  font-size: 21px;
+  letter-spacing: -0.03em;
+  margin: 4px 0 0;
+}
+
+.icon-button {
+  align-items: center;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  font: 300 19px/1 sans-serif;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.composer-form {
+  max-height: calc(100vh - 125px);
+  overflow-y: auto;
+  padding: 18px 20px;
+}
+
+.intake-note {
+  align-items: flex-start;
+  background: rgba(201, 243, 107, 0.045);
+  border: 1px solid rgba(201, 243, 107, 0.16);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 13px;
+}
+
+.intake-note > span {
+  color: var(--acid);
+  font: 650 10px/1.3 var(--mono);
+}
+
+.intake-note strong {
+  font-size: 12px;
+}
+
+.intake-note p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-columns {
+  grid-template-columns: 0.6fr 0.9fr 1.5fr;
+}
+
+.composer-form label {
+  display: block;
+  margin-bottom: 13px;
+}
+
+.composer-form label > span {
+  color: var(--muted);
+  display: block;
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.06em;
+  margin: 0 0 7px 2px;
+}
+
+.composer-form input,
+.composer-form textarea {
+  background: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  width: 100%;
+}
+
+.composer-form input {
+  height: 40px;
+  padding: 0 11px;
+}
+
+.composer-form textarea {
+  line-height: 1.6;
+  min-height: 76px;
+  padding: 10px 11px;
+}
+
+.composer-form .script-textarea {
+  min-height: 260px;
+}
+
+.composer-form .prompt-textarea {
+  min-height: 100px;
+}
+
+.composer-form input::placeholder,
+.composer-form textarea::placeholder {
+  color: #545b57;
+}
+
+.composer-form label > small {
+  color: var(--faint);
+  display: block;
+  font: 500 8px/1 var(--mono);
+  margin-top: 6px;
+  text-align: right;
+}
+
+.composer-footer {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 15px;
+}
+
+.composer-footer > span {
+  color: var(--faint);
+  font: 500 9px/1 var(--mono);
+}
+
+.composer-footer > div {
+  display: flex;
+  gap: 8px;
+}
+
+.toast {
+  align-items: center;
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  bottom: 18px;
+  box-shadow: var(--shadow);
+  color: var(--ink-0);
+  cursor: pointer;
+  display: flex;
+  font-size: 11px;
+  font-weight: 650;
+  gap: 9px;
+  left: 50%;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 11px 14px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 70;
+}
+
+.toast span {
+  align-items: center;
+  background: var(--ink-0);
+  border-radius: 50%;
+  color: var(--acid);
+  display: flex;
+  height: 18px;
+  justify-content: center;
+  width: 18px;
+}
+
+.toast[data-tone="error"] span {
+  color: var(--danger);
+}
+
+.progress-bar {
+  animation: progress 1.2s ease-in-out infinite;
+  background: var(--acid);
+  height: 2px;
+  left: 0;
+  position: fixed;
+  top: 71px;
+  width: 30vw;
+  z-index: 80;
+}
+
+@keyframes progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(440%); }
+}

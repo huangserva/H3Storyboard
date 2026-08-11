@@ -1,0 +1,124 @@
+import { createServer, type Server } from 'node:http';
+import { openProjectStore, type ProjectStore } from '@h3storyboard/project-store';
+import { errorResponse } from './api-error.js';
+import { sendJson } from './http.js';
+import { dispatchRoute } from './routes.js';
+
+export interface ApiServerOptions {
+  database_path: string;
+  host?: string;
+  port?: number;
+}
+
+export interface ApiServerAddress {
+  host: string;
+  port: number;
+  origin: string;
+}
+
+export interface ApiServer {
+  start(): Promise<ApiServerAddress>;
+  close(): Promise<void>;
+}
+
+export function createApiServer(options: ApiServerOptions): ApiServer {
+  const host = options.host ?? '127.0.0.1';
+  const port = options.port ?? 4187;
+  const store = openProjectStore(options.database_path);
+  const server = buildHttpServer(store);
+  let started = false;
+  let closed = false;
+  let closing = false;
+  let startPromise: Promise<ApiServerAddress> | null = null;
+  let closePromise: Promise<void> | null = null;
+
+  return {
+    async start() {
+      if (closed || closing) throw new Error('Cannot start a closed API server');
+      if (started) return serverAddress(server, host);
+      if (!startPromise) {
+        startPromise = (async () => {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const onError = (error: Error) => {
+                server.off('listening', onListening);
+                reject(error);
+              };
+              const onListening = () => {
+                server.off('error', onError);
+                resolve();
+              };
+              server.once('error', onError);
+              server.once('listening', onListening);
+              server.listen(port, host);
+            });
+          } catch (error) {
+            store.close();
+            closed = true;
+            throw error;
+          }
+          started = true;
+          return serverAddress(server, host);
+        })();
+      }
+      try {
+        return await startPromise;
+      } finally {
+        startPromise = null;
+      }
+    },
+    async close() {
+      if (closePromise) return closePromise;
+      closing = true;
+      closePromise = (async () => {
+        try {
+          if (startPromise) {
+            try {
+              await startPromise;
+            } catch {
+              // A failed start already closes the store in start().
+            }
+          }
+          if (server.listening) {
+            await new Promise<void>((resolve, reject) => {
+              server.close((error) => {
+                if (error) reject(error);
+                else resolve();
+              });
+            });
+          }
+        } finally {
+          if (!closed) store.close();
+          started = false;
+          closed = true;
+          closing = false;
+        }
+      })();
+      return closePromise;
+    },
+  };
+}
+
+function buildHttpServer(store: ProjectStore): Server {
+  return createServer(async (request, response) => {
+    try {
+      const result = await dispatchRoute(request, store);
+      sendJson(response, result.status, { data: result.body });
+    } catch (error) {
+      const result = errorResponse(error);
+      sendJson(response, result.status, result.body);
+    }
+  });
+}
+
+function serverAddress(server: Server, host: string): ApiServerAddress {
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('API server does not have a TCP address');
+  }
+  return {
+    host,
+    port: address.port,
+    origin: `http://${host}:${address.port}`,
+  };
+}
