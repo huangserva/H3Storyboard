@@ -20,7 +20,7 @@ last_review: 2026-08-11
 - [x] 四路 review 全部 B- 以上
 - 详细见 docs/plan.md（工程侧 delivery plan 以 docs/plan.md 为准）
 
-### M1A · 导演级生产契约 · review_pending
+### M1A · 导演级生产契约 · done
 - [x] 可扩展 production Mode registry + candidate/validated/blocked 证据状态机
 - [x] Production brief、项目生成锁与 job 不可变锁快照
 - [x] Asset 生命周期（candidate/approved/archived）+ 血缘 + immutable current-assets manifest
@@ -84,7 +84,12 @@ M1 + M2 画布原型提前 — user 2026-08-11 要求先搭无限画布看效果
 ## 2026-08-11 M1A Representative take gate 交付状态
 - commit `fe3e62c`：migration v12 将代表 Take 状态与 job 门禁 override 原因持久化；QC verdict 与代表审批保持独立，第二个及后续同镜 job 必须已有 approved representative 或显式记录 override。
 - Studio 已提供标记、批准、拒绝、撤销操作；“雨夜来信”演示 Take 已标记并批准，同时保留 `qc_verdict=pending` 以证明两套裁决互不替代。
-- M1A 工程 bullet 已全部落地，里程碑保持 `review_pending`，待 AGENTS.md 要求的架构、缺陷、测试、协议四路独立 review 后再宣告 done。
+- M1A 工程 bullet 已全部落地；架构、缺陷、测试、协议四路独立 review 及整改均完成，里程碑已宣告 `done`。
+
+## 2026-08-11 M1A 四路 review 整改状态
+- commit `70d83c7`：逐项关闭 review F1–F10；migration v13 为旧 image bindings 回填语义引用，v2v/rv2v 保留原验证路径。
+- Protocol 升至 1.1，六大实体族、状态机、稳定错误与 API 路由已入档；架构边界补齐，`ProjectStore` 拆出 `CharacterStore` 后为 252 行。
+- `pnpm check && pnpm build && pnpm test` 全绿（8 files / 56 tests）；真实演示库升级到 schema v13，4 条资产路径全部通过 traversal 核验。
 
 ## 2026-08-11 M2 原型交付状态
 - 首次 commit `cac91a9`：M0 全部 + M2 画布原型 + .hive PM 文档（134 files）。

@@ -19,6 +19,8 @@
 - [x] Representative-take approval gate before any repeated-shot or future batch submission, with an auditable override reason.
 - [x] Resolve the camera-shot versus multi-shot generation-segment boundary before Protocol 1.1 migration (ADR: one `ShotPlan` is one generation segment).
 
+M1A passed the required architecture, bug, test, and protocol reviews. Follow-up commit `70d83c7` closes findings F1–F10, adds migration v13 compatibility repair, and publishes Protocol 1.1.
+
 ## M1B — single-shot H3 loop
 
 - [ ] Explicit image, first-frame, and last-frame binding slots.
