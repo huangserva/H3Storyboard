@@ -1,7 +1,7 @@
 # 决策：R2V graph 用显式 loader 配置隔离 stock 与 hybrid
 
 **日期**: 2026-08-12
-**状态**: 提案中
+**状态**: accepted（orch 2026-08-12：loader 隔离设计采纳；r2v-hybrid 升 validated 与否另由 user 看片决定）
 **关联**: plan.md → M1B-3b
 
 ## 背景
