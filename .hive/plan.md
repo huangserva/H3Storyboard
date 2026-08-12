@@ -28,9 +28,9 @@ last_review: 2026-08-12
 - [x] 角色接入 per-shot 语义引用绑定 + opening/ending state + 确定性 H3 binding 编译
 - [x] 代表性 take 审批门（与单条 QC 独立；重复 job 需 approved representative 或审计 override）
 
-### M1B · 单镜 H3 闭环 · open
+### M1B · 单镜 H3 闭环 · ready_for_review
 - [x] M1B-1：TypeScript ComfyUI contract adapter、I2V graph、提交前 H3 lint 与只读 capability discovery
-- [ ] i2v / fl2v / r2v 绑定槽 + provider 校验（代码与 stub 契约已齐；fl2v 真机冒烟受共享 8190 外部批处理阻塞）
+- [x] i2v / fl2v / r2v 绑定槽 + provider 校验（FL2V 真机双流冒烟已完成）
 - [x] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + stock ref2va / hybrid 同 prompt、seed 对照（见 research/2026-08-12-m1b3b-hybrid-r2v-comparison.md）
 - [x] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
 - [x] M1B-3：真实 graph 出片与 Mode evidence（3a i2v + 3b HybridLoader/r2v 对照均完成；Mode 仍为 candidate，待 user 看片）
@@ -131,5 +131,6 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 ## 2026-08-12 M1B-4 FL2V 状态
 - commit `545fc5a`：新增 stock fl2va 首尾帧 Director graph；worker 严格按编译后的 `first_frame`、`last_frame` 上传并提交。单元快照及真实 HTTP stub + SQLite 集成已覆盖。
 - 真实尾帧变体已用 ffmpeg 生成并以真 hash 注册 approved asset；manifest v4、brief v3、dry-run FL2V 两槽编译均完成。
-- 真机提交被共享 8190 外部 S4–S10 连续批处理阻塞。原子队列门禁多次拒绝抢占；未提交 draft job 已取消，项目生成锁已释放，不留后台副作用。
-- 因无真实 MP4/ffprobe/GPU evidence，M1B 最后一项仍保持 open。证据双产出见 `research/2026-08-12-m1b4-fl2v-smoke.md` 与 `reports/2026-08-12-m1b4-fl2v-smoke.html`。
+- 初次真机窗口被共享 8190 外部 S4–S10 连续批处理阻塞；原子门禁未抢占，旧 draft job 安全取消。重试窗口连续确认空闲并 `/free` 两实例后，以全新 job `ac2ad96e` 成功完成。
+- provider task `d807e4b5` 仅提交一次，75 秒完成；输出 480×864、5.167 秒 H.264 + AAC，532,582 bytes，sha256 `8836d771…e79117`；峰值显存 45,661 MiB。candidate asset + pending actual 落库，生成锁已释放。
+- M1B 六项功能证据已齐，状态进入 `ready_for_review`；四路 review 由 Orchestrator 组织。证据双产出见 `research/2026-08-12-m1b4-fl2v-smoke.md` 与 `reports/2026-08-12-m1b4-fl2v-smoke.html`。

@@ -1,8 +1,8 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>M1B-4 FL2V 冒烟状态</title><style>body{font:16px/1.6 system-ui;max-width:900px;margin:40px auto;padding:0 24px;color:#18202a}code{background:#eef1f4;padding:2px 5px}h1,h2{line-height:1.2}.ok{color:#08783e}.wait{color:#a45d00}</style></head><body>
-<h1>M1B-4 FL2V：代码完成，真机冒烟等待独占窗口</h1>
-<p class="ok">FL2V graph builder、worker 双帧上传接线及真实 HTTP + SQLite stub 集成测试均已完成，提交 <code>545fc5a</code>。全量质量门通过：81 passed，1 个 opt-in probe skipped。</p>
+<h1>M1B-4 FL2V：真机冒烟完成</h1>
+<p class="ok">FL2V graph builder、worker 双帧上传接线、真实 HTTP + SQLite stub 集成测试与 8190 真机出片均已完成。代码提交 <code>545fc5a</code>；全量质量门通过：81 passed，1 个 opt-in probe skipped。</p>
 <h2>已准备的真实契约</h2><p>“雨夜来信”第 1 镜已配置 approved 首帧与真实尾帧变体，冻结 manifest v4、创建 brief v3，并 dry-run 编译为严格有序的 <code>first_frame → last_frame</code> 两槽 FL2V 输入。</p>
-<h2>为什么没有声称出片</h2><p class="wait">8190 被外部批处理 S4–S10 连续占用。每次短暂空窗后，下一任务都在本任务的原子队列门禁前进入；门禁按纪律拒绝 <code>/free</code> 与提交，没有抢占或杀进程。等待超过 35 分钟后，未提交的 draft job 已安全取消，项目锁已释放。</p>
-<p>因此本轮没有 MP4、ffprobe、显存峰值或新 Mode evidence。需要在真正空闲的 GPU 窗口重新 engage lock 并创建新 job，才能完成最后一项真机证据。</p>
+<h2>真机结果</h2><p class="ok">重试窗口中两次确认队列空闲后，对 8188/8190 执行 <code>/free</code>，新 job 仅提交一次并在 75 秒完成。输出为 480×864、24 fps、5.167 秒的 H.264 + AAC 双流 MP4，532,582 bytes，sha256 <code>8836d771…e79117</code>。峰值显存 45,661 MiB，最低空闲 2,841 MiB。</p>
+<p>candidate asset 与 pending actual 已原子落库，job 为 completed，项目锁已释放。抽帧显示从暗首帧稳定过渡到更明亮温暖的尾帧，并保留雨线运动。</p>
+<h2>早先阻塞</h2><p class="wait">第一次窗口曾被外部 S4–S10 批任务占用，门禁没有抢占；旧 draft job 被取消。该事件保留在 research 中，成功重试使用全新 job。</p>
 </body></html>
-
