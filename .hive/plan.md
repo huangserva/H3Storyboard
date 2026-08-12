@@ -3,7 +3,7 @@ title: H3Storyboard
 started: 2026-08-11
 current_phase: M1
 status: active
-last_review: 2026-08-11
+last_review: 2026-08-12
 ---
 
 ## 目标
@@ -31,9 +31,9 @@ last_review: 2026-08-11
 ### M1B · 单镜 H3 闭环 · open
 - [x] M1B-1：TypeScript ComfyUI contract adapter、I2V graph、提交前 H3 lint 与只读 capability discovery
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
-- [ ] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + 同 prompt/seed 三方对照验证（见 research/2026-08-11-h3-hybrid-loader-assessment.md）
+- [x] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + stock ref2va / hybrid 同 prompt、seed 对照（见 research/2026-08-12-m1b3b-hybrid-r2v-comparison.md）
 - [x] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
-- [ ] M1B-3：真实 graph 出片与 Mode evidence（3a i2v 首跑已完成；3b HybridLoader/r2v 对照待办）
+- [x] M1B-3：真实 graph 出片与 Mode evidence（3a i2v + 3b HybridLoader/r2v 对照均完成；Mode 仍为 candidate，待 user 看片）
 - [x] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
 
@@ -119,3 +119,11 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 - `/free` 后空闲显存 32.6 GiB；生成期间峰值占用 45,667 MiB、最低空闲 2,835 MiB、GPU 利用率峰值 100%。生成锁完成后已释放。
 - `cinematic-drama` 已写入本次 evidence，但按阶段纪律保持 `candidate`；M1B-3 整体仍等待 3b HybridLoader/r2v 对照，不提前宣告完成。
 - 证据双产出：`research/2026-08-12-m1b3a-real-i2v-smoke.md` + `reports/2026-08-12-m1b3a-real-i2v-smoke.html`。
+
+## 2026-08-12 M1B-3b HybridLoader / r2v 对照状态
+- 8190 已安装 commit `861c7df` 的 `ComfyUI_MinimaxH3HybridLoader`；重启后 custom node 与原 11 个 H3 必需节点全部 present，8188 未重启。
+- Krea 真实生成林澜 720×1280 主形象并以真 hash 登记；旧演示占位 asset 经 replacement 状态机归档，新 reference 进入 immutable manifest v3。镜头编译为 `first_frame` + `reference_character` 两个有序 r2v binding。
+- commit `9aec643`：新增 stock/hybrid 显式 loader 的 raw `MiniMaxH3ReferenceToVideo` graph；worker 支持按编译顺序上传 r2v 图片，真实 HTTP + SQLite 测试覆盖。
+- 同 prompt/seed 对照：stock 75.343 秒、峰值 46,875 MiB；hybrid 75.103 秒、峰值 45,107 MiB。两段均为 480×864、5.167 秒 H.264 + AAC，并生成 candidate asset + pending actual；两条 job 都记录 `gate_override_reason`。
+- 抽帧显示 hybrid 的林澜身份、完整巷景与首秒质量优于 stock；手部/信封仍有生成伪影。`r2v-hybrid` evidence 已更新，validation status 保持 candidate，等待 user 看片。
+- 运行中发现共享 GPU 队列竞态；生成前门禁随后改为显式失败并等待外部任务自然完成。详见 paired research/report。

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M1B-3b · HybridLoader R2V 对照</title>
+<style>body{margin:0;background:#0b1020;color:#e8edf7;font:16px/1.6 system-ui,sans-serif}main{max-width:960px;margin:auto;padding:44px 24px}h1{font-size:34px;margin:0}.ok{color:#62e6a7}.warn{color:#ffc66d}.muted{color:#9ca9c4}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:24px 0}.card{background:#151d33;border:1px solid #293554;border-radius:12px;padding:16px}.value{font-size:25px;font-weight:700}table{width:100%;border-collapse:collapse;margin:14px 0}td,th{text-align:left;border-bottom:1px solid #293554;padding:10px 7px}code{color:#9bdcff;overflow-wrap:anywhere}h2{margin-top:32px}li{margin:7px 0}</style></head>
+<body><main><p class="ok">● REAL GPU COMPARISON COMPLETE</p><h1>HybridLoader R2V 对照</h1>
+<p class="muted">2026-08-12 · 雨夜来信第 1 镜 · 同 prompt / seed / binding</p>
+<section class="grid"><div class="card"><div class="muted">Stock ref2va</div><div class="value">75.343 s</div><div>峰值 46,875 MiB</div></div><div class="card"><div class="muted">Hybrid 30–49</div><div class="value">75.103 s</div><div>峰值 45,107 MiB</div></div><div class="card"><div class="muted">共同输出</div><div class="value">5.167 s</div><div>480×864 · H.264 + AAC</div></div></section>
+<h2>结论</h2><p>Hybrid 在本次受控镜头中明显更好：首秒即建立完整雨巷与人物，林澜脸型、短发、雨衣和酒红内搭更接近 approved Krea 主图；stock 首秒为暗剪影，霓虹参考线侵入更明显，信封纹理伪影更重。两者仍有手部与信封伪影，因此 Mode 保持 <code>candidate</code>，等待 user 看片。</p>
+<h2>运行证据</h2><table><tr><th></th><th>Stock</th><th>Hybrid</th></tr><tr><td>Provider task</td><td><code>8a4a4577…</code></td><td><code>e773ff9b…</code></td></tr><tr><td>文件大小</td><td>615,580 B</td><td>811,282 B</td></tr><tr><td>GPU 最低空闲</td><td>1,627 MiB</td><td>3,395 MiB</td></tr><tr><td>音频 RMS / peak</td><td>-17.88 / -2.86 dB</td><td>-22.46 / -6.29 dB</td></tr></table>
+<h2>生产契约</h2><ul><li>Krea 真参考图已用真实 hash 注册、approve 并关联林澜，旧假占位资产归档。</li><li>manifest v3、brief v2、锁快照与两条有序 compiled bindings 均固化在 job。</li><li>两条 job 都记录 <code>gate_override_reason=M1B-3b hybrid comparison</code>，并产出 candidate asset + pending take。</li><li>Hybrid 日志确认 fl2va base + ref2va AdaLN overlay blocks 30–49。</li></ul>
+<h2>操作风险回执</h2><p class="warn">安装重启期间发生共享队列竞态：初次空队列审计后出现外部任务，且第一条 compound shell 未使用 <code>set -e</code>，仍执行了 SIGTERM。8190 随后恢复，后续所有生成均改用显式失败门禁并等待外部任务自然结束。只重启了 8190；8188 未重启，未杀常驻进程。</p>
+<p class="muted">主观音频清晰度需要 user 实际播放；报告只陈述已验证的非静音、无削波与响度指标。</p></main></body></html>
