@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import type { AssetKind } from '@h3storyboard/protocol';
 import { useAssets } from '../lib/use-assets.js';
-import { assetFileUrl } from '../lib/api.js';
+import { AssetThumbnail } from './AssetThumbnail.js';
 
 export function AssetLibraryPanel({ projectId }: { projectId: string }) {
   const store = useAssets(projectId);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [uri, setUri] = useState('');
   const [kind, setKind] = useState<AssetKind>('image');
   const latestVersion = Math.max(0, ...store.manifests.map(
@@ -40,9 +40,7 @@ export function AssetLibraryPanel({ projectId }: { projectId: string }) {
           {store.assets.length === 0 ? <p className="rail-empty">还没有登记资产</p> : null}
           {store.assets.map((asset) => <article key={asset.id} data-status={asset.status}>
             <header><span>{asset.kind}</span><i>{asset.status}</i></header>
-            {asset.kind === 'image' ? <a className="asset-thumb" href={assetFileUrl(asset.id)}
-              target="_blank" rel="noreferrer"><img loading="lazy" alt={asset.name}
-                src={assetFileUrl(asset.id)} /></a> : null}
+            {asset.kind === 'image' ? <AssetThumbnail asset={asset} /> : null}
             <strong title={asset.uri}>{asset.uri}</strong>
             <footer>{asset.status === 'candidate' ? <button disabled={store.busy}
               type="button" onClick={() => void store.update({ asset_id: asset.id,

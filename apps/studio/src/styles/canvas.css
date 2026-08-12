@@ -20,6 +20,13 @@
   color: var(--paper);
 }
 
+.canvas-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
 .infinite-canvas {
   background-color: #0b0e0d;
   background-image: radial-gradient(circle, rgba(238, 234, 222, 0.14) 1px, transparent 1px);
@@ -142,7 +149,14 @@
   justify-content: space-between;
   margin: 9px 0;
   padding: 7px;
+  position: relative;
 }
+
+.canvas-card-frame video,
+.canvas-card-frame img { height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; }
+.canvas-card-frame::after { background: linear-gradient(transparent 45%, rgba(5,8,7,.7)); content: ""; inset: 0; position: absolute; }
+.canvas-card-frame b,
+.canvas-card-frame span { position: relative; z-index: 1; }
 
 .canvas-card-frame b,
 .canvas-card-frame span { color: var(--muted); font: 600 8px/1 var(--mono); }

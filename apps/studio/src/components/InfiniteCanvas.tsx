@@ -185,7 +185,9 @@ export function InfiniteCanvas({
   };
 
   return (
-    <div className="infinite-canvas" ref={surfaceRef} data-space="false" data-panning="false"
+    <div className="canvas-layout">
+      <AssetLibraryPanel projectId={snapshot.project.id} />
+      <div className="infinite-canvas" ref={surfaceRef} data-space="false" data-panning="false"
       onDoubleClick={onDoubleClick} onPointerDown={onPointerDown}
       onPointerMove={onPointerMove} onPointerUp={endInteraction}
       onPointerCancel={endInteraction} onWheel={onWheel}>
@@ -194,13 +196,6 @@ export function InfiniteCanvas({
         <small>拖拽平移 · 滚轮缩放 · 拖动卡片 · 双击聚焦 · 空格拖拽平移</small></div>
       {error ? <div className="canvas-status" role="alert">{error}</div> : null}
       {loading ? <div className="canvas-status">正在加载画布布局…</div> : null}
-      <AssetLibraryPanel projectId={snapshot.project.id} />
-      <CharacterLibraryPanel characters={characterStore.characters}
-        canvasCharacterIds={new Set(nodes.filter(({ node_type }) =>
-          node_type === 'character').map(({ ref_id }) => ref_id))}
-        busy={characterStore.busy} error={characterStore.error}
-        onCreate={characterStore.create} onUpdate={characterStore.update}
-        onPlace={(characterId) => void placeCharacter(characterId)} />
       {snapshot.shot_plans.length === 0 &&
         !nodes.some(({ node_type }) => node_type === 'character') ? (
         <div className="canvas-empty"><span>EMPTY CANVAS</span><h2>从第一镜开始搭建场景</h2>
@@ -218,6 +213,7 @@ export function InfiniteCanvas({
           {snapshot.shot_plans.map((shot) => {
             const node = shotNodes.get(shot.id);
             return node ? <CanvasShotCard key={shot.id} shot={shot} node={node}
+              assets={snapshot.assets}
               selected={selectedShotId === shot.id}
               compileReady={compilableShots.has(shot.id)}
               actuals={snapshot.shot_actuals.filter(
@@ -230,6 +226,13 @@ export function InfiniteCanvas({
           })}
         </div>
       )}
+      </div>
+      <CharacterLibraryPanel characters={characterStore.characters}
+        canvasCharacterIds={new Set(nodes.filter(({ node_type }) =>
+          node_type === 'character').map(({ ref_id }) => ref_id))}
+        busy={characterStore.busy} error={characterStore.error}
+        onCreate={characterStore.create} onUpdate={characterStore.update}
+        onPlace={(characterId) => void placeCharacter(characterId)} />
     </div>
   );
 }

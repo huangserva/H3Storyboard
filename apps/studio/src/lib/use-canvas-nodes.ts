@@ -125,7 +125,7 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
       const created = await api.createCanvasNode(snapshot.project.id, {
         node_type: 'character',
         ref_id: characterId,
-        x: 940,
+        x: 640,
         y: 100 + characterCount * 244,
         width: 240,
         height: 220,

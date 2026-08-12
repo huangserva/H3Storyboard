@@ -26,6 +26,7 @@ export function CharacterLibraryPanel({
   characters, canvasCharacterIds, busy, error, onCreate, onUpdate, onPlace,
 }: CharacterLibraryPanelProps) {
   const [editing, setEditing] = useState<Character | 'new' | null>(null);
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [appearance, setAppearance] = useState('');
   const [seeds, setSeeds] = useState('');
@@ -55,12 +56,15 @@ export function CharacterLibraryPanel({
   };
 
   return (
-    <aside className="character-library" aria-label="角色库"
+    <aside className="character-library" aria-label="角色库" data-open={open}
       onPointerDown={(event) => event.stopPropagation()}
       onWheel={(event) => event.stopPropagation()}>
       <header><div><span className="eyebrow">CHARACTER BIBLE</span>
-        <strong>角色库</strong></div>
-        <button type="button" onClick={() => openEditor('new')}>＋ 新建</button></header>
+        <strong>角色库</strong></div><div className="character-header-actions">
+        {open ? <button type="button" onClick={() => openEditor('new')}>＋ 新建</button> : null}
+        <button type="button" onClick={() => setOpen((current) => !current)}>
+          {open ? '收起' : '角色'}</button></div></header>
+      {open ? <>
       {error || localError ? <p className="character-error">{localError ?? error}</p> : null}
       {editing ? <form className="character-form" onSubmit={submit}>
         <label><span>角色名称</span><input required maxLength={160} value={name}
@@ -90,6 +94,7 @@ export function CharacterLibraryPanel({
                 status: 'archived' })}>归档</button></footer>
         </article>)}
       </div>
+      </> : null}
     </aside>
   );
 }
