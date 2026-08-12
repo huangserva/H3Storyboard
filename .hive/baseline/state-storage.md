@@ -1,6 +1,6 @@
 # State Storage
 
-> SQLite 单库（默认 `~/.h3storyboard/h3storyboard.db`，可用 `H3_STORYBOARD_DB` 覆盖）。所有写入先落库再改内存投影。schema 变更走编号 migration，记录于 `schema_version`。当前 **v14**（2026-08-11，M1B-2）。
+> SQLite 单库（默认 `~/.h3storyboard/h3storyboard.db`，可用 `H3_STORYBOARD_DB` 覆盖）。所有写入先落库再改内存投影。schema 变更走编号 migration，记录于 `schema_version`。当前 **v15**（2026-08-12，M1B 整改）。
 
 ## Migration 索引（packages/project-store/src/migrations.ts + migration-v*.ts）
 - v1–v5（M0）：projects、script versions、shot_plans、shot_actuals、h3_jobs（lease 状态机）、assets（当时含 NOT NULL content_hash）、QC verdict
@@ -13,6 +13,7 @@
 - v12：shot_actuals representative 字段（partial unique index 保证每镜一个）+ h3_jobs.gate_override_reason
 - v13：M1A review 整改——旧 image reference_bindings 回填 semantic_references；路径穿越校验恢复
 - v14：h3_jobs.cancel_reason；provider_job_id/output_asset_id 沿用既有列，worker 完成时 asset/job/pending take 单事务落库
+- v15：h3_jobs.provider_client_id（submit intent，提交崩溃窗口恢复认领，见 ADR comfyui-submit-intent-recovery）；输出文件名带 job+attempt+lease 唯一后缀
 
 ## 关键不变量
 - planned（shot_plans）与 actual（shot_actuals）分离，QC verdict 与 representative approve 独立

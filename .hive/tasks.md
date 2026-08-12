@@ -2,12 +2,7 @@
 
 ## In progress
 
-### Sprint · M1B 单镜 H3 闭环（2026-08-11 启动）
-本机即 GPU 盒（4090 48G，8190=H3 / 8188=Krea，共享显存）。三刀顺序推进：
-1. ▶️ M1B-1 ComfyUI adapter（contract 级：submit/poll/graph builder/提交前校验/prompt lint/只读能力发现；零真实生成）
-2. ⏳ M1B-2 lease worker：submit-once/poll/恢复 + 下载/hash/canonical 资产注册/pending take（顺带清理 content_hash 空串哨兵，ADR 欠账）
-3. ⏳ M1B-3 真机出片 + r2v-hybrid 三方对照（装 HybridLoader 需重启 ComfyUI，**须与 user 协调 GPU 窗口**）
-门禁：每刀四路 review 纪律沿用；真实生成前必须项目锁 + brief + manifest（M1A 契约）。
+### （M1B 已完成，归档见 Done）
 
 - [x] **全栈工程师** dispatch `478c3bf6` — 任务：M1B-1——ComfyUI H3 adapter（TypeScript，contract 级）+ 只读能力发现。蓝本：h3-film-studio 的 scripts/local_providers.py
 
@@ -16,7 +11,12 @@
 - [x] **全栈工程师** dispatch `382b50e7` — 任务：M1B-3b——HybridLoader 安装 + r2v 真机对照实验。user 已确认 GPU 无人使用，允许重启 8190 ComfyUI（谨慎执行，见步骤 1）。参考：.hive/research/2026-08-11-h3…
 - [x] **全栈工程师** dispatch `6403bb4a` — 任务：M1B-4——fl2v（首尾帧）路径补齐：graph builder + 真机冒烟。GPU 窗口仍有效（user 已授权），显存纪律照旧（生成前 /free 两实例、不杀进程、注意共享 GPU 外部队列——排队非空就等自然空闲，显式…
 - [x] **全栈工程师** dispatch `670e7676` — 任务：M1B-4 续——fl2v 真机冒烟补跑。8190 外部批任务已排空（orch 监视器确认连续 3 分钟空闲），窗口现在有效。
+- [x] **全栈工程师** dispatch `846d2a77` — 任务：M1B 收尾整改——修复四路 review 发现的 W1–W10，修完并复验后 M1B 才宣告 done。完整 findings 与修法方向见 docs/reviews/m1b-bug-review.md，逐条修复逐条回执。
 ## Done
+
+### 2026-08-12 · M1B 单镜 H3 闭环（done，commit 4055bc0 收官）
+三种模式（i2v/fl2v/r2v+hybrid）真机证据齐全；四路 review W1–W10 整改闭环，92 tests：
+- [x] M1B-1 ComfyUI contract adapter（e0c4f1c）· M1B-2 lease worker + 完成管线（dbc2559，v14）· M1B-3a 真机 i2v 首跑（3031a56）· M1B-3b HybridLoader + r2v 对照（9aec643）· M1B-4 fl2v（545fc5a）· review 整改 W1–W10（4055bc0，v15）
 
 ### 2026-08-11 · M1A 导演级生产契约（done，commit 70d83c7 收官）
 六刀 + review 整改全部完成；四路 review（架构 B+/缺陷 9+1 findings 修复/测试 A-/协议 1.1 补齐）通过：

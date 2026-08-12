@@ -1,7 +1,7 @@
 # 决策：用持久 client_id 意图恢复 ComfyUI 提交崩溃窗口
 
 **日期**: 2026-08-12
-**状态**: 提案中
+**状态**: accepted（orch 架构 review 通过 2026-08-12）
 **关联**: plan.md → M1B-2 / M1B review 整改
 
 ## 背景
@@ -14,7 +14,6 @@ ComfyUI `/prompt` 成功与 `provider_job_id` SQLite 落库之间存在进程崩
 1. ComfyUI 在 queue item 和 history prompt metadata 中保留 `client_id`，足以关联已经接受但本地尚未记录 prompt id 的任务。
 2. 意图先写库符合“数据库写先于投影/外部副作用”的项目纪律。
 3. 历史 job 的 nullable 字段允许 additive migration，不破坏现有项目。
-2. ...
 
 ## 已知代价
 - ComfyUI 若重启并同时清空 queue/history，无法证明旧任务从未执行；系统会在连续缺失确认后重提，并保留 attempt/event 审计。
