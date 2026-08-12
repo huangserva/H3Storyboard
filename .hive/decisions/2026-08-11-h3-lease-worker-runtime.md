@@ -1,7 +1,7 @@
 # 决策：H3 lease worker 归属 task-engine，由 API 进程按环境开关装配
 
 **日期**: 2026-08-11
-**状态**: accepted（orch 架构 review 通过 2026-08-11；结果段待 M1B-3 真机回填）
+**状态**: accepted（orch 架构 review 通过 2026-08-11；M1B-3a 真机结果已回填）
 **关联**: plan.md → M1B-2
 
 ## 背景
@@ -25,4 +25,14 @@ M1B-2 需要持久 lease、submit-once/poll-same-task、文件落盘和原子完
 - 文件已 rename 但 DB 事务失败时依赖 best-effort 删除；极端进程崩溃可能留下无 DB 引用的孤儿文件，后续可做只读 orphan audit。
 
 ## 结果（后写）
-待 M1B-3 真机首跑后回填 submit/poll、显存释放和故障恢复实证。
+
+2026-08-12 的 M1B-3a 首跑验证了本决策的正常完成路径：先对 8188/8190
+执行 `/free`，空闲显存由约 12.3 GiB 升至 32.6 GiB；worker 对真实 8190
+只提交一次，持久化 provider task
+`b41e6e4f-f3d9-43a3-be39-9337ff0dbd61` 后轮询至完成。submit→completed
+耗时 75.644 秒，显存峰值 45,667 MiB，GPU 利用率峰值 100%。
+
+完成管线产出 632,806 字节 MP4（H.264 480×864/24fps + AAC，5.167 秒），
+sha256 为 `59b4fb1bc4a22f2da396a6641a25a244c2869e4ce743f457a57233d5d6182f05`；
+candidate canonical asset、pending ShotActual 与 completed job 在同一完成事务后可见。
+本次没有触发恢复路径；该路径仍由 M1B-2 的真实 HTTP stub + SQLite 集成测试覆盖。

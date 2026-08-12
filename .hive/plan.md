@@ -33,7 +33,7 @@ last_review: 2026-08-11
 - [ ] i2v / fl2v / r2v 绑定槽 + provider 校验
 - [ ] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + 同 prompt/seed 三方对照验证（见 research/2026-08-11-h3-hybrid-loader-assessment.md）
 - [x] M1B-2：submit-once / poll-same-task worker、lease 恢复与 provider 切换显存钩子
-- [ ] M1B-3：协调 GPU 窗口后的真实 graph 出片、结果验证与 Mode evidence 升级
+- [ ] M1B-3：真实 graph 出片与 Mode evidence（3a i2v 首跑已完成；3b HybridLoader/r2v 对照待办）
 - [x] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
 
@@ -112,3 +112,10 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 - 下载非空 → 项目相对路径落盘 → 真实 sha256 → candidate canonical asset → pending take → completed job；三条 DB 记录在一个 immediate transaction 内可见。
 - 真实 HTTP stub + SQLite 覆盖成功、恢复零重提交、零字节失败无半成品、hash、取消原因；Protocol 升至 1.2，Studio task drawer 显示 worker/job/provider task 状态。
 - 本轮 `H3_WORKER` 未设置，对真实 8190/8188 零 POST；真机首跑仍属于 M1B-3。
+
+## 2026-08-12 M1B-3a H3 i2v 真机首跑状态
+- “雨夜来信”第 1 镜已用真实 480×864 首帧，经 approved asset → manifest v2 → semantic binding → generation lock → immutable job snapshot → worker submit/poll → candidate output asset → pending take 完成全链路。
+- provider task `b41e6e4f-f3d9-43a3-be39-9337ff0dbd61` 仅提交一次，75.644 秒完成；输出 H.264 + AAC 双流 MP4 为 5.167 秒、632,806 字节，真实 sha256 已落库。
+- `/free` 后空闲显存 32.6 GiB；生成期间峰值占用 45,667 MiB、最低空闲 2,835 MiB、GPU 利用率峰值 100%。生成锁完成后已释放。
+- `cinematic-drama` 已写入本次 evidence，但按阶段纪律保持 `candidate`；M1B-3 整体仍等待 3b HybridLoader/r2v 对照，不提前宣告完成。
+- 证据双产出：`research/2026-08-12-m1b3a-real-i2v-smoke.md` + `reports/2026-08-12-m1b3a-real-i2v-smoke.html`。

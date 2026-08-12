@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M1B-3a · H3 i2v 真机首跑</title>
+  <style>
+    body{margin:0;background:#0b1020;color:#e8edf7;font:16px/1.6 system-ui,sans-serif}main{max-width:880px;margin:auto;padding:48px 24px}h1{font-size:34px;margin:0 0 8px}.ok{color:#62e6a7}.muted{color:#9ca9c4}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:24px 0}.card{background:#151d33;border:1px solid #293554;border-radius:12px;padding:16px}.value{font-size:24px;font-weight:700}code{color:#9bdcff;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{text-align:left;border-bottom:1px solid #293554;padding:10px 6px}h2{margin-top:32px}
+  </style>
+</head>
+<body><main>
+  <p class="ok">● REAL MACHINE PASS</p>
+  <h1>H3 i2v 真机首跑</h1>
+  <p class="muted">2026-08-12 · “雨夜来信”第 1 镜 · 完整 M1A 锁定契约</p>
+  <section class="grid">
+    <div class="card"><div class="muted">submit → completed</div><div class="value">75.644 s</div></div>
+    <div class="card"><div class="muted">输出</div><div class="value">5.167 s</div><div>H.264 + AAC</div></div>
+    <div class="card"><div class="muted">分辨率</div><div class="value">480 × 864</div><div>24 fps</div></div>
+    <div class="card"><div class="muted">GPU 峰值</div><div class="value">45,667 MiB</div><div>利用率 100%</div></div>
+  </section>
+  <h2>契约链路</h2>
+  <p>真实首帧 approved asset → manifest v2 → <code>first_frame</code> semantic binding → generation lock → immutable job snapshot → submit-once/poll-same-task → download/hash → candidate asset → pending ShotActual → completed job。</p>
+  <h2>关键证据</h2>
+  <table>
+    <tr><th>Provider task</th><td><code>b41e6e4f-f3d9-43a3-be39-9337ff0dbd61</code></td></tr>
+    <tr><th>输出大小</th><td>632,806 bytes</td></tr>
+    <tr><th>输出 sha256</th><td><code>59b4fb1bc4a22f2da396a6641a25a244c2869e4ce743f457a57233d5d6182f05</code></td></tr>
+    <tr><th>显存</th><td>/free 后空闲 32.6 GiB；生成最低空闲 2,835 MiB</td></tr>
+    <tr><th>持久结果</th><td>job completed；asset candidate；actual qc_verdict=pending</td></tr>
+  </table>
+  <h2>边界</h2>
+  <p><code>cinematic-drama</code> 已记录本次 evidence，但仍保持 candidate。HybridLoader/r2v 对照属于 M1B-3b，本次没有安装、重启或杀死任何服务进程。</p>
+</main></body></html>
