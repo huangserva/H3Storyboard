@@ -144,6 +144,14 @@
   padding: 9px 0;
 }
 
+.qc-controls { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding: 9px 0; }
+.qc-controls > span { color: var(--faint); font: 650 8px/1 var(--mono); }
+.qc-controls > div { display: flex; gap: 5px; }
+.qc-controls button { background: var(--ink-4); border-radius: 3px; color: var(--paper); cursor: pointer; font: 600 8px/1 var(--mono); padding: 6px 7px; }
+.take-switcher { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.take-switcher button { background: var(--ink-4); border: 1px solid var(--line); border-radius: 3px; color: var(--faint); cursor: pointer; font: 600 8px/1 var(--mono); padding: 6px 7px; }
+.take-switcher button[data-active="true"] { border-color: var(--teal); color: var(--teal); }
+
 .representative-controls > span { color: var(--faint); font: 650 8px/1 var(--mono); }
 .representative-controls > span[data-status="approved"] { color: var(--teal); }
 .representative-controls > span[data-status="pending"] { color: var(--acid); }

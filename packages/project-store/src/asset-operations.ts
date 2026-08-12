@@ -29,6 +29,14 @@ export function listAssets(db: Database.Database, projectId: string): Asset[] {
   })();
 }
 
+export function getAsset(db: Database.Database, assetId: string): Asset {
+  const row = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
+  if (!row) throw new StoreError('ASSET_NOT_FOUND', 'Asset does not exist', {
+    asset_id: assetId,
+  });
+  return mapAsset(row);
+}
+
 function requireRelatedAsset(db: Database.Database, projectId: string, assetId: string) {
   const asset = db.prepare('SELECT project_id, kind, status FROM assets WHERE id = ?')
     .get(assetId) as { project_id: string; kind: string; status: string } | undefined;

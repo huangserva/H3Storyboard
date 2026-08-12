@@ -1,13 +1,16 @@
 import { createServer, type Server } from 'node:http';
+import { dirname, resolve } from 'node:path';
 import { openProjectStore, type ProjectStore } from '@h3storyboard/project-store';
 import { errorResponse } from './api-error.js';
 import { sendJson } from './http.js';
 import { dispatchRoute } from './routes.js';
+import { serveMediaRoute } from './media-routes.js';
 
 export interface ApiServerOptions {
   database_path: string;
   host?: string;
   port?: number;
+  data_directory?: string;
 }
 
 export interface ApiServerAddress {
@@ -25,7 +28,8 @@ export function createApiServer(options: ApiServerOptions): ApiServer {
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 4187;
   const store = openProjectStore(options.database_path);
-  const server = buildHttpServer(store);
+  const dataDirectory = resolve(options.data_directory ?? dirname(options.database_path));
+  const server = buildHttpServer(store, dataDirectory);
   let started = false;
   let closed = false;
   let closing = false;
@@ -99,12 +103,17 @@ export function createApiServer(options: ApiServerOptions): ApiServer {
   };
 }
 
-function buildHttpServer(store: ProjectStore): Server {
+function buildHttpServer(store: ProjectStore, dataDirectory: string): Server {
   return createServer(async (request, response) => {
     try {
+      if (await serveMediaRoute(request, response, store, dataDirectory)) return;
       const result = await dispatchRoute(request, store);
       sendJson(response, result.status, { data: result.body });
     } catch (error) {
+      if (response.headersSent) {
+        response.destroy(error instanceof Error ? error : undefined);
+        return;
+      }
       const result = errorResponse(error);
       sendJson(response, result.status, result.body);
     }

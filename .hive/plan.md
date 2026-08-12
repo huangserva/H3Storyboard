@@ -43,6 +43,7 @@ last_review: 2026-08-12
 - [x] 角色库面板与画布联动（character node 共用 SQLite 布局/z-index）
 - [x] 与 planned/actual 列视图通过工作区切换共存
 - [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
+- [x] Actual 面板可切换并内嵌播放同镜真实 Take（Range 流式媒体端点），资产库图片可预览，pending QC 操作可见
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列

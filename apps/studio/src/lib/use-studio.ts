@@ -141,6 +141,12 @@ export function useStudio() {
       status === 'approved' ? '代表 Take 已批准，批量门禁已打开' : '代表 Take 已拒绝',
     ), [updateActual]);
 
+  const reviewActual = useCallback((actualId: string,
+    verdict: 'approved' | 'rejected') => updateActual(
+      () => api.reviewActual(actualId, verdict),
+      verdict === 'approved' ? 'Take QC 已批准' : 'Take QC 已拒绝',
+    ), [updateActual]);
+
   return {
     projects,
     snapshot,
@@ -155,6 +161,7 @@ export function useStudio() {
     updateShot,
     markRepresentative,
     reviewRepresentative,
+    reviewActual,
     dismissNotice: () => setNotice(null),
   };
 }

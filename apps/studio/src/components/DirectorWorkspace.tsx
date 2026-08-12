@@ -22,6 +22,8 @@ interface DirectorWorkspaceProps {
   onMarkRepresentative: (actualId: string, representative: boolean) => Promise<boolean>;
   onReviewRepresentative: (actualId: string,
     status: 'approved' | 'rejected') => Promise<boolean>;
+  onReviewActual: (actualId: string,
+    verdict: 'approved' | 'rejected') => Promise<boolean>;
 }
 
 export function DirectorWorkspace({
@@ -33,10 +35,12 @@ export function DirectorWorkspace({
   onUpdateShot,
   onMarkRepresentative,
   onReviewRepresentative,
+  onReviewActual,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'director' | 'canvas'>('canvas');
   const [productionOpen, setProductionOpen] = useState(false);
   const [shotProductionOpen, setShotProductionOpen] = useState(false);
+  const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
   const actuals = snapshot?.shot_actuals.filter(
     (actual) => actual.shot_plan_id === selectedShot?.id,
   ) ?? [];
@@ -45,11 +49,13 @@ export function DirectorWorkspace({
       !latest || actual.attempt_number > latest.attempt_number ? actual : latest,
     null,
   );
-  const displayedActual = actuals.find(({ is_representative }) =>
-    is_representative) ?? currentActual;
+  const displayedActual = actuals.find(({ id }) => id === selectedActualId)
+    ?? currentActual;
   const displayedJob = (snapshot?.h3_jobs ?? []).filter(
     ({ shot_plan_id }) => shot_plan_id === selectedShot?.id,
   ).at(-1) ?? null;
+  const outputAsset = snapshot?.assets.find(
+    ({ id }) => id === displayedActual?.output_asset_id) ?? null;
 
   if (!snapshot) {
     return (
@@ -95,7 +101,11 @@ export function DirectorWorkspace({
         <div className="comparison-grid">
           <PlannedShotPanel shot={selectedShot} />
           <ActualShotPanel actual={displayedActual} busy={busy}
+            actuals={actuals}
             hasSelectedShot={Boolean(selectedShot)}
+            outputAsset={outputAsset}
+            onReviewActual={onReviewActual}
+            onSelectActual={setSelectedActualId}
             onMarkRepresentative={onMarkRepresentative}
             onReviewRepresentative={onReviewRepresentative} />
         </div>

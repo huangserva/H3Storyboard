@@ -24,6 +24,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   createAsset,
+  getAsset,
   listAssets,
   updateAsset,
 } from './asset-operations.js';
@@ -125,6 +126,8 @@ export class ProjectStore {
   listAssets(projectId: string): Asset[] {
     return listAssets(this.#database, projectId);
   }
+
+  getAsset(assetId: string): Asset { return getAsset(this.#database, assetId); }
 
   updateAsset(projectId: string, input: UpdateAssetInput): Asset {
     return updateAsset(this.#database, projectId, input);

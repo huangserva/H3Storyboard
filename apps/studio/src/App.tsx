@@ -40,6 +40,7 @@ export function App() {
           onUpdateShot={studio.updateShot}
           onMarkRepresentative={studio.markRepresentative}
           onReviewRepresentative={studio.reviewRepresentative}
+          onReviewActual={studio.reviewActual}
           selectedShot={studio.selectedShot}
           snapshot={studio.snapshot}
         />

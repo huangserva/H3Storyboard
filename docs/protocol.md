@@ -188,6 +188,7 @@ Error envelope:
 | `POST` | `/api/projects/:project_id/shots` | append a plan |
 | `POST` | `/api/projects/:project_id/assets` | register project-relative asset metadata |
 | `GET/PATCH` | `/api/projects/:project_id/assets` | list or update asset lifecycle metadata |
+| `GET` | `/api/assets/:asset_id/file` | stream the on-disk asset; supports a single byte `Range` with `206` |
 | `GET/POST` | `/api/projects/:project_id/canvas_nodes` | list or create persisted canvas nodes |
 | `PATCH` | `/api/projects/:project_id/canvas_nodes` | update canvas position, size, or z-index |
 | `GET/POST/PATCH` | `/api/projects/:project_id/characters` | character CRUD/archival |
@@ -205,6 +206,6 @@ Error envelope:
 | `POST` | `/api/actuals/:actual_id/representative` | select or withdraw representative |
 | `POST` | `/api/actuals/:actual_id/representative/review` | approve or reject representative |
 
-The API binds to `127.0.0.1`. JSON bodies are limited to 1 MB. Asset paths are relative and reject absolute paths plus `.` or `..` traversal segments.
+The API binds to `127.0.0.1`. JSON bodies are limited to 1 MB. Asset paths are relative and reject absolute paths plus `.` or `..` traversal segments. Media reads resolve the stored path again beneath the configured data directory before opening a file; missing metadata, missing files, invalid paths, and invalid ranges use stable `ASSET_*` codes.
 
 Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text.

@@ -1,16 +1,23 @@
-import type { ShotActual } from '@h3storyboard/protocol';
+import type { Asset, ShotActual } from '@h3storyboard/protocol';
+import { assetFileUrl } from '../lib/api.js';
 
 interface ActualShotPanelProps {
   actual: ShotActual | null;
+  actuals: ShotActual[];
   hasSelectedShot: boolean;
   busy: boolean;
+  outputAsset: Asset | null;
+  onReviewActual: (actualId: string,
+    verdict: 'approved' | 'rejected') => Promise<boolean>;
+  onSelectActual: (actualId: string) => void;
   onMarkRepresentative: (actualId: string, representative: boolean) => Promise<boolean>;
   onReviewRepresentative: (actualId: string,
     status: 'approved' | 'rejected') => Promise<boolean>;
 }
 
-export function ActualShotPanel({ actual, hasSelectedShot, busy,
-  onMarkRepresentative, onReviewRepresentative }: ActualShotPanelProps) {
+export function ActualShotPanel({ actual, actuals, hasSelectedShot, busy,
+  outputAsset, onReviewActual, onSelectActual, onMarkRepresentative,
+  onReviewRepresentative }: ActualShotPanelProps) {
   if (!actual) {
     return (
       <section className="comparison-card actual-panel empty-panel">
@@ -34,7 +41,27 @@ export function ActualShotPanel({ actual, hasSelectedShot, busy,
         <div><span className="panel-index">B</span><span className="eyebrow">ACTUAL / 实测分镜</span></div>
         <span className={`record-state ${actual.qc_verdict}`}>{actual.qc_verdict}</span>
       </header>
-      <div className="actual-preview"><span>TAKE {String(actual.attempt_number).padStart(2, '0')}</span></div>
+      {actuals.length > 1 ? <nav className="take-switcher" aria-label="选择 Take">
+        {actuals.map((item) => <button data-active={item.id === actual.id}
+          key={item.id} type="button" onClick={() => onSelectActual(item.id)}>
+          TAKE {String(item.attempt_number).padStart(2, '0')}
+          {item.is_representative ? ' · REP' : ''}</button>)}
+      </nav> : null}
+      <div className="actual-preview">
+        {outputAsset?.kind === 'video' ? <video controls preload="metadata"
+          src={assetFileUrl(outputAsset.id)} /> : outputAsset?.kind === 'image'
+          ? <img alt={`Take ${actual.attempt_number}`} src={assetFileUrl(outputAsset.id)} />
+          : <span>TAKE {String(actual.attempt_number).padStart(2, '0')}</span>}
+      </div>
+      <div className="qc-controls">
+        <span>QC VERDICT · {actual.qc_verdict}</span>
+        {actual.qc_verdict === 'pending' ? <div>
+          <button disabled={busy} type="button" onClick={() => void
+            onReviewActual(actual.id, 'approved')}>QC APPROVE</button>
+          <button disabled={busy} type="button" onClick={() => void
+            onReviewActual(actual.id, 'rejected')}>QC REJECT</button>
+        </div> : null}
+      </div>
       <div className="representative-controls">
         <span data-status={actual.representative_status}>
           {actual.is_representative
