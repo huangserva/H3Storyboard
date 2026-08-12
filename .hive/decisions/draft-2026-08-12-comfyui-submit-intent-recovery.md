@@ -21,4 +21,4 @@ ComfyUI `/prompt` 成功与 `provider_job_id` SQLite 落库之间存在进程崩
 - 认领依赖 ComfyUI 当前 queue/history JSON 形态，contract stub 与真机回归需持续覆盖。
 
 ## 结果（后写）
-待四路 review 整改验收后回填。
+migration v15 与恢复逻辑已在 commit `4055bc0` 实施。真实 HTTP + SQLite 测试证明提交崩溃后按 client id 认领且 `/prompt` 调用为零，ComfyUI 重启清空 queue/history 后才生成新意图重提。post-fix 真机 i2v 同时落库 client id 与 prompt id 并单次完成。

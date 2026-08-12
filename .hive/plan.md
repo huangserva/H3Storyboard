@@ -1,7 +1,7 @@
 ---
 title: H3Storyboard
 started: 2026-08-11
-current_phase: M1
+current_phase: M2
 status: active
 last_review: 2026-08-12
 ---
@@ -28,7 +28,7 @@ last_review: 2026-08-12
 - [x] 角色接入 per-shot 语义引用绑定 + opening/ending state + 确定性 H3 binding 编译
 - [x] 代表性 take 审批门（与单条 QC 独立；重复 job 需 approved representative 或审计 override）
 
-### M1B · 单镜 H3 闭环 · ready_for_review
+### M1B · 单镜 H3 闭环 · done
 - [x] M1B-1：TypeScript ComfyUI contract adapter、I2V graph、提交前 H3 lint 与只读 capability discovery
 - [x] i2v / fl2v / r2v 绑定槽 + provider 校验（FL2V 真机双流冒烟已完成）
 - [x] r2v 走 HybridLoader（fl2va base + ref2va adaln overlay，blocks 30-49）：GPU 盒部署 + stock ref2va / hybrid 同 prompt、seed 对照（见 research/2026-08-12-m1b3b-hybrid-r2v-comparison.md）
@@ -62,7 +62,7 @@ last_review: 2026-08-12
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contract 级）→ M1B-2 submit/poll worker + 下载/hash/资产注册 → M1B-3 真机出片 + r2v-hybrid 对照验证（需与 user 协调 GPU 窗口）。本机即 GPU 盒（4090 48G，8190=H3 / 8188=Krea）。
+M2 — 无限画布 Studio 继续迭代。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
@@ -134,3 +134,10 @@ M1B — 单镜 H3 闭环启动（2026-08-11）：M1B-1 ComfyUI adapter（contrac
 - 初次真机窗口被共享 8190 外部 S4–S10 连续批处理阻塞；原子门禁未抢占，旧 draft job 安全取消。重试窗口连续确认空闲并 `/free` 两实例后，以全新 job `ac2ad96e` 成功完成。
 - provider task `d807e4b5` 仅提交一次，75 秒完成；输出 480×864、5.167 秒 H.264 + AAC，532,582 bytes，sha256 `8836d771…e79117`；峰值显存 45,661 MiB。candidate asset + pending actual 落库，生成锁已释放。
 - M1B 六项功能证据已齐，状态进入 `ready_for_review`；四路 review 由 Orchestrator 组织。证据双产出见 `research/2026-08-12-m1b4-fl2v-smoke.md` 与 `reports/2026-08-12-m1b4-fl2v-smoke.html`。
+
+## 2026-08-12 M1B 四路 review 整改与终验
+- commit `4055bc0` 关闭 W1–W10：migration v15 持久 `provider_client_id` submit intent，按 client id 认领崩溃窗口内任务；连续 history/queue 缺失才重提。
+- poll 内 heartbeat、帧数动态预算、recoverable timeout、目标 task cancel/interrupt、job+slot 上传名、attempt+lease 输出所有权均有真实 HTTP + SQLite 回归。
+- 三类 graph 共用 Director/LoRA/sampler/output 骨架；能力发现从 graph 节点 union 派生并由守护测试防漂移。Protocol 升 1.3。
+- `pnpm check && pnpm build && pnpm test` 全绿（11 files；92 passed，1 opt-in probe skipped）。post-fix 真机 i2v job `c5685701` 单次提交，70.476 秒完成；480×864、5.167 秒 H.264 + AAC，真 hash、candidate asset、pending actual 与双 provider id 齐全，锁已释放。
+- M1B 六项全部完成，四路 review 整改闭环，里程碑状态更新为 `done`。配对证据见 `research/2026-08-12-m1b-review-remediation.md` 与 `reports/2026-08-12-m1b-review-remediation.html`。

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M1B 四路 Review 整改报告</title><style>
+body{font-family:system-ui,sans-serif;max-width:960px;margin:40px auto;padding:0 24px;color:#172033;background:#f6f8fb;line-height:1.6}main{background:white;padding:32px;border-radius:16px;box-shadow:0 8px 30px #1a274018}h1,h2{line-height:1.2}code{background:#eef2f7;padding:2px 5px;border-radius:4px}table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid #dfe5ee;text-align:left;vertical-align:top}.ok{color:#08783e;font-weight:700}.note{background:#eef7ff;border-left:4px solid #3977c3;padding:12px 16px}</style></head>
+<body><main><h1>M1B 四路 Review 整改完成</h1><p>日期：2026-08-12 · 实现 commit <code>4055bc0</code></p>
+<p class="note">结论：W1–W10 全部有回归覆盖；全仓门禁通过；post-fix 真机 i2v 单次提交并完成双流输出。M1B 可进入 done。</p>
+<h2>逐项回执</h2><table><thead><tr><th>Finding</th><th>修复与证据</th></tr></thead><tbody>
+<tr><td>W1</td><td>attempt/lease 唯一输出路径；双 worker 竞争测试证明陈旧 worker 不删除新成片。</td></tr>
+<tr><td>W2 + W4</td><td>migration v15 持久 client submit intent；queue/history 认领，连续缺失才清除并重提。</td></tr>
+<tr><td>W3</td><td>动态 poll 预算；timeout 中断目标 task 并进入可恢复 timed_out。</td></tr>
+<tr><td>W5</td><td>上传名加入 job id 与 slot，同名输入保持独立。</td></tr>
+<tr><td>W6</td><td>AbortSignal 打断轮询；pending 删除、running interrupt 均限定目标 task。</td></tr>
+<tr><td>W7</td><td>空错误规范化；普通失败落库异常时用同 lease 最后手段事务收口。</td></tr>
+<tr><td>W8 + W10</td><td>graph 公共骨架；能力清单从四类代表 graph 的节点 union 派生，守护测试防漂移。</td></tr>
+<tr><td>W9</td><td>poll 内 heartbeat；启动校验最大动态 poll 窗口短于 lease。</td></tr>
+</tbody></table>
+<h2>自动验证</h2><p class="ok">pnpm check ✓ · pnpm build ✓ · pnpm test ✓</p><p>11 test files；92 passed；1 个 opt-in capability probe skipped。所有修改后的 service 文件低于 300 行。</p>
+<h2>真机 i2v 回归</h2><ul><li>job <code>c5685701…</code>，client id 与 prompt id 均落库，attempt=1</li><li>70.476 秒完成；观察峰值显存 43,635 MiB</li><li>480×864，5.167 秒，H.264 + AAC，516,342 bytes</li><li>sha256 <code>e3a299bc…d5d0fc</code></li><li>candidate asset 与 pending actual 齐全；生成锁已释放</li></ul>
+<h2>剩余边界</h2><p>ComfyUI 若执行后重启并同时清空 queue/history，远端执行无法被严格证明；系统会连续确认缺失后创建可审计的新 attempt，并依靠唯一输出路径避免覆盖。Mode 保持 candidate，等待导演看片决定 validated。</p>
+</main></body></html>

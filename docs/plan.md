@@ -24,12 +24,17 @@ M1A passed the required architecture, bug, test, and protocol reviews. Follow-up
 ## M1B — single-shot H3 loop
 
 - [x] Contract-level TypeScript ComfyUI client, deterministic H3 I2V graph, preflight lint, and read-only node capability evidence (`e0c4f1c`).
-- [ ] Explicit image, first-frame, and last-frame binding slots.
-- [ ] `i2v`, `fl2v`, and `r2v` provider validation.
-- [ ] Promote live capabilities from node-presence evidence to `validated` only after a coordinated real-generation experiment.
+- [x] Explicit image, first-frame, and last-frame binding slots.
+- [x] `i2v`, `fl2v`, and `r2v` provider validation, including real H.264 + AAC smoke outputs.
+- [x] Attach real-generation evidence to candidate modes; promotion to `validated` remains an explicit director decision after visual review.
 - [x] Provider worker for submit-once, poll-same-task, cancel audit, restart recovery, and explicit rerun as a new job (`dbc2559`; runtime remains opt-in).
 - [x] Download, non-empty verification, content hash, canonical candidate asset registration, and pending-take creation before atomic job completion.
 - [x] Actual result capture and QC verdict contract/API.
+
+M1B passed architecture, protocol, and test review; remediation commit `4055bc0`
+closes bug findings W1–W10 with migration v15 submit intent, crash recovery,
+lease heartbeat/cancel behavior, attempt-owned output paths, and graph-derived
+capability inventory. A post-fix real i2v run completed end to end on 2026-08-12.
 
 ## M2 — multimodal H3
 
