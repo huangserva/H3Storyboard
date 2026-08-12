@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>M1B-4 FL2V 冒烟状态</title><style>body{font:16px/1.6 system-ui;max-width:900px;margin:40px auto;padding:0 24px;color:#18202a}code{background:#eef1f4;padding:2px 5px}h1,h2{line-height:1.2}.ok{color:#08783e}.wait{color:#a45d00}</style></head><body>
+<h1>M1B-4 FL2V：代码完成，真机冒烟等待独占窗口</h1>
+<p class="ok">FL2V graph builder、worker 双帧上传接线及真实 HTTP + SQLite stub 集成测试均已完成，提交 <code>545fc5a</code>。全量质量门通过：81 passed，1 个 opt-in probe skipped。</p>
+<h2>已准备的真实契约</h2><p>“雨夜来信”第 1 镜已配置 approved 首帧与真实尾帧变体，冻结 manifest v4、创建 brief v3，并 dry-run 编译为严格有序的 <code>first_frame → last_frame</code> 两槽 FL2V 输入。</p>
+<h2>为什么没有声称出片</h2><p class="wait">8190 被外部批处理 S4–S10 连续占用。每次短暂空窗后，下一任务都在本任务的原子队列门禁前进入；门禁按纪律拒绝 <code>/free</code> 与提交，没有抢占或杀进程。等待超过 35 分钟后，未提交的 draft job 已安全取消，项目锁已释放。</p>
+<p>因此本轮没有 MP4、ffprobe、显存峰值或新 Mode evidence。需要在真正空闲的 GPU 窗口重新 engage lock 并创建新 job，才能完成最后一项真机证据。</p>
+</body></html>
+
