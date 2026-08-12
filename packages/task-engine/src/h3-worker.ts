@@ -1,9 +1,11 @@
 import {
   H3ComfyError,
   buildH3I2VGraph,
+  buildH3R2VGraph,
   framesForDuration,
   type ComfyUIClient,
   type H3Lora,
+  type H3R2VLoader,
 } from '@h3storyboard/h3-provider';
 import {
   RelativeAssetPathSchema,
@@ -50,6 +52,7 @@ export interface H3LeaseWorkerOptions {
   loras?: readonly H3Lora[];
   generate_audio?: boolean;
   free_before_submit?: boolean;
+  r2v_loader?: H3R2VLoader;
   on_error?: (error: unknown) => void;
 }
 
@@ -80,6 +83,7 @@ export class H3LeaseWorker {
       loras: options.loras ?? [],
       generate_audio: options.generate_audio ?? true,
       free_before_submit: options.free_before_submit ?? true,
+      r2v_loader: options.r2v_loader ?? { kind: 'stock' },
     };
   }
 
@@ -142,33 +146,45 @@ export class H3LeaseWorker {
   }
 
   async #submit(job: H3Job): Promise<string> {
-    if (job.mode !== 'i2v') throw new H3WorkerError(
-      'H3_WORKER_MODE_UNSUPPORTED', 'M1B-2 worker supports i2v jobs only');
+    if (job.mode !== 'i2v' && job.mode !== 'r2v') throw new H3WorkerError(
+      'H3_WORKER_MODE_UNSUPPORTED', 'H3 worker supports i2v and r2v jobs');
     if (job.seed === null) throw new H3WorkerError(
       'H3_WORKER_SEED_REQUIRED', 'H3 worker jobs require a persisted seed');
-    const firstFrame = job.compiled_bindings?.find(
-      ({ purpose }) => purpose === 'first_frame');
-    if (!firstFrame) throw new H3WorkerError('H3_WORKER_INPUT_MISSING',
-      'Compiled i2v job has no first_frame input');
-    const path = safeDataPath(this.#options.data_directory, firstFrame.uri);
-    let image: Buffer;
-    try { image = await readFile(path); }
-    catch (error) { throw new H3WorkerError('H3_WORKER_INPUT_READ_FAILED',
-      'Could not read the compiled first-frame asset', { cause: error }); }
-    if (image.byteLength === 0) throw new H3WorkerError(
-      'H3_WORKER_INPUT_EMPTY', 'Compiled first-frame asset is empty');
+    const bindings = job.mode === 'i2v'
+      ? [job.compiled_bindings?.find(({ purpose }) => purpose === 'first_frame')]
+      : [...(job.compiled_bindings ?? [])];
+    if (bindings.length === 0 || bindings.some((binding) => !binding)) {
+      throw new H3WorkerError('H3_WORKER_INPUT_MISSING',
+        `Compiled ${job.mode} job has no required image inputs`);
+    }
+    const images: Array<{ path: string; bytes: Buffer }> = [];
+    for (const binding of bindings) {
+      const path = safeDataPath(this.#options.data_directory, binding!.uri);
+      let bytes: Buffer;
+      try { bytes = await readFile(path); }
+      catch (error) { throw new H3WorkerError('H3_WORKER_INPUT_READ_FAILED',
+        'Could not read a compiled image asset', { cause: error }); }
+      if (bytes.byteLength === 0) throw new H3WorkerError(
+        'H3_WORKER_INPUT_EMPTY', 'Compiled image asset is empty');
+      images.push({ path, bytes });
+    }
     if (this.#options.free_before_submit) await this.#options.client.free();
-    const startName = await this.#options.client.uploadImage(
-      new Blob([Uint8Array.from(image)]), basename(path));
-    return this.#options.client.submitPrompt(buildH3I2VGraph({
-      start_name: startName, prompt: job.prompt, width: this.#options.width,
+    const names: string[] = [];
+    for (const image of images) names.push(await this.#options.client.uploadImage(
+      new Blob([Uint8Array.from(image.bytes)]), basename(image.path)));
+    const common = { prompt: job.prompt, width: this.#options.width,
       height: this.#options.height,
       frames: framesForDuration(job.duration_seconds, this.#options.fps),
       fps: this.#options.fps, seed: job.seed, loras: this.#options.loras,
       steps: job.steps, turbo: this.#options.turbo,
       filename_prefix: `h3storyboard/${job.id}`,
       generate_audio: this.#options.generate_audio,
-    }));
+    };
+    const graph = job.mode === 'i2v'
+      ? buildH3I2VGraph({ ...common, start_name: names[0]! })
+      : buildH3R2VGraph({ ...common, reference_names: names,
+        loader: this.#options.r2v_loader });
+    return this.#options.client.submitPrompt(graph);
   }
 
   async #writeOutput(job: H3Job, bytes: Uint8Array) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   H3ComfyError,
   buildH3I2VGraph,
+  buildH3R2VGraph,
   framesForDuration,
   lintH3Prompt,
 } from '../../packages/h3-provider/src/index.js';
@@ -18,6 +19,21 @@ const base = {
   steps: 20,
   turbo: true,
   filename_prefix: 'h3storyboard/shot-1',
+  generate_audio: true,
+} as const;
+
+const r2vBase = {
+  reference_names: ['inputs/scene.png', 'inputs/lin-lan.png'],
+  prompt: '<Picture 1> establishes the rainy alley. <Picture 2> is Lin Lan.',
+  width: 480,
+  height: 864,
+  frames: 124,
+  fps: 24,
+  seed: 20260812,
+  loras: [] as const,
+  steps: 4,
+  turbo: true,
+  filename_prefix: 'h3storyboard/r2v-shot-1',
   generate_audio: true,
 } as const;
 
@@ -90,5 +106,74 @@ describe('H3 prompt lint', () => {
       message: expect.stringContaining('「」'),
     }]);
     expect(lintH3Prompt('Dialogue: 林澜说「你来了。」')).toEqual([]);
+  });
+});
+
+describe('H3 r2v graph contract', () => {
+  it('builds ordered multi-reference inputs with the stock ref2va loader', () => {
+    const graph = buildH3R2VGraph({ ...r2vBase,
+      loader: { kind: 'stock' } });
+
+    expect(Object.fromEntries(Object.entries(graph).map(([id, node]) =>
+      [id, node.class_type]))).toMatchInlineSnapshot(`
+      {
+        "1": "UNETLoader",
+        "2": "CLIPLoader",
+        "20": "LoraLoaderModelOnly",
+        "3": "VAELoader",
+        "30": "MiniMaxH3SigmaShift",
+        "31": "RandomNoise",
+        "32": "BasicGuider",
+        "33": "KSamplerSelect",
+        "34": "BasicScheduler",
+        "35": "SamplerCustomAdvanced",
+        "36": "VAEDecode",
+        "37": "VAEDecodeAudio",
+        "4": "VAELoader",
+        "5": "MiniMaxH3ReferenceToVideo",
+        "6": "CreateVideo",
+        "7": "SaveVideo",
+        "8": "LoadImage",
+        "9": "LoadImage",
+      }
+    `);
+    expect(graph['1']?.inputs).toEqual({
+      unet_name: 'minimax_h3_ref2va_pruned_int8_convrot.safetensors',
+      weight_dtype: 'default',
+    });
+    expect(graph['5']?.inputs['ref_images.ref_image_0']).toEqual(['8', 0]);
+    expect(graph['5']?.inputs['ref_images.ref_image_1']).toEqual(['9', 0]);
+    expect(graph['8']?.inputs.image).toBe('inputs/scene.png');
+    expect(graph['9']?.inputs.image).toBe('inputs/lin-lan.png');
+  });
+
+  it('changes only the loader contract for the recommended hybrid', () => {
+    const graph = buildH3R2VGraph({ ...r2vBase, loader: {
+      kind: 'hybrid', block_range_start: 30, block_range_end: 49,
+    } });
+
+    expect(graph['1']).toEqual({
+      class_type: 'MiniMaxH3HybridLoader',
+      inputs: {
+        base_model: 'minimax_h3_fl2va_pruned_int8_convrot.safetensors',
+        overlay_model: 'minimax_h3_ref2va_pruned_int8_convrot.safetensors',
+        overlay_preset: 'block_range_adaln',
+        block_range_start: 30,
+        block_range_end: 49,
+        final_adaln_from_overlay: false,
+        custom_overlays: '',
+        custom_base: '',
+        weight_dtype: 'default',
+      },
+    });
+    expect(graph['5']?.class_type).toBe('MiniMaxH3ReferenceToVideo');
+    expect(graph['5']?.inputs['ref_images.ref_image_1']).toEqual(['9', 0]);
+  });
+
+  it('rejects an empty reference list', () => {
+    expect(() => buildH3R2VGraph({ ...r2vBase, reference_names: [],
+      loader: { kind: 'stock' } })).toThrowError(expect.objectContaining({
+        code: 'H3_COMFY_PROTOCOL_ERROR',
+      }));
   });
 });
