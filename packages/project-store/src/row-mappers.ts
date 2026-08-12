@@ -148,6 +148,7 @@ export function mapH3Job(row: unknown): H3Job {
       jsonColumn(record, 'compiled_bindings_json'),
     gate_override_reason: record.gate_override_reason ?? null,
     cancel_reason: record.cancel_reason ?? null,
+    provider_client_id: record.provider_client_id ?? null,
   });
 }
 

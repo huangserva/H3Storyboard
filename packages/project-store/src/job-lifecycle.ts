@@ -102,6 +102,43 @@ export function failH3Job(
   });
 }
 
+export function forceFailH3Job(db: Database.Database, jobId: string,
+  leaseToken: string, errorCode: string, errorMessage: string): H3Job {
+  const code = errorCode.trim() || 'H3_WORKER_FAILED';
+  const message = errorMessage.trim() || 'H3 worker failed without details';
+  return runWriteTransaction(db, () => {
+    const job = getJob(db, jobId);
+    if (!activeStatuses.includes(job.status as (typeof activeStatuses)[number]) ||
+      job.lease_token !== leaseToken) return job;
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE h3_jobs SET status = 'failed', error_code = ?,
+      error_message = ?, completed_at = ?, updated_at = ?, lease_token = NULL,
+      lease_expires_at = NULL, heartbeat_at = ? WHERE id = ? AND lease_token = ?`)
+      .run(code, message, now, now, now, jobId, leaseToken);
+    appendJobEvent(db, jobId, job.status, 'failed', message, now, code);
+    return getJob(db, jobId);
+  });
+}
+
+export function deferH3Job(db: Database.Database, jobId: string,
+  leaseToken: string, errorCode: string, errorMessage: string): H3Job {
+  const message = errorMessage.trim() || 'Provider polling timed out';
+  return runWriteTransaction(db, () => {
+    const job = getJob(db, jobId);
+    requireJobTransition(job, 'timed_out');
+    requireLeaseToken(job, leaseToken);
+    const now = new Date().toISOString();
+    const result = db.prepare(`UPDATE h3_jobs SET status = 'timed_out',
+      error_code = ?, error_message = ?, completed_at = ?, updated_at = ?,
+      lease_token = NULL, lease_expires_at = NULL, heartbeat_at = ?
+      WHERE id = ? AND status = ? AND lease_token = ?`)
+      .run(errorCode, message, now, now, now, jobId, job.status, leaseToken);
+    if (result.changes !== 1) throw staleLease(jobId);
+    appendJobEvent(db, jobId, job.status, 'timed_out', message, now, errorCode);
+    return getJob(db, jobId);
+  });
+}
+
 export function cancelH3Job(
   db: Database.Database,
   jobId: string,

@@ -17,11 +17,11 @@ M1B-2 需要持久 lease、submit-once/poll-same-task、文件落盘和原子完
 1. 依赖方向保持单向：project-store 继续复用 task-engine 状态机，worker 用接口注入获得持久操作。
 2. 本地单进程部署最小，不新增 daemon/systemd；开关明确守住“零真实生成”的阶段边界。
 3. SQLite 对 asset/job/actual 提供真正的全有或全无；文件系统无法与 SQLite 两阶段提交，采用临时文件 + rename + 失败补偿是本地最小正确方案。
-4. `provider_job_id` 已是 provider task id，继续复用可保持 Protocol 兼容，migration v14 只补取消审计字段。
+4. `provider_job_id` 继续表示 provider task id；migration v14 补取消审计字段，review 整改 migration v15 再补提交前持久化的 `provider_client_id` 意图。
 
 ## 已知代价
-- 进程若在 ComfyUI 接受 prompt 后、`provider_job_id` 落库前崩溃，ComfyUI 本身没有 idempotency key，无法严格消除窄窗口重复提交；落库后恢复路径保证不重提交。
-- API shutdown 会等待当前有限轮询结束；M1B-3 实跑后若停机延迟不可接受，再给 client poll 增加 abort signal。
+- ComfyUI 没有应用级 idempotency key；本系统以持久 `client_id` + queue/history 认领把提交崩溃窗口收窄为可恢复协议，只有连续确认远端不存在时才重提。
+- 取消可通过 AbortSignal 打断轮询；只对目标 prompt 执行 pending queue 删除或 running interrupt，避免干扰其他任务。当前 graceful shutdown 仍等待本轮结束。
 - 文件已 rename 但 DB 事务失败时依赖 best-effort 删除；极端进程崩溃可能留下无 DB 引用的孤儿文件，后续可做只读 orphan audit。
 
 ## 结果（后写）
@@ -36,3 +36,8 @@ M1B-2 需要持久 lease、submit-once/poll-same-task、文件落盘和原子完
 sha256 为 `59b4fb1bc4a22f2da396a6641a25a244c2869e4ce743f457a57233d5d6182f05`；
 candidate canonical asset、pending ShotActual 与 completed job 在同一完成事务后可见。
 本次没有触发恢复路径；该路径仍由 M1B-2 的真实 HTTP stub + SQLite 集成测试覆盖。
+
+2026-08-12 四路 review 整改新增 migration v15 与真实 HTTP + SQLite 崩溃窗口测试：
+提交前落 `provider_client_id`，恢复从 queue/history 认领 prompt，认领不到才重提；轮询内续租，
+timeout 进入可恢复态并中断目标 task。输出路径加入 attempt/lease 所有权，双 worker 竞争测试证明
+陈旧 worker 不会覆盖或删除新 attempt 的已登记成片。

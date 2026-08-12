@@ -1,12 +1,8 @@
 import { H3ComfyError, type ComfyGraph } from './comfyui-types.js';
 import { lintH3Prompt, type H3Lora } from './h3-graph.js';
+import { appendLoras, appendVideoOutput, baseGraph, graphNodeTypes, H3_MODELS,
+  validateH3GraphInput } from './h3-graph-common.js';
 
-const H3_UNET_FL2V = 'minimax_h3_fl2va_pruned_int8_convrot.safetensors';
-const H3_UNET_R2V = 'minimax_h3_ref2va_pruned_int8_convrot.safetensors';
-const H3_CLIP = 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors';
-const H3_VIDEO_VAE = 'minimax_h3_video_vae_fp16.safetensors';
-const H3_AUDIO_VAE = 'minimax_h3_audio_vae_fp32.safetensors';
-const H3_TURBO = 'minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors';
 
 export type H3R2VLoader =
   | { kind: 'stock' }
@@ -29,32 +25,17 @@ export interface BuildH3R2VGraphInput {
 }
 
 export function buildH3R2VGraph(input: BuildH3R2VGraphInput): ComfyGraph {
-  validateInput(input);
+  validateH3GraphInput(input);
+  validateReferences(input);
   lintH3Prompt(input.prompt);
-  const graph: ComfyGraph = {
-    '1': loaderNode(input.loader),
-    '2': { class_type: 'CLIPLoader', inputs: {
-      clip_name: H3_CLIP, type: 'minimax', device: 'default' } },
-    '3': { class_type: 'VAELoader', inputs: { vae_name: H3_VIDEO_VAE } },
-    '4': { class_type: 'VAELoader', inputs: { vae_name: H3_AUDIO_VAE } },
-  };
+  const graph = baseGraph(loaderNode(input.loader));
   const referenceInputs: Record<string, unknown> = {};
   input.reference_names.forEach((name, index) => {
     const id = String(8 + index);
     graph[id] = { class_type: 'LoadImage', inputs: { image: name } };
     referenceInputs[`ref_images.ref_image_${index}`] = [id, 0];
   });
-  let model: [string, number] = ['1', 0];
-  const loras = [...input.loras];
-  if (input.turbo && !loras.some(({ name }) => name === H3_TURBO)) {
-    loras.push({ name: H3_TURBO, strength: 1 });
-  }
-  loras.forEach((lora, index) => {
-    const id = String(20 + index);
-    graph[id] = { class_type: 'LoraLoaderModelOnly', inputs: {
-      model, lora_name: lora.name, strength_model: lora.strength } };
-    model = [id, 0];
-  });
+  const model = appendLoras(graph, input, 20);
   graph['30'] = { class_type: 'MiniMaxH3SigmaShift', inputs: {
     model, shift_video: 12, shift_audio: 3 } };
   const sampledModel: [string, number] = ['30', 0];
@@ -76,28 +57,22 @@ export function buildH3R2VGraph(input: BuildH3R2VGraphInput): ComfyGraph {
   } };
   graph['36'] = { class_type: 'VAEDecode', inputs: {
     samples: ['35', 0], vae: ['3', 0] } };
-  const videoInputs: Record<string, unknown> = {
-    images: ['36', 0], fps: input.fps ?? 24, bit_depth: 8,
-  };
+  let audio: [string, number] | null = null;
   if (input.generate_audio) {
     graph['37'] = { class_type: 'VAEDecodeAudio', inputs: {
       samples: ['35', 0], vae: ['4', 0] } };
-    videoInputs.audio = ['37', 0];
+    audio = ['37', 0];
   }
-  graph['6'] = { class_type: 'CreateVideo', inputs: videoInputs };
-  graph['7'] = { class_type: 'SaveVideo', inputs: {
-    video: ['6', 0], filename_prefix: input.filename_prefix,
-    format: 'auto', codec: 'auto',
-  } };
+  appendVideoOutput(graph, ['36', 0], audio, input.fps ?? 24, input);
   return graph;
 }
 
 function loaderNode(loader: H3R2VLoader) {
   if (loader.kind === 'stock') return { class_type: 'UNETLoader', inputs: {
-    unet_name: H3_UNET_R2V, weight_dtype: 'default',
+    unet_name: H3_MODELS.r2v, weight_dtype: 'default',
   } };
   return { class_type: 'MiniMaxH3HybridLoader', inputs: {
-    base_model: H3_UNET_FL2V, overlay_model: H3_UNET_R2V,
+    base_model: H3_MODELS.fl2v, overlay_model: H3_MODELS.r2v,
     overlay_preset: 'block_range_adaln',
     block_range_start: loader.block_range_start,
     block_range_end: loader.block_range_end,
@@ -106,25 +81,11 @@ function loaderNode(loader: H3R2VLoader) {
   } };
 }
 
-function validateInput(input: BuildH3R2VGraphInput): void {
-  if (![input.width, input.height].every((value) =>
-    Number.isInteger(value) && value > 0 && value % 32 === 0)) {
-    throw new H3ComfyError('H3_DIMENSION_INVALID',
-      'H3 width and height must be positive integers divisible by 32');
-  }
-  if (!Number.isInteger(input.frames) || input.frames < 5 ||
-    (input.frames - 5) % 17 !== 0) {
-    throw new H3ComfyError('H3_FRAME_GRID_INVALID',
-      'H3 frame count must lie on the 17k+5 grid');
-  }
+function validateReferences(input: BuildH3R2VGraphInput): void {
   if (input.reference_names.length < 1 || input.reference_names.length > 9 ||
     input.reference_names.some((name) => name.trim().length === 0)) {
     throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
       'H3 r2v requires between one and nine named image references');
-  }
-  if (!Number.isInteger(input.steps) || input.steps <= 0) {
-    throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
-      'Sampling steps must be a positive integer');
   }
   if (input.loader.kind === 'hybrid' &&
     (!Number.isInteger(input.loader.block_range_start) ||
@@ -135,3 +96,15 @@ function validateInput(input: BuildH3R2VGraphInput): void {
       'Hybrid block range must be an ordered subset of 0..49');
   }
 }
+
+const capabilityR2VInput = {
+  reference_names: ['reference.png'], prompt: '', width: 480, height: 864,
+  frames: 124, seed: 0, loras: [], steps: 4, turbo: true,
+  filename_prefix: 'capability/r2v', generate_audio: true,
+} as const;
+export const H3_R2V_NODE_TYPES = [...new Set([
+  ...graphNodeTypes(buildH3R2VGraph({ ...capabilityR2VInput,
+    loader: { kind: 'stock' } })),
+  ...graphNodeTypes(buildH3R2VGraph({ ...capabilityR2VInput,
+    loader: { kind: 'hybrid', block_range_start: 30, block_range_end: 49 } })),
+])];

@@ -15,8 +15,9 @@ import { addSemanticBindings } from './migration-v11.js';
 import { addRepresentativeTakeGate } from './migration-v12.js';
 import { backfillSemanticReferences } from './migration-v13.js';
 import { addWorkerCancellationReason } from './migration-v14.js';
+import { addProviderSubmitIntent } from './migration-v15.js';
 
-const CURRENT_SCHEMA_VERSION = 14;
+const CURRENT_SCHEMA_VERSION = 15;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -302,6 +303,12 @@ export function migrateDatabase(db: Database.Database): void {
       db.prepare(
         'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
       ).run(14, new Date().toISOString());
+    }
+    if (!appliedVersions.has(15)) {
+      addProviderSubmitIntent(db);
+      db.prepare(
+        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      ).run(15, new Date().toISOString());
     }
   })();
 }

@@ -1,18 +1,11 @@
 import { H3ComfyError } from './comfyui-types.js';
+import { H3_I2V_NODE_TYPES } from './h3-graph.js';
+import { H3_FL2V_NODE_TYPES } from './h3-fl2v-graph.js';
+import { H3_R2V_NODE_TYPES } from './h3-r2v-graph.js';
 
-export const REQUIRED_H3_NODES = [
-  'MiniMaxH3ImageToVideo',
-  'MiniMaxH3ReferenceToVideo',
-  'EmptyMiniMaxH3LatentAV',
-  'MiniMaxH3Director',
-  'UNETLoader',
-  'CLIPLoader',
-  'VAELoader',
-  'LoraLoaderModelOnly',
-  'LoadImage',
-  'CreateVideo',
-  'SaveVideo',
-] as const;
+export const REQUIRED_H3_NODES = [...new Set([
+  ...H3_I2V_NODE_TYPES, ...H3_FL2V_NODE_TYPES, ...H3_R2V_NODE_TYPES,
+])] as readonly string[];
 
 export type H3RequiredNode = typeof REQUIRED_H3_NODES[number];
 

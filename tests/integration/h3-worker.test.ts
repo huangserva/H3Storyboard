@@ -1,13 +1,14 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync,
+  writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { basename, dirname, join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ComfyUIClient } from '../../packages/h3-provider/src/index.js';
 import { ProjectStore } from '../../packages/project-store/src/index.js';
-import { H3LeaseWorker } from '../../packages/task-engine/src/index.js';
+import { H3LeaseWorker, workerFailure } from '../../packages/task-engine/src/index.js';
 
 const outputBytes = Buffer.from('stub-h3-video-with-audio');
 const directories: string[] = [];
@@ -65,9 +66,51 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
 
     expect(result.outcome).toBe('completed');
     expect(stub.counts).toMatchObject({ free: 0, upload: 0, prompt: 0,
-      history: 1, view: 1 });
+      history: 2, view: 1 });
     expect(reopened.getProjectSnapshot(fixture.projectId).h3_jobs
       .find(({ id }) => id === fixture.jobId)?.provider_job_id).toBe('prompt-1');
+  });
+
+  it('claims a submitted task by persisted client id after the submit crash window', async () => {
+    const fixture = seedWorkerJob();
+    const claimed = fixture.store.claimH3Job(fixture.jobId);
+    fixture.store.markH3SubmitIntent(fixture.jobId, claimed.lease_token!, 'intent-1');
+    fixture.store.close(); stores.splice(stores.indexOf(fixture.store), 1);
+    const raw = new Database(fixture.databasePath);
+    raw.prepare(`UPDATE h3_jobs SET status='timed_out', lease_token=NULL,
+      lease_expires_at=NULL WHERE id=?`).run(fixture.jobId); raw.close();
+    const reopened = track(new ProjectStore(fixture.databasePath));
+    const stub = await startComfyStub('claim-client');
+
+    const result = await createWorker(reopened, fixture.directory,
+      stub.endpoint).runOnce();
+
+    expect(result.outcome).toBe('completed');
+    expect(stub.counts.prompt).toBe(0);
+    expect(reopened.getH3Job(fixture.jobId)).toMatchObject({
+      provider_client_id: 'intent-1', provider_job_id: 'prompt-1' });
+  });
+
+  it('clears an evaporated provider task after restart and resubmits once', async () => {
+    const fixture = seedWorkerJob();
+    const claimed = fixture.store.claimH3Job(fixture.jobId);
+    fixture.store.markH3SubmitIntent(fixture.jobId, claimed.lease_token!, 'old-client');
+    fixture.store.markH3JobQueued(fixture.jobId, claimed.lease_token!, 'lost-task');
+    fixture.store.markH3JobRunning(fixture.jobId, claimed.lease_token!);
+    fixture.store.close(); stores.splice(stores.indexOf(fixture.store), 1);
+    const raw = new Database(fixture.databasePath);
+    raw.prepare('UPDATE h3_jobs SET lease_expires_at=? WHERE id=?')
+      .run('2000-01-01T00:00:00.000Z', fixture.jobId); raw.close();
+    const reopened = track(new ProjectStore(fixture.databasePath));
+    const stub = await startComfyStub('success');
+
+    const result = await createWorker(reopened, fixture.directory,
+      stub.endpoint).runOnce();
+
+    expect(result.outcome).toBe('completed');
+    expect(stub.counts.prompt).toBe(1);
+    expect(stub.counts.queue).toBeGreaterThanOrEqual(4);
+    expect(reopened.getH3Job(fixture.jobId).provider_job_id).toBe('prompt-1');
   });
 
   it('fails a zero-byte download without creating an output asset or take', async () => {
@@ -94,7 +137,7 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     const stub = await startComfyStub('success');
     const worker = createWorker(fixture.store, fixture.directory, stub.endpoint);
 
-    const canceled = worker.cancel(fixture.jobId, 'Director canceled test run');
+    const canceled = await worker.cancel(fixture.jobId, 'Director canceled test run');
 
     expect(canceled).toMatchObject({ status: 'canceled',
       cancel_reason: 'Director canceled test run' });
@@ -140,6 +183,123 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     expect(timeline.timelineMode).toBe('fl2v');
     expect(timeline.shots[0].startImage.imageFile).toBe('worker/upload-1.png');
     expect(timeline.shots[0].endImage.imageFile).toBe('worker/upload-2.png');
+  });
+
+  it('uses attempt and lease ownership in output paths', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('success');
+    const result = await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce();
+    expect(result).toMatchObject({ outcome: 'completed' });
+    if (result.outcome !== 'completed') return;
+    expect(result.output_path).toMatch(
+      new RegExp(`${fixture.jobId}-1-[0-9a-f-]{36}\\.mp4$`));
+  });
+
+  it('prevents an expired worker from deleting the newer attempt output', async () => {
+    const fixture = seedWorkerJob();
+    const staleStub = await startComfyStub('delayed-download');
+    const staleRun = createWorker(fixture.store, fixture.directory,
+      staleStub.endpoint).runOnce();
+    await until(() => staleStub.counts.view === 1);
+    const raw = new Database(fixture.databasePath);
+    raw.prepare('UPDATE h3_jobs SET lease_expires_at=? WHERE id=?')
+      .run('2000-01-01T00:00:00.000Z', fixture.jobId);
+    raw.close();
+    const freshStub = await startComfyStub('success');
+    const freshResult = await createWorker(fixture.store, fixture.directory,
+      freshStub.endpoint).runOnce();
+    expect(freshResult).toMatchObject({ outcome: 'completed' });
+
+    staleStub.releaseDownload();
+    expect(await staleRun).toMatchObject({ outcome: 'failed' });
+    const completed = fixture.store.getH3Job(fixture.jobId);
+    expect(completed).toMatchObject({ status: 'completed', attempt: 2 });
+    const output = fixture.store.getProjectSnapshot(fixture.projectId).assets
+      .find(({ id }) => id === completed.output_asset_id)!;
+    expect(readFileSync(join(fixture.directory, output.relative_path)))
+      .toEqual(outputBytes);
+    expect(readdirSync(dirname(join(fixture.directory, output.relative_path)))
+      .filter((name) => name.startsWith(fixture.jobId))).toEqual([
+        basename(output.relative_path),
+      ]);
+  });
+
+  it('prefixes uploads by job and slot so equal basenames stay distinct', async () => {
+    const fixture = seedFL2VWorkerJob();
+    const stub = await startComfyStub('success');
+    await createWorker(fixture.store, fixture.directory, stub.endpoint).runOnce();
+    expect(stub.uploadBodies[0]).toContain(`${fixture.jobId}-slot0-start.png`);
+    expect(stub.uploadBodies[1]).toContain(`${fixture.jobId}-slot1-end.png`);
+  });
+
+  it('rejects a poll window that can outlive its lease', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('success');
+    expect(() => new H3LeaseWorker({ store: fixture.store,
+      client: new ComfyUIClient({ endpoint: stub.endpoint,
+        poll_interval_ms: 100, poll_max_attempts: 10 }),
+      data_directory: fixture.directory, lease_duration_ms: 1_000 }))
+      .toThrowError(expect.objectContaining({ code: 'H3_WORKER_CONFIG_INVALID' }));
+  });
+
+  it('marks poll timeout recoverable and interrupts the provider task', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('hanging');
+    const heartbeat = vi.spyOn(fixture.store, 'heartbeatH3Job');
+    const result = await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce();
+    expect(result).toMatchObject({ outcome: 'timed_out',
+      provider_task_id: 'prompt-1' });
+    expect(fixture.store.getH3Job(fixture.jobId)).toMatchObject({
+      status: 'timed_out', provider_job_id: 'prompt-1' });
+    expect(stub.counts.interrupt).toBe(1);
+    expect(heartbeat.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('aborts active polling and interrupts ComfyUI when canceled', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('hanging');
+    const worker = new H3LeaseWorker({ store: fixture.store,
+      client: new ComfyUIClient({ endpoint: stub.endpoint,
+        poll_interval_ms: 20, poll_max_attempts: 100 }),
+      data_directory: fixture.directory, lease_duration_ms: 3_000_000,
+      free_before_submit: false });
+    const running = worker.runOnce();
+    await until(() => fixture.store.getH3Job(fixture.jobId).status === 'running');
+    const canceled = await worker.cancel(fixture.jobId, 'Stop active render');
+    const result = await running;
+    expect(canceled.status).toBe('canceled');
+    expect(result).toMatchObject({ outcome: 'failed',
+      error_code: 'H3_COMFY_ABORTED' });
+    expect(stub.counts.interrupt).toBe(1);
+  });
+
+  it('normalizes an empty error message before persistence', () => {
+    expect(workerFailure(new Error(''))).toEqual({ code: 'H3_WORKER_FAILED',
+      message: 'H3 worker failed without details' });
+  });
+
+  it('force-fails the leased job when normal failure persistence itself errors', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('success');
+    const client = new ComfyUIClient({ endpoint: stub.endpoint,
+      poll_interval_ms: 0, poll_max_attempts: 1 });
+    vi.spyOn(client, 'downloadOutput').mockRejectedValueOnce(new Error(''));
+    vi.spyOn(fixture.store, 'failH3Job').mockImplementationOnce(() => {
+      throw new Error('simulated validation failure');
+    });
+    const worker = new H3LeaseWorker({ store: fixture.store, client,
+      data_directory: fixture.directory, lease_duration_ms: 3_000_000 });
+
+    const result = await worker.runOnce();
+
+    expect(result).toMatchObject({ outcome: 'failed',
+      error_code: 'H3_WORKER_FAILED',
+      error_message: 'H3 worker failed without details' });
+    expect(fixture.store.getH3Job(fixture.jobId)).toMatchObject({
+      status: 'failed', error_code: 'H3_WORKER_FAILED',
+      error_message: 'H3 worker failed without details', lease_token: null });
   });
 });
 
@@ -294,28 +454,45 @@ function createWorker(store: ProjectStore, dataDirectory: string, endpoint: stri
   return new H3LeaseWorker({ store,
     client: new ComfyUIClient({ endpoint, poll_interval_ms: 0,
       poll_max_attempts: 1 }), data_directory: dataDirectory,
-    lease_duration_ms: 60_000, width: 480, height: 864, fps: 24,
+    lease_duration_ms: 3_000_000, width: 480, height: 864, fps: 24,
     turbo: false, loras: [], generate_audio: true, r2v_loader: r2vLoader });
 }
 
-async function startComfyStub(mode: 'success' | 'empty-download') {
-  const counts = { free: 0, upload: 0, prompt: 0, history: 0, view: 0 };
+async function startComfyStub(mode: 'success' | 'empty-download' | 'claim-client' |
+  'hanging' | 'delayed-download') {
+  const counts = { free: 0, upload: 0, prompt: 0, history: 0, view: 0,
+    queue: 0, interrupt: 0 };
   const prompts: unknown[] = [];
+  const uploadBodies: string[] = [];
+  let releaseDownload = () => undefined;
+  const downloadGate = new Promise<void>((resolve) => { releaseDownload = resolve; });
   const server = createServer(async (request, response) => {
     const path = request.url ?? '';
     if (path === '/free') { counts.free += 1; await drain(request);
       return json(response, { ok: true }); }
-    if (path === '/upload/image') { counts.upload += 1; await drain(request);
+    if (path === '/upload/image') { counts.upload += 1;
+      uploadBodies.push((await body(request)).toString('latin1'));
       return json(response, { name: `upload-${counts.upload}.png`,
         subfolder: 'worker' }); }
     if (path === '/prompt') { counts.prompt += 1;
       prompts.push(JSON.parse((await body(request)).toString('utf8')));
       return json(response, { prompt_id: 'prompt-1', node_errors: {} }); }
     if (path === '/history/prompt-1') { counts.history += 1;
+      if (mode === 'hanging') return json(response, {});
       return json(response, { 'prompt-1': { status: { completed: true },
         outputs: { '7': { videos: [{ filename: 'output.mp4',
           subfolder: 'worker', type: 'output' }] } } } }); }
+    if (path === '/queue') { counts.queue += 1;
+      if (request.method === 'POST') { await drain(request); return json(response, {}); }
+      if (mode === 'claim-client') return json(response, { queue_running: [
+        [1, 'prompt-1', {}, { client_id: 'intent-1' }]], queue_pending: [] });
+      if (mode === 'hanging') return json(response, { queue_running: [
+        [1, 'prompt-1', {}, { client_id: 'hanging' }]], queue_pending: [] });
+      return json(response, { queue_running: [], queue_pending: [] }); }
+    if (path === '/history') return json(response, {});
+    if (path === '/interrupt') { counts.interrupt += 1; return json(response, {}); }
     if (path.startsWith('/view?')) { counts.view += 1;
+      if (mode === 'delayed-download') await downloadGate;
       response.writeHead(200, { 'content-type': 'video/mp4' });
       return response.end(mode === 'empty-download' ? Buffer.alloc(0) : outputBytes); }
     response.writeHead(404); response.end();
@@ -324,7 +501,8 @@ async function startComfyStub(mode: 'success' | 'empty-download') {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('missing stub address');
-  return { endpoint: `http://127.0.0.1:${address.port}`, counts, prompts };
+  return { endpoint: `http://127.0.0.1:${address.port}`, counts, prompts,
+    uploadBodies, releaseDownload };
 }
 
 function track(store: ProjectStore) { stores.push(store); return store; }
@@ -337,4 +515,11 @@ async function body(request: IncomingMessage) {
 function json(response: ServerResponse, body: unknown) {
   response.writeHead(200, { 'content-type': 'application/json' });
   response.end(JSON.stringify(body));
+}
+async function until(predicate: () => boolean) {
+  for (let index = 0; index < 100; index += 1) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+  throw new Error('condition not reached');
 }

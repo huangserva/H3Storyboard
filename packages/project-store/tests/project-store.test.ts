@@ -296,7 +296,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(14);
+    ).toBe(15);
     migratedVersion.close();
   });
 

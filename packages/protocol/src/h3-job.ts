@@ -84,6 +84,7 @@ export const H3JobSchema = z.object({
   status: H3JobStatusSchema,
   attempt: z.number().int().nonnegative(),
   provider_job_id: z.string().nullable(),
+  provider_client_id: z.string().nullable(),
   output_asset_id: IdSchema.nullable(),
   error_code: z.string().nullable(),
   error_message: z.string().nullable(),

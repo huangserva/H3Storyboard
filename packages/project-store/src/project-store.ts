@@ -39,16 +39,21 @@ import {
   createH3Job,
   markH3JobQueued,
   markH3JobRunning,
+  markH3SubmitIntent,
+  clearH3ProviderTask,
 } from './job-operations.js';
 import { completeH3Job } from './job-completion.js';
 import {
   cancelH3Job,
+  deferH3Job,
   failH3Job,
+  forceFailH3Job,
   heartbeatH3Job,
   listH3JobEvents,
   recoverExpiredH3Jobs,
 } from './job-lifecycle.js';
 import { migrateDatabase } from './migrations.js';
+import { getJob } from './job-support.js';
 import { ModeStore } from './mode-store.js';
 import { ProductionStore } from './production-store.js';
 import { TakeStore } from './take-store.js';
@@ -176,6 +181,17 @@ export class ProjectStore {
     return claimNextH3Job(this.#database, leaseDurationMs);
   }
 
+  getH3Job(jobId: string): H3Job { return getJob(this.#database, jobId); }
+
+  markH3SubmitIntent(jobId: string, leaseToken: string,
+    providerClientId: string): H3Job {
+    return markH3SubmitIntent(this.#database, jobId, leaseToken, providerClientId);
+  }
+
+  clearH3ProviderTask(jobId: string, leaseToken: string): H3Job {
+    return clearH3ProviderTask(this.#database, jobId, leaseToken);
+  }
+
   finalizeWorkerOutput(jobId: string, leaseToken: string,
     input: WorkerOutputInput): WorkerOutputResult {
     return finalizeWorkerOutput(this.#database, jobId, leaseToken, input);
@@ -227,6 +243,17 @@ export class ProjectStore {
       errorCode,
       errorMessage,
     );
+  }
+
+  deferH3Job(jobId: string, leaseToken: string, errorCode: string,
+    errorMessage: string): H3Job {
+    return deferH3Job(this.#database, jobId, leaseToken, errorCode, errorMessage);
+  }
+
+  forceFailH3Job(jobId: string, leaseToken: string, errorCode: string,
+    errorMessage: string): H3Job {
+    return forceFailH3Job(this.#database, jobId, leaseToken,
+      errorCode, errorMessage);
   }
 
   cancelH3Job(jobId: string, reason?: string): H3Job {

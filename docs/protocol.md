@@ -1,6 +1,6 @@
-# Protocol 1.2
+# Protocol 1.3
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.2 retains the M0 planned/actual and M1A production invariants and adds the M1B lease-worker audit fields below.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.3 retains the M0 planned/actual and M1A production invariants and closes the M1B submit/recovery audit window with a durable provider client id.
 
 ## Project lineage
 
@@ -66,11 +66,13 @@ draft -> submitting -> queued -> running -> completed
 - Replaying it with different input returns `IDEMPOTENCY_KEY_REUSED`.
 - Every transition appends a `job_event` in the same database transaction.
 - Heartbeats renew active leases. On restart, expired active leases move once to `timed_out` and can be explicitly reclaimed.
-- `provider_job_id` is the durable ComfyUI task id. Reclaiming `timed_out` work preserves it and polls that same task; only a job without one may submit.
+- `provider_client_id` is a durable submit intent written before provider I/O. If the process exits after ComfyUI accepts the prompt but before `provider_job_id` is stored, recovery searches queue and history by this client id and claims the existing prompt.
+- `provider_job_id` is the durable ComfyUI prompt id. Reclaiming `timed_out` work verifies and polls that same task. Only after repeated history misses and an absent queue entry may recovery clear both provider ids and resubmit.
 - Cancel records a non-empty `cancel_reason`; a rerun is a new job/idempotency key and never reuses the provider task.
+- Poll attempts renew the lease. The maximum frame-scaled poll window must be shorter than the lease; a poll timeout interrupts/removes the exact provider task and records recoverable `timed_out`, not permanent failure.
 - A worker output becomes visible atomically as a candidate video `Asset` with a real `sha256:<64 hex>` hash, the completed job output, and a pending `ShotActual`. Any database failure rolls back all three.
 
-The optional local worker is disabled unless `H3_WORKER=1`. Before a new submission it may call `/free` (default enabled), uploads the compiled first frame, persists the returned prompt id, and only then polls. Download, non-empty validation, file persistence, hash, canonical asset registration, pending take, and job completion form the completion gate. Protocol 1.2 does not claim real-provider validation; M1B-3 supplies that evidence.
+The optional local worker is disabled unless `H3_WORKER=1`. Before a new submission it stores `provider_client_id`, may call `/free` (default enabled), uploads each binding under a job-and-slot-qualified name, submits, then stores `provider_job_id`. Poll and download are abortable; cancel interrupts a running prompt or removes that exact pending prompt. Output paths carry attempt and lease ownership, so late workers can compensate only their own file. Download, non-empty validation, file persistence, hash, canonical asset registration, pending take, and job completion form the completion gate. M1B-3 supplies real-provider evidence.
 
 Worker failures persist stable `H3_WORKER_*` or `H3_COMFY_*` codes. Input mode/seed/binding/file failures are distinct from provider HTTP/protocol/timeout/output failures; clients must not infer them from messages.
 

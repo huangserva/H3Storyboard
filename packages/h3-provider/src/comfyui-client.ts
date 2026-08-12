@@ -14,6 +14,13 @@ export interface ComfyUIClientOptions {
   client_id_factory?: () => string;
 }
 
+export interface PollHistoryOptions {
+  signal?: AbortSignal;
+  on_attempt?: (attempt: number) => void | Promise<void>;
+  missing_max_attempts?: number;
+  max_attempts?: number;
+}
+
 export class ComfyUIClient {
   readonly #endpoint: string;
   readonly #fetch: typeof globalThis.fetch;
@@ -29,6 +36,13 @@ export class ComfyUIClient {
     this.#clientIdFactory = options.client_id_factory ?? randomUUID;
   }
 
+  get poll_window_ms(): number {
+    return this.#pollIntervalMs * this.#pollMaxAttempts;
+  }
+  get poll_interval_ms(): number { return this.#pollIntervalMs; }
+
+  createClientId(): string { return this.#clientIdFactory(); }
+
   async uploadImage(image: Blob, filename: string): Promise<string> {
     const form = new FormData();
     form.append('image', image, filename);
@@ -42,10 +56,10 @@ export class ComfyUIClient {
     return subfolder ? `${subfolder}/${name}` : name;
   }
 
-  async submitPrompt(graph: ComfyGraph): Promise<string> {
+  async submitPrompt(graph: ComfyGraph, clientId = this.createClientId()): Promise<string> {
     const response = await this.#fetch(`${this.#endpoint}/prompt`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: graph, client_id: this.#clientIdFactory() }),
+      body: JSON.stringify({ prompt: graph, client_id: clientId }),
     });
     const body = await parseJson(response, 'submit prompt');
     if (isRecord(body.node_errors) && Object.keys(body.node_errors).length > 0) {
@@ -55,14 +69,26 @@ export class ComfyUIClient {
     return stringField(body, 'prompt_id', 'submit prompt');
   }
 
-  async pollHistory(promptId: string): Promise<ComfyHistoryEntry> {
-    for (let attempt = 0; attempt < this.#pollMaxAttempts; attempt += 1) {
-      await delay(this.#pollIntervalMs);
+  async pollHistory(promptId: string,
+    options: PollHistoryOptions = {}): Promise<ComfyHistoryEntry> {
+    let missing = 0;
+    const maxAttempts = options.max_attempts ?? this.#pollMaxAttempts;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await delay(this.#pollIntervalMs, options.signal);
+      await options.on_attempt?.(attempt + 1);
       const response = await this.#fetch(
-        `${this.#endpoint}/history/${encodeURIComponent(promptId)}`);
+        `${this.#endpoint}/history/${encodeURIComponent(promptId)}`,
+        requestSignal(options.signal));
       if (!response.ok) continue;
       const body = await response.json() as unknown;
-      if (!isRecord(body) || !isRecord(body[promptId])) continue;
+      if (!isRecord(body) || !isRecord(body[promptId])) {
+        missing = await this.taskExists(promptId, options.signal) ? 0 : missing + 1;
+        if (missing >= (options.missing_max_attempts ?? 3)) {
+          throw new H3ComfyError('H3_COMFY_TASK_MISSING',
+            'ComfyUI task is absent from history and queue', { prompt_id: promptId });
+        }
+        continue;
+      }
       const history = body[promptId] as unknown as ComfyHistoryEntry;
       if (history.status?.status_str === 'error') {
         throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
@@ -78,8 +104,55 @@ export class ComfyUIClient {
     }
     throw new H3ComfyError('H3_COMFY_TIMEOUT',
       'ComfyUI history polling reached its attempt limit', {
-        prompt_id: promptId, max_attempts: this.#pollMaxAttempts,
+        prompt_id: promptId, max_attempts: maxAttempts,
       });
+  }
+
+  async findTaskByClientId(clientId: string): Promise<string | null> {
+    const queue = await this.#fetch(`${this.#endpoint}/queue`);
+    const queueBody = queue.ok ? await queue.json() as unknown : null;
+    const queued = findPromptInQueue(queueBody, clientId);
+    if (queued) return queued;
+    const history = await this.#fetch(`${this.#endpoint}/history`);
+    const historyBody = history.ok ? await history.json() as unknown : null;
+    return findPromptInHistory(historyBody, clientId);
+  }
+
+  async taskExists(promptId: string, signal?: AbortSignal,
+    confirmationAttempts = 1): Promise<boolean> {
+    for (let attempt = 0; attempt < confirmationAttempts; attempt += 1) {
+      const history = await this.#fetch(
+        `${this.#endpoint}/history/${encodeURIComponent(promptId)}`,
+        requestSignal(signal));
+      if (history.ok) {
+        const historyBody = await history.json() as unknown;
+        if (isRecord(historyBody) && isRecord(historyBody[promptId])) return true;
+      }
+      const queue = await this.#fetch(`${this.#endpoint}/queue`, requestSignal(signal));
+      if (!queue.ok) return true;
+      const body = await queue.json() as unknown;
+      if (queueContainsPrompt(body, promptId)) return true;
+      if (attempt + 1 < confirmationAttempts) await delay(this.#pollIntervalMs, signal);
+    }
+    return false;
+  }
+
+  async cancelTask(promptId: string): Promise<void> {
+    const state = await this.#fetch(`${this.#endpoint}/queue`);
+    if (!state.ok) throw await httpError(state, 'inspect queue');
+    const body = await state.json() as unknown;
+    if (queueListContains(body, 'queue_pending', promptId)) {
+      const deleted = await this.#fetch(`${this.#endpoint}/queue`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ delete: [promptId] }),
+      });
+      if (!deleted.ok) throw await httpError(deleted, 'delete queued prompt');
+    }
+    if (queueListContains(body, 'queue_running', promptId)) {
+      const interrupt = await this.#fetch(`${this.#endpoint}/interrupt`,
+        { method: 'POST' });
+      if (!interrupt.ok) throw await httpError(interrupt, 'interrupt prompt');
+    }
   }
 
   firstOutput(history: ComfyHistoryEntry): ComfyOutputItem {
@@ -165,8 +238,56 @@ function isOutputItem(value: unknown): value is ComfyOutputItem {
   return isRecord(value) && typeof value.filename === 'string';
 }
 
-function delay(milliseconds: number) {
-  return milliseconds > 0
-    ? new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
-    : Promise.resolve();
+function requestSignal(signal?: AbortSignal): RequestInit | undefined {
+  return signal ? { signal } : undefined;
+}
+
+function delay(milliseconds: number, signal?: AbortSignal) {
+  if (signal?.aborted) throw new H3ComfyError('H3_COMFY_ABORTED',
+    'ComfyUI polling was aborted');
+  if (milliseconds <= 0) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, milliseconds);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(new H3ComfyError('H3_COMFY_ABORTED',
+        'ComfyUI polling was aborted'));
+    }, { once: true });
+  });
+}
+
+function queueContainsPrompt(value: unknown, promptId: string): boolean {
+  if (!isRecord(value)) return false;
+  return ['queue_running', 'queue_pending'].some((key) =>
+    Array.isArray(value[key]) && (value[key] as unknown[]).some((item) =>
+      Array.isArray(item) && item[1] === promptId));
+}
+
+function queueListContains(value: unknown, key: string, promptId: string): boolean {
+  return isRecord(value) && Array.isArray(value[key]) &&
+    (value[key] as unknown[]).some((item) => Array.isArray(item) && item[1] === promptId);
+}
+
+function findPromptInQueue(value: unknown, clientId: string): string | null {
+  if (!isRecord(value)) return null;
+  for (const key of ['queue_running', 'queue_pending']) {
+    const entries = value[key];
+    if (!Array.isArray(entries)) continue;
+    for (const item of entries) if (Array.isArray(item) &&
+      isRecord(item[3]) && item[3].client_id === clientId &&
+      typeof item[1] === 'string') return item[1];
+  }
+  return null;
+}
+
+function findPromptInHistory(value: unknown, clientId: string): string | null {
+  if (!isRecord(value)) return null;
+  for (const [promptId, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) continue;
+    const prompt = entry.prompt;
+    if (Array.isArray(prompt) && isRecord(prompt[3]) &&
+      prompt[3].client_id === clientId) return promptId;
+    if (entry.client_id === clientId) return promptId;
+  }
+  return null;
 }

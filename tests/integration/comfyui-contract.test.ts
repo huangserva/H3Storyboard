@@ -120,7 +120,7 @@ describe('ComfyUI HTTP contract', () => {
     const evidence = await discoverCapabilities(endpoint);
     expect(evidence.ready).toBe(false);
     expect(evidence.nodes[REQUIRED_H3_NODES.at(-1)!]).toBe('missing');
-    expect(evidence.nodes.MiniMaxH3ImageToVideo).toBe('present');
+    expect(evidence.nodes.MiniMaxH3Director).toBe('present');
   });
 });
 
@@ -128,9 +128,9 @@ const probe = process.env.H3_COMFY_PROBE === '1' ? it : it.skip;
 probe('read-only probes the local H3 ComfyUI capability contract', async () => {
   const evidence = await discoverCapabilities('http://127.0.0.1:8190');
   expect(evidence.ready).toBe(true);
-  expect(evidence.nodes.MiniMaxH3ImageToVideo).toBe('present');
+  expect(evidence.nodes.MiniMaxH3Director).toBe('present');
   expect(evidence.nodes.MiniMaxH3ReferenceToVideo).toBe('present');
-  expect(evidence.nodes.EmptyMiniMaxH3LatentAV).toBe('present');
+  expect(evidence.nodes.SamplerCustomAdvanced).toBe('present');
 });
 
 async function readBody(request: IncomingMessage): Promise<Buffer> {

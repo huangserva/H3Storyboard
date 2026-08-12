@@ -39,8 +39,9 @@ protocol (single JSON contract)
 13. Candidate and archived assets cannot enter a job. Submission snapshots the approved current-asset manifest so later replacements do not rewrite generation history.
 14. Each planned generation unit is self-contained and records its opening and ending state; it never relies on instructions such as “continue the previous shot”.
 15. Batch generation requires an explicitly approved representative result. Provider success alone is not creative or QC approval.
-16. A worker with no persisted provider task submits once, stores the returned task id, and polls that same task across lease recovery. A remote URL is not an asset until the output is downloaded, verified, hashed, registered, and linked to a pending take.
-17. Worker completion exposes the candidate asset, completed job, and pending take in one immediate SQLite transaction; a filesystem write is staged with a temporary file and compensated if the database transaction fails.
+16. A worker persists a unique provider client id before submission. Recovery first claims a matching ComfyUI queue/history task and only resubmits after repeated proof that neither client intent nor prompt id exists remotely.
+17. Worker completion exposes the candidate asset, completed job, and pending take in one immediate SQLite transaction. Files are staged under attempt-and-lease-qualified paths, so a late worker can compensate only its own output.
+18. Provider graph builders share one Director/LoRA/sampler/output skeleton. Capability discovery is the union of node classes emitted by representative i2v, fl2v, stock r2v, and hybrid r2v graphs.
 
 ## Production-policy boundary
 
@@ -48,9 +49,9 @@ protocol (single JSON contract)
 
 Provider-specific facts remain below that boundary. Model names, current schemas, resolution limits, media counts, authentication, submission, polling, and download behavior belong to `h3-provider` adapters. The core must not hard-code `director`'s current Seedance 2.0 Pro, 720p, 15-second, or shot-count choices.
 
-`director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. Protocol 1.1 must preserve an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
+`director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.1 module ownership
+## Protocol 1.3 module ownership
 
 ```text
 packages/protocol
@@ -69,12 +70,12 @@ packages/task-engine
 apps/api
   small domain route dispatchers + optional H3_WORKER=1 runtime assembly
 apps/studio
-  director UI consuming only Protocol 1.1 API shapes
+  director UI consuming only Protocol 1.3 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
 
-Migrations v7–v14 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason; the existing `provider_job_id` and `output_asset_id` already satisfy worker persistence and output lineage, so they are not duplicated.
+Migrations v7–v15 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null.
 
 ## Initial deployment
 

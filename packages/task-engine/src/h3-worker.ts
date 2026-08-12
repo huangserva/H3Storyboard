@@ -1,68 +1,24 @@
 import {
-  H3ComfyError,
   buildH3FL2VGraph,
   buildH3I2VGraph,
   buildH3R2VGraph,
   framesForDuration,
-  type ComfyUIClient,
   type H3Lora,
-  type H3R2VLoader,
 } from '@h3storyboard/h3-provider';
+import type { H3Job } from '@h3storyboard/protocol';
+import { readFile, rm } from 'node:fs/promises';
+import { basename, resolve } from 'node:path';
 import {
-  RelativeAssetPathSchema,
-  type H3Job,
-  type ProjectSnapshot,
-} from '@h3storyboard/protocol';
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+  H3WorkerError,
+  safeDataPath,
+  workerDelay,
+  workerFailure,
+  writeWorkerOutput,
+  type H3LeaseWorkerOptions,
+  type H3WorkerRunResult,
+} from './h3-worker-support.js';
 
-export interface WorkerCompletionInput {
-  name: string;
-  relative_path: string;
-  content_hash: string;
-  observed_description: string;
-}
-
-export interface H3WorkerStore {
-  recoverExpiredH3Jobs(now?: Date): number;
-  claimNextH3Job(leaseDurationMs?: number): H3Job | null;
-  getProjectSnapshot(projectId: string): ProjectSnapshot;
-  markH3JobQueued(jobId: string, leaseToken: string,
-    providerJobId: string): H3Job;
-  markH3JobRunning(jobId: string, leaseToken: string): H3Job;
-  heartbeatH3Job(jobId: string, leaseToken: string,
-    leaseDurationMs?: number): H3Job;
-  failH3Job(jobId: string, leaseToken: string, errorCode: string,
-    errorMessage: string): H3Job;
-  cancelH3Job(jobId: string, reason?: string): H3Job;
-  finalizeWorkerOutput(jobId: string, leaseToken: string,
-    input: WorkerCompletionInput): unknown;
-}
-
-export interface H3LeaseWorkerOptions {
-  store: H3WorkerStore;
-  client: ComfyUIClient;
-  data_directory: string;
-  lease_duration_ms?: number;
-  idle_interval_ms?: number;
-  width?: number;
-  height?: number;
-  fps?: number;
-  turbo?: boolean;
-  loras?: readonly H3Lora[];
-  generate_audio?: boolean;
-  free_before_submit?: boolean;
-  r2v_loader?: H3R2VLoader;
-  on_error?: (error: unknown) => void;
-}
-
-export type H3WorkerRunResult =
-  | { outcome: 'idle' }
-  | { outcome: 'completed'; job_id: string; provider_task_id: string;
-    output_path: string }
-  | { outcome: 'failed'; job_id: string; error_code: string;
-    error_message: string };
+export * from './h3-worker-support.js';
 
 export class H3LeaseWorker {
   readonly #options: Required<Omit<H3LeaseWorkerOptions,
@@ -70,6 +26,7 @@ export class H3LeaseWorker {
     { loras: readonly H3Lora[] };
   #stopping = false;
   #loop: Promise<void> | null = null;
+  readonly #active = new Map<string, AbortController>();
 
   constructor(options: H3LeaseWorkerOptions) {
     this.#options = {
@@ -86,6 +43,12 @@ export class H3LeaseWorker {
       free_before_submit: options.free_before_submit ?? true,
       r2v_loader: options.r2v_loader ?? { kind: 'stock' },
     };
+    const maximumPollWindow = Math.max(this.#options.client.poll_window_ms,
+      framesForDuration(15, this.#options.fps) / 124 * 720_000);
+    if (maximumPollWindow >= this.#options.lease_duration_ms) {
+      throw new H3WorkerError('H3_WORKER_CONFIG_INVALID',
+        'Maximum frame-scaled ComfyUI poll window must be shorter than the lease');
+    }
   }
 
   async runOnce(): Promise<H3WorkerRunResult> {
@@ -94,20 +57,36 @@ export class H3LeaseWorker {
       this.#options.lease_duration_ms);
     if (!job) return { outcome: 'idle' };
     const leaseToken = job.lease_token!;
-    let outputPath: string | null = null;
+    let ownedOutputPath: string | null = null;
+    const controller = new AbortController();
+    this.#active.set(job.id, controller);
     try {
-      const providerTaskId = job.provider_job_id ?? await this.#submit(job);
+      const providerTaskId = await this.#resolveProviderTask(job, leaseToken);
       this.#options.store.markH3JobQueued(job.id, leaseToken, providerTaskId);
       this.#options.store.markH3JobRunning(job.id, leaseToken);
       this.#options.store.heartbeatH3Job(job.id, leaseToken,
         this.#options.lease_duration_ms);
-      const history = await this.#options.client.pollHistory(providerTaskId);
+      const dynamicBudgetMs = Math.max(this.#options.client.poll_window_ms,
+        framesForDuration(job.duration_seconds, this.#options.fps) / 124 * 720_000);
+      const maxAttempts = this.#options.client.poll_interval_ms === 0 ? undefined :
+        Math.ceil(dynamicBudgetMs / this.#options.client.poll_interval_ms);
+      const history = await this.#options.client.pollHistory(providerTaskId, {
+        signal: controller.signal, ...(maxAttempts === undefined ? {} :
+          { max_attempts: maxAttempts }),
+        on_attempt: () => {
+          const current = this.#options.store.getH3Job(job.id);
+          if (current.status === 'canceled') controller.abort();
+          else this.#options.store.heartbeatH3Job(job.id, leaseToken,
+            this.#options.lease_duration_ms);
+        },
+      });
       this.#options.store.heartbeatH3Job(job.id, leaseToken,
         this.#options.lease_duration_ms);
       const item = this.#options.client.firstOutput(history);
       const bytes = await this.#options.client.downloadOutput(item);
-      const written = await this.#writeOutput(job, bytes);
-      outputPath = written.absolutePath;
+      const written = await writeWorkerOutput(
+        this.#options.data_directory, job, bytes);
+      ownedOutputPath = written.absolutePath;
       this.#options.store.finalizeWorkerOutput(job.id, leaseToken, {
         name: basename(written.relativePath),
         relative_path: written.relativePath,
@@ -117,21 +96,39 @@ export class H3LeaseWorker {
       return { outcome: 'completed', job_id: job.id,
         provider_task_id: providerTaskId, output_path: written.relativePath };
     } catch (error) {
-      if (outputPath) await rm(outputPath, { force: true }).catch(() => undefined);
+      if (ownedOutputPath) await rm(ownedOutputPath, { force: true }).catch(() => undefined);
       const failure = workerFailure(error);
+      const current = this.#options.store.getH3Job(job.id);
+      if (current.status === 'canceled') return { outcome: 'failed', job_id: job.id,
+        error_code: 'H3_COMFY_ABORTED', error_message: 'Job was canceled' };
+      if (failure.code === 'H3_COMFY_TIMEOUT') {
+        if (current.provider_job_id) await this.#options.client.cancelTask(
+          current.provider_job_id).catch(this.#options.on_error);
+        this.#options.store.deferH3Job(job.id, leaseToken,
+          failure.code, failure.message);
+        return { outcome: 'timed_out', job_id: job.id,
+          provider_task_id: current.provider_job_id ?? '' };
+      }
       try {
         this.#options.store.failH3Job(job.id, leaseToken,
           failure.code, failure.message);
       } catch (failError) {
         this.#options.on_error?.(failError);
+        this.#options.store.forceFailH3Job(job.id, leaseToken,
+          failure.code, failure.message);
       }
       return { outcome: 'failed', job_id: job.id,
         error_code: failure.code, error_message: failure.message };
-    }
+    } finally { this.#active.delete(job.id); }
   }
 
-  cancel(jobId: string, reason: string): H3Job {
-    return this.#options.store.cancelH3Job(jobId, reason);
+  async cancel(jobId: string, reason: string): Promise<H3Job> {
+    const before = this.#options.store.getH3Job(jobId);
+    const canceled = this.#options.store.cancelH3Job(jobId, reason);
+    this.#active.get(jobId)?.abort();
+    if (before.provider_job_id) await this.#options.client.cancelTask(
+      before.provider_job_id).catch(this.#options.on_error);
+    return canceled;
   }
 
   start(): void {
@@ -146,7 +143,23 @@ export class H3LeaseWorker {
     this.#loop = null;
   }
 
-  async #submit(job: H3Job): Promise<string> {
+  async #resolveProviderTask(job: H3Job, leaseToken: string): Promise<string> {
+    if (job.provider_job_id && await this.#options.client.taskExists(
+      job.provider_job_id, undefined, 3)) return job.provider_job_id;
+    if (job.provider_client_id) {
+      const claimed = await this.#options.client.findTaskByClientId(
+        job.provider_client_id);
+      if (claimed) return claimed;
+      this.#options.store.clearH3ProviderTask(job.id, leaseToken);
+    } else if (job.provider_job_id) {
+      this.#options.store.clearH3ProviderTask(job.id, leaseToken);
+    }
+    const clientId = this.#options.client.createClientId();
+    this.#options.store.markH3SubmitIntent(job.id, leaseToken, clientId);
+    return this.#submit(job, clientId);
+  }
+
+  async #submit(job: H3Job, clientId: string): Promise<string> {
     if (job.mode !== 'i2v' && job.mode !== 'fl2v' && job.mode !== 'r2v') {
       throw new H3WorkerError('H3_WORKER_MODE_UNSUPPORTED',
         'H3 worker supports i2v, fl2v, and r2v jobs');
@@ -174,8 +187,9 @@ export class H3LeaseWorker {
     }
     if (this.#options.free_before_submit) await this.#options.client.free();
     const names: string[] = [];
-    for (const image of images) names.push(await this.#options.client.uploadImage(
-      new Blob([Uint8Array.from(image.bytes)]), basename(image.path)));
+    for (const [slot, image] of images.entries()) names.push(
+      await this.#options.client.uploadImage(new Blob([Uint8Array.from(image.bytes)]),
+        `${job.id}-slot${slot}-${basename(image.path)}`));
     const common = { prompt: job.prompt, width: this.#options.width,
       height: this.#options.height,
       frames: framesForDuration(job.duration_seconds, this.#options.fps),
@@ -191,76 +205,14 @@ export class H3LeaseWorker {
           end_name: names[1]! })
         : buildH3R2VGraph({ ...common, reference_names: names,
           loader: this.#options.r2v_loader });
-    return this.#options.client.submitPrompt(graph);
-  }
-
-  async #writeOutput(job: H3Job, bytes: Uint8Array) {
-    const relativePath = `projects/${job.project_id}/outputs/${job.id}.mp4`;
-    const absolutePath = safeDataPath(this.#options.data_directory, relativePath);
-    const temporaryPath = `${absolutePath}.${randomUUID()}.tmp`;
-    await mkdir(dirname(absolutePath), { recursive: true });
-    try {
-      await writeFile(temporaryPath, bytes, { flag: 'wx' });
-      await rename(temporaryPath, absolutePath);
-    } catch (error) {
-      await rm(temporaryPath, { force: true }).catch(() => undefined);
-      throw new H3WorkerError('H3_WORKER_OUTPUT_WRITE_FAILED',
-        'Could not persist the downloaded H3 output', { cause: error });
-    }
-    return { relativePath, absolutePath,
-      contentHash: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
+    return this.#options.client.submitPrompt(graph, clientId);
   }
 
   async #runLoop(): Promise<void> {
     while (!this.#stopping) {
       try { await this.runOnce(); }
       catch (error) { this.#options.on_error?.(error); }
-      if (!this.#stopping) await delay(this.#options.idle_interval_ms);
+      if (!this.#stopping) await workerDelay(this.#options.idle_interval_ms);
     }
   }
-}
-
-export type H3WorkerErrorCode =
-  | 'H3_WORKER_MODE_UNSUPPORTED'
-  | 'H3_WORKER_SEED_REQUIRED'
-  | 'H3_WORKER_INPUT_MISSING'
-  | 'H3_WORKER_INPUT_READ_FAILED'
-  | 'H3_WORKER_INPUT_EMPTY'
-  | 'H3_WORKER_OUTPUT_WRITE_FAILED'
-  | 'H3_WORKER_PATH_INVALID'
-  | 'H3_WORKER_FAILED';
-
-export class H3WorkerError extends Error {
-  constructor(readonly code: H3WorkerErrorCode, message: string,
-    options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'H3WorkerError';
-  }
-}
-
-function safeDataPath(dataDirectory: string, relativePath: string): string {
-  const parsed = RelativeAssetPathSchema.safeParse(relativePath);
-  if (!parsed.success) throw new H3WorkerError('H3_WORKER_PATH_INVALID',
-    'Worker asset path must remain project-relative');
-  const absolute = resolve(dataDirectory, parsed.data);
-  if (!absolute.startsWith(`${dataDirectory}${sep}`)) throw new H3WorkerError(
-    'H3_WORKER_PATH_INVALID', 'Worker asset path escaped the data directory');
-  return absolute;
-}
-
-function workerFailure(error: unknown): { code: string; message: string } {
-  if (error instanceof H3ComfyError || error instanceof H3WorkerError) {
-    return { code: error.code, message: error.message.slice(0, 2_000) };
-  }
-  if (typeof error === 'object' && error !== null &&
-    typeof (error as { code?: unknown }).code === 'string') {
-    return { code: (error as { code: string }).code,
-      message: error instanceof Error ? error.message.slice(0, 2_000) : 'Worker failed' };
-  }
-  return { code: 'H3_WORKER_FAILED',
-    message: error instanceof Error ? error.message.slice(0, 2_000) : 'Worker failed' };
-}
-
-function delay(milliseconds: number) {
-  return new Promise<void>((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }

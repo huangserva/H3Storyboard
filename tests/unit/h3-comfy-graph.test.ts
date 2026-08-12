@@ -4,6 +4,7 @@ import {
   buildH3FL2VGraph,
   buildH3I2VGraph,
   buildH3R2VGraph,
+  REQUIRED_H3_NODES,
   framesForDuration,
   lintH3Prompt,
 } from '../../packages/h3-provider/src/index.js';
@@ -223,5 +224,17 @@ describe('H3 r2v graph contract', () => {
       loader: { kind: 'stock' } })).toThrowError(expect.objectContaining({
         code: 'H3_COMFY_PROTOCOL_ERROR',
       }));
+  });
+});
+
+describe('H3 capability inventory', () => {
+  it('contains every class type emitted by all production graph variants', () => {
+    const graphs = [buildH3I2VGraph(base), buildH3FL2VGraph(fl2vBase),
+      buildH3R2VGraph({ ...r2vBase, loader: { kind: 'stock' } }),
+      buildH3R2VGraph({ ...r2vBase, loader: { kind: 'hybrid',
+        block_range_start: 30, block_range_end: 49 } })];
+    for (const graph of graphs) for (const { class_type } of Object.values(graph)) {
+      expect(REQUIRED_H3_NODES).toContain(class_type);
+    }
   });
 });
