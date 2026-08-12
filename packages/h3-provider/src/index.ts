@@ -5,4 +5,5 @@ export * from './comfyui-types.js';
 export * from './comfyui-client.js';
 export * from './comfyui-capabilities.js';
 export * from './h3-graph.js';
+export * from './h3-fl2v-graph.js';
 export * from './h3-r2v-graph.js';

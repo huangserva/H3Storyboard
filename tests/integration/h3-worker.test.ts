@@ -120,6 +120,27 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     expect(graph['5']?.inputs['ref_images.ref_image_0']).toEqual(['8', 0]);
     expect(graph['5']?.inputs['ref_images.ref_image_1']).toEqual(['9', 0]);
   });
+
+  it('uploads first and last frames and submits the fl2v Director graph', async () => {
+    const fixture = seedFL2VWorkerJob();
+    const stub = await startComfyStub('success');
+    const worker = createWorker(fixture.store, fixture.directory, stub.endpoint);
+
+    const result = await worker.runOnce();
+
+    expect(result.outcome, JSON.stringify(result)).toBe('completed');
+    expect(result).toMatchObject({ job_id: fixture.jobId });
+    expect(stub.counts).toMatchObject({ free: 1, upload: 2, prompt: 1 });
+    const graph = (stub.prompts[0] as { prompt: Record<string, {
+      class_type: string; inputs: Record<string, unknown> }> }).prompt;
+    expect(graph['1']?.inputs.unet_name).toBe(
+      'minimax_h3_fl2va_pruned_int8_convrot.safetensors');
+    expect(graph['5']?.class_type).toBe('MiniMaxH3Director');
+    const timeline = JSON.parse(String(graph['5']?.inputs.timeline_data));
+    expect(timeline.timelineMode).toBe('fl2v');
+    expect(timeline.shots[0].startImage.imageFile).toBe('worker/upload-1.png');
+    expect(timeline.shots[0].endImage.imageFile).toBe('worker/upload-2.png');
+  });
 });
 
 function seedWorkerJob() {
@@ -217,6 +238,57 @@ function seedR2VWorkerJob() {
     jobId: job.id };
 }
 
+function seedFL2VWorkerJob() {
+  const directory = mkdtempSync(join(tmpdir(), 'h3-fl2v-worker-'));
+  directories.push(directory);
+  const databasePath = join(directory, 'storyboard.db');
+  const store = track(new ProjectStore(databasePath));
+  const project = store.createProject({ title: 'FL2V worker integration',
+    script_title: 'FL2V worker', script_content:
+      'A courier moves from the opening pose into a distinctly brighter ending pose.' });
+  const paths = [`projects/${project.id}/inputs/start.png`,
+    `projects/${project.id}/inputs/end.png`];
+  for (const path of paths) {
+    mkdirSync(dirname(join(directory, path)), { recursive: true });
+    writeFileSync(join(directory, path), Buffer.from(`stub-${path}`));
+  }
+  const assets = paths.map((relative_path, index) => store.createAsset(project.id,
+    { kind: 'image', name: index === 0 ? 'Opening frame' : 'Ending frame',
+      relative_path, content_hash: `sha256:fl2v-${index}`, status: 'candidate' }));
+  for (const asset of assets) store.updateAsset(project.id,
+    { asset_id: asset.id, status: 'approved' });
+  const modeKey = `fl2v-worker-${project.id.slice(0, 8)}`;
+  store.modes.create({ key: modeKey, title: 'Worker FL2V',
+    description: 'FL2V worker integration mode.', capability_declaration: {
+      generation_modes: ['fl2v'], duration_seconds: { min: 2, max: 15 },
+      resolution: { min_width: 32, max_width: 2048, min_height: 32,
+        max_height: 2048 }, lora_profile_requirements: [],
+      provider_requirements: ['local_comfyui'], extensions: {} } });
+  const shot = store.createShotPlan(project.id, { title: 'FL2V worker shot',
+    scene_id: 'SC-FL', duration_seconds: 5, shot_size: 'medium',
+    camera_movement: 'locked', action: 'The courier crosses into warm light.',
+    semantic_references: [
+      { purpose: 'first_frame', target: { type: 'asset', asset_id: assets[0]!.id } },
+      { purpose: 'last_frame', target: { type: 'asset', asset_id: assets[1]!.id } },
+    ], opening_state: null, ending_state: null });
+  store.freezeCurrentAssetsManifest(project.id);
+  store.production.createBrief(project.id, { mode_key: modeKey, body: {
+    logline: 'A worker completes one first-last take.', style_notes: 'Cinematic.',
+    text_style_lock: null, hard_rules: [] } });
+  store.production.updateLock(project.id, { engaged: true,
+    reason: 'FL2V worker integration fixture' });
+  const job = store.createH3Job(shot.id, { mode: 'fl2v',
+    provider: 'local_comfyui', model: 'H3-fl2va', prompt:
+      'The courier walks from rain into warm window light.', duration_seconds: 5,
+    seed: 20260812, steps: 4, idempotency_key: `fl2v-worker-${project.id}`,
+    input_bindings: [
+      { asset_id: assets[0]!.id, asset_kind: 'image', role: 'first_frame', ordinal: 0 },
+      { asset_id: assets[1]!.id, asset_kind: 'image', role: 'last_frame', ordinal: 1 },
+    ] });
+  return { directory, databasePath, store, projectId: project.id,
+    jobId: job.id };
+}
+
 function createWorker(store: ProjectStore, dataDirectory: string, endpoint: string,
   r2vLoader = { kind: 'stock' } as const) {
   return new H3LeaseWorker({ store,
@@ -234,7 +306,8 @@ async function startComfyStub(mode: 'success' | 'empty-download') {
     if (path === '/free') { counts.free += 1; await drain(request);
       return json(response, { ok: true }); }
     if (path === '/upload/image') { counts.upload += 1; await drain(request);
-      return json(response, { name: 'start.png', subfolder: 'worker' }); }
+      return json(response, { name: `upload-${counts.upload}.png`,
+        subfolder: 'worker' }); }
     if (path === '/prompt') { counts.prompt += 1;
       prompts.push(JSON.parse((await body(request)).toString('utf8')));
       return json(response, { prompt_id: 'prompt-1', node_errors: {} }); }

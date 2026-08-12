@@ -1,5 +1,6 @@
 import {
   H3ComfyError,
+  buildH3FL2VGraph,
   buildH3I2VGraph,
   buildH3R2VGraph,
   framesForDuration,
@@ -146,13 +147,16 @@ export class H3LeaseWorker {
   }
 
   async #submit(job: H3Job): Promise<string> {
-    if (job.mode !== 'i2v' && job.mode !== 'r2v') throw new H3WorkerError(
-      'H3_WORKER_MODE_UNSUPPORTED', 'H3 worker supports i2v and r2v jobs');
+    if (job.mode !== 'i2v' && job.mode !== 'fl2v' && job.mode !== 'r2v') {
+      throw new H3WorkerError('H3_WORKER_MODE_UNSUPPORTED',
+        'H3 worker supports i2v, fl2v, and r2v jobs');
+    }
     if (job.seed === null) throw new H3WorkerError(
       'H3_WORKER_SEED_REQUIRED', 'H3 worker jobs require a persisted seed');
-    const bindings = job.mode === 'i2v'
-      ? [job.compiled_bindings?.find(({ purpose }) => purpose === 'first_frame')]
-      : [...(job.compiled_bindings ?? [])];
+    const bindings = job.mode === 'r2v' ? [...(job.compiled_bindings ?? [])] :
+      ['first_frame', ...(job.mode === 'fl2v' ? ['last_frame'] : [])].map(
+        (purpose) => job.compiled_bindings?.find((binding) =>
+          binding.purpose === purpose));
     if (bindings.length === 0 || bindings.some((binding) => !binding)) {
       throw new H3WorkerError('H3_WORKER_INPUT_MISSING',
         `Compiled ${job.mode} job has no required image inputs`);
@@ -182,8 +186,11 @@ export class H3LeaseWorker {
     };
     const graph = job.mode === 'i2v'
       ? buildH3I2VGraph({ ...common, start_name: names[0]! })
-      : buildH3R2VGraph({ ...common, reference_names: names,
-        loader: this.#options.r2v_loader });
+      : job.mode === 'fl2v'
+        ? buildH3FL2VGraph({ ...common, start_name: names[0]!,
+          end_name: names[1]! })
+        : buildH3R2VGraph({ ...common, reference_names: names,
+          loader: this.#options.r2v_loader });
     return this.#options.client.submitPrompt(graph);
   }
 

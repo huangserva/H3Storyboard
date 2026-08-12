@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   H3ComfyError,
+  buildH3FL2VGraph,
   buildH3I2VGraph,
   buildH3R2VGraph,
   framesForDuration,
@@ -35,6 +36,13 @@ const r2vBase = {
   turbo: true,
   filename_prefix: 'h3storyboard/r2v-shot-1',
   generate_audio: true,
+} as const;
+
+const fl2vBase = {
+  ...base,
+  start_name: 'inputs/opening.png',
+  end_name: 'inputs/ending.png',
+  filename_prefix: 'h3storyboard/fl2v-shot-1',
 } as const;
 
 describe('H3 i2v graph contract', () => {
@@ -106,6 +114,46 @@ describe('H3 prompt lint', () => {
       message: expect.stringContaining('「」'),
     }]);
     expect(lintH3Prompt('Dialogue: 林澜说「你来了。」')).toEqual([]);
+  });
+});
+
+describe('H3 fl2v graph contract', () => {
+  it('builds a first-last Director timeline with the stock fl2va model', () => {
+    const graph = buildH3FL2VGraph(fl2vBase);
+
+    expect(Object.fromEntries(Object.entries(graph).map(([id, node]) =>
+      [id, node.class_type]))).toMatchInlineSnapshot(`
+      {
+        "1": "UNETLoader",
+        "10": "LoraLoaderModelOnly",
+        "11": "LoraLoaderModelOnly",
+        "2": "CLIPLoader",
+        "3": "VAELoader",
+        "4": "VAELoader",
+        "5": "MiniMaxH3Director",
+        "6": "CreateVideo",
+        "7": "SaveVideo",
+      }
+    `);
+    expect(graph['1']?.inputs.unet_name).toBe(
+      'minimax_h3_fl2va_pruned_int8_convrot.safetensors');
+    const timeline = JSON.parse(String(graph['5']?.inputs.timeline_data));
+    expect(timeline).toMatchObject({
+      timelineMode: 'fl2v',
+      global: { genImage: { imageFile: 'inputs/opening.png' } },
+      shots: [{
+        startImage: { imageFile: 'inputs/opening.png' },
+        endImage: { imageFile: 'inputs/ending.png' },
+      }],
+      segments: [{ endImage: { imageFile: 'inputs/ending.png' } }],
+    });
+  });
+
+  it('rejects a missing frame name and invalid sampling parameters', () => {
+    expect(() => buildH3FL2VGraph({ ...fl2vBase, end_name: '' }))
+      .toThrowError(expect.objectContaining({ code: 'H3_COMFY_PROTOCOL_ERROR' }));
+    expect(() => buildH3FL2VGraph({ ...fl2vBase, frames: 123 }))
+      .toThrowError(expect.objectContaining({ code: 'H3_FRAME_GRID_INVALID' }));
   });
 });
 
