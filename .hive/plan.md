@@ -3,7 +3,7 @@ title: H3Storyboard
 started: 2026-08-11
 current_phase: M2
 status: active
-last_review: 2026-08-12
+last_review: 2026-08-13
 ---
 
 ## 目标
@@ -45,6 +45,7 @@ last_review: 2026-08-12
 - [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
 - [x] Actual 面板可切换并内嵌播放同镜真实 Take（Range 流式媒体端点），资产库图片可预览，pending QC 操作可见
 - [x] 画布视觉整改：两侧资产/角色面板改独立占位且默认折叠；分镜卡显示 Take 首帧或真实 first_frame；缺文件缩略图显示稳定占位
+- [ ] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P0 方案见 2026-08-13 OiiOii 调研，待 user 拍板后实现）
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列
@@ -54,6 +55,7 @@ last_review: 2026-08-12
 - `luojiang419/filmstoryboard`（检视 commit d7572b1）— 桌面工作台信息架构、项目/素材管理 → 借鉴思路，不复用代码（无 LICENSE）
 - `scottmudge/ComfyUI_MinimaxH3HybridLoader`（MIT，检视 commit 861c7df）— r2v 质量根因（ref2va 训练缺陷）+ 混合加载解药 → M1B r2v 路径采纳
 - `huangserva/h3-film-studio`（自家项目，检视 commit 8693cc7）— **唯一实跑通本地 H3 的参考**：ComfyUI submit/poll 契约（M1B adapter 蓝本）、三模式↔reference 用途映射、角色 bible 三重锚（Q2 证据）、H3 硬约束（÷32 / 17k+5 / 中文 Audio 行会被念出）、INTENT 协议 ≈ production brief 原型
+- `huangserva/xyz-video-creator`（私有，检视 commit 67d11bf）— OiiOii 的可借鉴核心是卡片内编辑/生成/重做/媒体查看/进度反馈，不是完整 node editor；直接回填结果的语义不可搬。详见 `research/2026-08-13-oii-canvas-interaction-model.md`
 
 ## Scope
 - in: 本地优先工作台、H3 生成编排、planned/actual 分离、QC
