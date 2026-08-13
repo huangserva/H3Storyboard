@@ -12,6 +12,10 @@
 - [x] **全栈工程师** dispatch `6403bb4a` — 任务：M1B-4——fl2v（首尾帧）路径补齐：graph builder + 真机冒烟。GPU 窗口仍有效（user 已授权），显存纪律照旧（生成前 /free 两实例、不杀进程、注意共享 GPU 外部队列——排队非空就等自然空闲，显式…
 - [x] **全栈工程师** dispatch `670e7676` — 任务：M1B-4 续——fl2v 真机冒烟补跑。8190 外部批任务已排空（orch 监视器确认连续 3 分钟空闲），窗口现在有效。
 - [x] **全栈工程师** dispatch `846d2a77` — 任务：M1B 收尾整改——修复四路 review 发现的 W1–W10，修完并复验后 M1B 才宣告 done。完整 findings 与修法方向见 docs/reviews/m1b-bug-review.md，逐条修复逐条回执。
+- [x] **全栈工程师** dispatch `b2303b68` — 任务：紧急小刀——Studio 视频播放：媒体文件服务端点 + actual 面板内嵌播放器。user 正等着在浏览器看 5 个 pending take 的成片，优先级最高，做小做快。
+- [x] **全栈工程师** dispatch `4cf55d02` — 任务：画布视觉缺陷修复（user 截图反馈，三处）。优先级高，做完 user 直接刷新验收。
+- [ ] **全栈工程师** dispatch `647d8527` — 任务：Studio 生成按钮——把'点一下出片'的最后闭环补上。user 要直接在浏览器里用，优先级最高。
+- [x] **全栈工程师2** dispatch `bfcba78a` — 任务：【调研，不写实现代码】深挖 xyz 的 OiiOii 画布交互模型，产出 H3Storyboard 画布'直接操作化'改造方案。user 拍板：现画布不如 OiiOii 好用，核心差距是'能在画布上直接操作'。完整任务书见 .hiv…
 ## Done
 
 ### 2026-08-12 · M1B 单镜 H3 闭环（done，commit 4055bc0 收官）
