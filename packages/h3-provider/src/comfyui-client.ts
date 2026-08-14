@@ -43,6 +43,14 @@ export class ComfyUIClient {
 
   createClientId(): string { return this.#clientIdFactory(); }
 
+  async assertQueueIdle(): Promise<void> {
+    const response = await this.#fetch(`${this.#endpoint}/queue`);
+    const body = await parseJson(response, 'inspect queue');
+    if (queueHasEntries(body)) throw new H3ComfyError(
+      'H3_COMFY_QUEUE_BUSY',
+      'ComfyUI queue is occupied; H3Storyboard will wait without freeing or submitting');
+  }
+
   async uploadImage(image: Blob, filename: string): Promise<string> {
     const form = new FormData();
     form.append('image', image, filename);
@@ -266,6 +274,12 @@ function queueContainsPrompt(value: unknown, promptId: string): boolean {
 function queueListContains(value: unknown, key: string, promptId: string): boolean {
   return isRecord(value) && Array.isArray(value[key]) &&
     (value[key] as unknown[]).some((item) => Array.isArray(item) && item[1] === promptId);
+}
+
+function queueHasEntries(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return ['queue_running', 'queue_pending'].some((key) =>
+    Array.isArray(value[key]) && value[key].length > 0);
 }
 
 function findPromptInQueue(value: unknown, clientId: string): string | null {

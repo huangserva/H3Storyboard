@@ -41,6 +41,7 @@ export function App() {
           onMarkRepresentative={studio.markRepresentative}
           onReviewRepresentative={studio.reviewRepresentative}
           onReviewActual={studio.reviewActual}
+          onGenerate={studio.generate}
           selectedShot={studio.selectedShot}
           snapshot={studio.snapshot}
         />

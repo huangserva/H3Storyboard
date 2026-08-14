@@ -1,11 +1,13 @@
 import { lazy, Suspense, useState } from 'react';
-import type { ProjectSnapshot, ShotPlan, UpdateShotPlanInput } from '@h3storyboard/protocol';
+import type { GenerationPreflight, ProjectSnapshot, ShotPlan,
+  UpdateShotPlanInput } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
 import { InfiniteCanvas } from './InfiniteCanvas.js';
 import { PlannedShotPanel } from './PlannedShotPanel.js';
 import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { ShotProductionEditor } from './ShotProductionEditor.js';
+import { useGenerationPreflights } from '../lib/use-generation-preflights.js';
 
 const ProductionBriefPanel = lazy(async () => {
   const module = await import('./ProductionBriefPanel.js');
@@ -24,6 +26,8 @@ interface DirectorWorkspaceProps {
     status: 'approved' | 'rejected') => Promise<boolean>;
   onReviewActual: (actualId: string,
     verdict: 'approved' | 'rejected') => Promise<boolean>;
+  onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
+    gateOverrideReason: string | null) => Promise<boolean>;
 }
 
 export function DirectorWorkspace({
@@ -36,11 +40,14 @@ export function DirectorWorkspace({
   onMarkRepresentative,
   onReviewRepresentative,
   onReviewActual,
+  onGenerate,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'director' | 'canvas'>('canvas');
   const [productionOpen, setProductionOpen] = useState(false);
   const [shotProductionOpen, setShotProductionOpen] = useState(false);
   const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
+  const [preflightRevision, setPreflightRevision] = useState(0);
+  const preflights = useGenerationPreflights(snapshot, preflightRevision);
   const actuals = snapshot?.shot_actuals.filter(
     (actual) => actual.shot_plan_id === selectedShot?.id,
   ) ?? [];
@@ -96,10 +103,18 @@ export function DirectorWorkspace({
 
       {view === 'canvas' ? (
         <InfiniteCanvas busy={busy} onNewShot={onNewShot} onSelectShot={onSelectShot}
-          selectedShotId={selectedShot?.id ?? null} snapshot={snapshot} />
+          selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
+          preflights={preflights} onGenerate={onGenerate}
+          onSetup={() => setProductionOpen(true)} />
       ) : <div className="director-grid">
         <div className="comparison-grid">
-          <PlannedShotPanel shot={selectedShot} />
+          <PlannedShotPanel busy={busy} shot={selectedShot}
+            job={displayedJob} preflight={selectedShot
+              ? preflights.get(selectedShot.id) ?? null : null}
+            onGenerate={(reason) => selectedShot
+              ? onGenerate(selectedShot, preflights.get(selectedShot.id)!, reason)
+              : Promise.resolve(false)}
+            onSetup={() => setProductionOpen(true)} />
           <ActualShotPanel actual={displayedActual} busy={busy}
             actuals={actuals}
             hasSelectedShot={Boolean(selectedShot)}
@@ -115,7 +130,8 @@ export function DirectorWorkspace({
         job={displayedJob} shot={selectedShot} /> : null}
       {productionOpen ? <Suspense fallback={<div className="progress-bar" />}>
         <ProductionBriefPanel projectId={snapshot.project.id}
-          onClose={() => setProductionOpen(false)} />
+          onClose={() => { setProductionOpen(false);
+            setPreflightRevision((value) => value + 1); }} />
       </Suspense> : null}
       {shotProductionOpen && selectedShot ? <ShotProductionEditor
         busy={busy} projectId={snapshot.project.id} shot={selectedShot}

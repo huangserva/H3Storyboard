@@ -1,5 +1,7 @@
-import type { Asset, CanvasNode, ShotActual, ShotPlan } from '@h3storyboard/protocol';
+import type { Asset, CanvasNode, GenerationPreflight, H3Job, ShotActual,
+  ShotPlan } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
+import { GenerationControl } from './GenerationControl.js';
 
 interface CanvasShotCardProps {
   shot: ShotPlan;
@@ -8,6 +10,11 @@ interface CanvasShotCardProps {
   node: CanvasNode;
   selected: boolean;
   compileReady: boolean;
+  busy: boolean;
+  job: H3Job | null;
+  preflight: GenerationPreflight | null;
+  onGenerate: (reason: string | null) => Promise<boolean>;
+  onSetup: () => void;
 }
 
 export function CanvasShotCard({
@@ -17,6 +24,11 @@ export function CanvasShotCard({
   node,
   selected,
   compileReady,
+  busy,
+  job,
+  preflight,
+  onGenerate,
+  onSetup,
 }: CanvasShotCardProps) {
   const latestActual = actuals.filter(({ qc_verdict }) => qc_verdict !== 'rejected')
     .reduce<ShotActual | null>(
@@ -61,6 +73,8 @@ export function CanvasShotCard({
       </div>
       <h3>{shot.title}</h3>
       <p>{shot.action}</p>
+      <GenerationControl compact busy={busy} job={job} preflight={preflight}
+        onGenerate={onGenerate} onSetup={onSetup} />
       <footer>
         <span>{shot.camera_movement}</span>
         <span data-verdict={latestActual?.qc_verdict ?? 'none'}>

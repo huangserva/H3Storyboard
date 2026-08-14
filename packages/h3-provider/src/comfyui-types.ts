@@ -15,7 +15,8 @@ export type H3ComfyErrorCode =
   | 'H3_COMFY_TASK_MISSING'
   | 'H3_COMFY_ABORTED'
   | 'H3_COMFY_OUTPUT_MISSING'
-  | 'H3_COMFY_EMPTY_DOWNLOAD';
+  | 'H3_COMFY_EMPTY_DOWNLOAD'
+  | 'H3_COMFY_QUEUE_BUSY';
 
 export class H3ComfyError extends Error {
   constructor(readonly code: H3ComfyErrorCode, message: string,

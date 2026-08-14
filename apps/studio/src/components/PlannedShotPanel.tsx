@@ -1,10 +1,17 @@
-import type { ShotPlan } from '@h3storyboard/protocol';
+import type { GenerationPreflight, H3Job, ShotPlan } from '@h3storyboard/protocol';
+import { GenerationControl } from './GenerationControl.js';
 
 interface PlannedShotPanelProps {
   shot: ShotPlan | null;
+  busy: boolean;
+  job: H3Job | null;
+  preflight: GenerationPreflight | null;
+  onGenerate: (reason: string | null) => Promise<boolean>;
+  onSetup: () => void;
 }
 
-export function PlannedShotPanel({ shot }: PlannedShotPanelProps) {
+export function PlannedShotPanel({ shot, busy, job, preflight,
+  onGenerate, onSetup }: PlannedShotPanelProps) {
   if (!shot) {
     return (
       <section className="comparison-card planned-panel empty-panel">
@@ -52,6 +59,8 @@ export function PlannedShotPanel({ shot }: PlannedShotPanelProps) {
         <span>H3 PROMPT</span>
         <p>{shot.prompt || '尚未填写生成提示词'}</p>
       </div>
+      <GenerationControl busy={busy} job={job} preflight={preflight}
+        onGenerate={onGenerate} onSetup={onSetup} />
     </section>
   );
 }

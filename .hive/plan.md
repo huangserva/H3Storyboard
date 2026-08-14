@@ -45,7 +45,7 @@ last_review: 2026-08-13
 - [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
 - [x] Actual 面板可切换并内嵌播放同镜真实 Take（Range 流式媒体端点），资产库图片可预览，pending QC 操作可见
 - [x] 画布视觉整改：两侧资产/角色面板改独立占位且默认折叠；分镜卡显示 Take 首帧或真实 first_frame；缺文件缩略图显示稳定占位
-- [ ] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P0 方案见 2026-08-13 OiiOii 调研，待 user 拍板后实现）
+- [ ] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P0 方案见 2026-08-13 OiiOii 调研；其中生成/新 Take、preflight 提示、per-job 进度与完成后 Take 自动刷新已于 2026-08-14 实质落地，待质量门与四路 review 后勾选；inspector 等其余 P0 范围仍待 user 拍板）
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列

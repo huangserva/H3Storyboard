@@ -71,6 +71,21 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
       .find(({ id }) => id === fixture.jobId)?.provider_job_id).toBe('prompt-1');
   });
 
+  it('never frees memory, uploads, or submits while an external queue is occupied', async () => {
+    const fixture = seedWorkerJob();
+    const stub = await startComfyStub('external-busy');
+
+    const result = await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce();
+
+    expect(result).toMatchObject({ outcome: 'timed_out',
+      error_code: 'H3_COMFY_QUEUE_BUSY' });
+    expect(stub.counts).toMatchObject({ free: 0, upload: 0, prompt: 0 });
+    expect(fixture.store.getH3Job(fixture.jobId)).toMatchObject({
+      status: 'timed_out', error_code: 'H3_COMFY_QUEUE_BUSY',
+    });
+  });
+
   it('claims a submitted task by persisted client id after the submit crash window', async () => {
     const fixture = seedWorkerJob();
     const claimed = fixture.store.claimH3Job(fixture.jobId);
@@ -459,7 +474,7 @@ function createWorker(store: ProjectStore, dataDirectory: string, endpoint: stri
 }
 
 async function startComfyStub(mode: 'success' | 'empty-download' | 'claim-client' |
-  'hanging' | 'delayed-download') {
+  'hanging' | 'delayed-download' | 'external-busy') {
   const counts = { free: 0, upload: 0, prompt: 0, history: 0, view: 0,
     queue: 0, interrupt: 0 };
   const prompts: unknown[] = [];
@@ -486,8 +501,10 @@ async function startComfyStub(mode: 'success' | 'empty-download' | 'claim-client
       if (request.method === 'POST') { await drain(request); return json(response, {}); }
       if (mode === 'claim-client') return json(response, { queue_running: [
         [1, 'prompt-1', {}, { client_id: 'intent-1' }]], queue_pending: [] });
-      if (mode === 'hanging') return json(response, { queue_running: [
+      if (mode === 'hanging' && counts.prompt > 0) return json(response, { queue_running: [
         [1, 'prompt-1', {}, { client_id: 'hanging' }]], queue_pending: [] });
+      if (mode === 'external-busy') return json(response, { queue_running: [
+        [1, 'external-prompt', {}, { client_id: 'other-client' }]], queue_pending: [] });
       return json(response, { queue_running: [], queue_pending: [] }); }
     if (path === '/history') return json(response, {});
     if (path === '/interrupt') { counts.interrupt += 1; return json(response, {}); }

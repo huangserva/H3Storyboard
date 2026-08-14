@@ -19,7 +19,7 @@ const api = createApiServer({
 const address = await api.start();
 process.stdout.write(`H3Storyboard API listening at ${address.origin}\n`);
 
-const workerStore = process.env.H3_WORKER === '1'
+const workerStore = process.env.H3_WORKER !== '0'
   ? openProjectStore(databasePath) : null;
 const worker = workerStore ? new H3LeaseWorker({
   store: workerStore,
@@ -32,7 +32,7 @@ const worker = workerStore ? new H3LeaseWorker({
     ? resolve(process.env.H3_WORKER_DATA_DIR) : dirname(databasePath),
   lease_duration_ms: parsePositiveInt(process.env.H3_WORKER_LEASE_MS, 3_600_000),
   idle_interval_ms: parsePositiveInt(process.env.H3_WORKER_IDLE_MS, 1_000),
-  free_before_submit: process.env.H3_WORKER_FREE !== '0',
+  free_before_submit: true,
   on_error: (error) => process.stderr.write(
     `H3 worker error: ${error instanceof Error ? error.message : String(error)}\n`),
 }) : null;

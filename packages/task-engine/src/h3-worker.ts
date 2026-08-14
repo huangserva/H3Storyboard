@@ -101,13 +101,15 @@ export class H3LeaseWorker {
       const current = this.#options.store.getH3Job(job.id);
       if (current.status === 'canceled') return { outcome: 'failed', job_id: job.id,
         error_code: 'H3_COMFY_ABORTED', error_message: 'Job was canceled' };
-      if (failure.code === 'H3_COMFY_TIMEOUT') {
+      if (failure.code === 'H3_COMFY_TIMEOUT' ||
+        failure.code === 'H3_COMFY_QUEUE_BUSY') {
         if (current.provider_job_id) await this.#options.client.cancelTask(
           current.provider_job_id).catch(this.#options.on_error);
         this.#options.store.deferH3Job(job.id, leaseToken,
           failure.code, failure.message);
         return { outcome: 'timed_out', job_id: job.id,
-          provider_task_id: current.provider_job_id ?? '' };
+          provider_task_id: current.provider_job_id ?? '',
+          error_code: failure.code, error_message: failure.message };
       }
       try {
         this.#options.store.failH3Job(job.id, leaseToken,
@@ -154,6 +156,7 @@ export class H3LeaseWorker {
     } else if (job.provider_job_id) {
       this.#options.store.clearH3ProviderTask(job.id, leaseToken);
     }
+    await this.#options.client.assertQueueIdle();
     const clientId = this.#options.client.createClientId();
     this.#options.store.markH3SubmitIntent(job.id, leaseToken, clientId);
     return this.#submit(job, clientId);

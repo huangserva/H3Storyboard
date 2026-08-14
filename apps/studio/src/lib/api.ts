@@ -13,6 +13,9 @@ import type {
   UpdateProjectGenerationLockInput,
   UpdateShotPlanInput,
   ShotActual,
+  H3Job,
+  GenerationPreflight,
+  CreateH3JobInput,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -127,6 +130,19 @@ export async function reviewActual(actualId: string,
   qc_verdict: 'approved' | 'rejected'): Promise<ShotActual> {
   return request<ShotActual>(`/api/actuals/${actualId}/review`, {
     method: 'POST', body: JSON.stringify({ qc_verdict }),
+  });
+}
+
+export async function getGenerationPreflight(projectId: string,
+  shotId: string): Promise<GenerationPreflight> {
+  return request<GenerationPreflight>(`/api/projects/${projectId}/shots/${shotId}` +
+    '/jobs/preflight');
+}
+
+export async function createH3Job(projectId: string, shotId: string,
+  input: CreateH3JobInput): Promise<H3Job> {
+  return request<H3Job>(`/api/projects/${projectId}/shots/${shotId}/jobs`, {
+    method: 'POST', body: JSON.stringify(input),
   });
 }
 

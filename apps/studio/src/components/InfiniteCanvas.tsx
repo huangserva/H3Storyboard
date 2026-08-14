@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent } from 'react';
-import type { CanvasNode, ProjectSnapshot } from '@h3storyboard/protocol';
+import type { CanvasNode, GenerationPreflight, ProjectSnapshot,
+  ShotPlan } from '@h3storyboard/protocol';
 import {
   centerViewportOnNode,
   nextCanvasZIndex,
@@ -21,6 +22,10 @@ interface InfiniteCanvasProps {
   busy: boolean;
   onNewShot: () => void;
   onSelectShot: (id: string) => void;
+  preflights: Map<string, GenerationPreflight>;
+  onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
+    reason: string | null) => Promise<boolean>;
+  onSetup: () => void;
 }
 
 type Interaction =
@@ -33,7 +38,8 @@ type Interaction =
 const RESET_VIEWPORT: CanvasViewport = { x: 0, y: 0, zoom: 1 };
 
 export function InfiniteCanvas({
-  snapshot, selectedShotId, busy, onNewShot, onSelectShot,
+  snapshot, selectedShotId, busy, onNewShot, onSelectShot, preflights,
+  onGenerate, onSetup,
 }: InfiniteCanvasProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const interactionRef = useRef<Interaction | null>(null);
@@ -216,6 +222,12 @@ export function InfiniteCanvas({
               assets={snapshot.assets}
               selected={selectedShotId === shot.id}
               compileReady={compilableShots.has(shot.id)}
+              busy={busy}
+              job={snapshot.h3_jobs.filter(({ shot_plan_id }) =>
+                shot_plan_id === shot.id).at(-1) ?? null}
+              preflight={preflights.get(shot.id) ?? null}
+              onGenerate={(reason) => onGenerate(shot, preflights.get(shot.id)!, reason)}
+              onSetup={onSetup}
               actuals={snapshot.shot_actuals.filter(
                 (actual) => actual.shot_plan_id === shot.id)} /> : null;
           })}

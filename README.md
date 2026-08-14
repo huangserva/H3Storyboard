@@ -12,7 +12,9 @@ Planned shots describe intent. Actual shots record generated evidence. They are 
 
 ## Current milestone
 
-M0 is the durable foundation: protocol, SQLite migrations, local API, task leases, continuity lineage, QC, and the Studio shell. The real ComfyUI/MiniMax submit-and-poll worker is deliberately M1; this repository does not yet claim end-to-end H3 generation.
+The local Studio now creates immutable H3 jobs, shows worker progress, and reveals
+the candidate video and pending Take when generation completes. Planned shots and
+generated results remain separate records until explicit QC.
 
 ## Workspace
 
@@ -33,6 +35,23 @@ pnpm dev
 - Studio: `http://127.0.0.1:5174`
 - API: `http://127.0.0.1:4187`
 - Data: `~/.h3storyboard/h3storyboard.db` by default, or set `H3_STORYBOARD_DB`.
+
+The API starts `H3LeaseWorker` by default and connects to
+`http://127.0.0.1:8190`. Override the endpoint with `H3_COMFY_ENDPOINT`; set
+`H3_WORKER=0` only when a separately managed worker owns this database. Before a
+new submission the worker verifies that ComfyUI's running and pending queues are
+both empty. If another application occupies the queue it records a recoverable
+wait state and does not call `/free`, upload inputs, or submit a prompt. Once the
+queue is free, it calls `/free` before loading the H3 model and submitting.
+
+Production startup uses the same behavior:
+
+```bash
+pnpm build
+H3_STORYBOARD_DB=/path/to/project.db \
+H3_COMFY_ENDPOINT=http://127.0.0.1:8190 \
+pnpm --filter @h3storyboard/api start
+```
 
 ## Quality gate
 

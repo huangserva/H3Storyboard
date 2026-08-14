@@ -101,6 +101,18 @@ export const H3JobSchema = z.object({
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 
+export const GenerationPreflightSchema = z.object({
+  ready: z.boolean(),
+  blocking_error: z.object({
+    code: z.string(),
+    message: z.string(),
+  }).nullable(),
+  mode: H3ModeSchema.nullable(),
+  input_bindings: z.array(AssetBindingSchema),
+  gate_override_required: z.boolean(),
+});
+export type GenerationPreflight = z.infer<typeof GenerationPreflightSchema>;
+
 export interface BindingIssue {
   code: string;
   message: string;

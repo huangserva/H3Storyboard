@@ -18,6 +18,7 @@ import { dispatchModeRoute } from './mode-routes.js';
 import { dispatchBriefRoute } from './brief-routes.js';
 import { dispatchShotProductionRoute } from './shot-production-routes.js';
 import { dispatchRepresentativeRoute } from './representative-routes.js';
+import { dispatchJobRoute } from './job-routes.js';
 
 interface RouteResult {
   status: number;
@@ -155,6 +156,8 @@ export async function dispatchRoute(
   const representativeResult = await dispatchRepresentativeRoute(
     request, store, method, pathname);
   if (representativeResult) return representativeResult;
+  const jobResult = await dispatchJobRoute(request, store, method, pathname);
+  if (jobResult) return jobResult;
 
   for (const route of routes) {
     if (route.method !== method) continue;

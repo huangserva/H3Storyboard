@@ -31,11 +31,12 @@ export function ProductionBriefPanel({ projectId, onClose }:
         <small>{store.lock?.reason ?? '冻结后才能创建 H3 Job'}</small></div>
         {store.lock?.engaged ? <button disabled={store.busy} type="button"
           onClick={() => void store.updateLock({ engaged: false })}>RELEASE</button>
-          : <button disabled={store.busy || !reason.trim()} type="button"
+          : <button disabled={store.busy || !latest || !reason.trim()} type="button"
             onClick={() => void store.updateLock({ engaged: true, reason: reason.trim() })}>
             ENGAGE</button>}</header>
       {!store.lock?.engaged ? <input value={reason}
-        onChange={(event) => setReason(event.target.value)} placeholder="Lock reason…" /> : null}
+        disabled={!latest} onChange={(event) => setReason(event.target.value)}
+        placeholder={latest ? 'Lock reason…' : '请先建立 Production Brief'} /> : null}
     </section>
     {store.error ? <p className="production-error" role="alert">{store.error}</p> : null}
     <section className="brief-current"><header><div><span className="eyebrow">INTENT SSOT</span>

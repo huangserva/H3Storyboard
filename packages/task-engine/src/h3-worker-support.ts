@@ -60,7 +60,8 @@ export type H3WorkerRunResult =
     output_path: string }
   | { outcome: 'failed'; job_id: string; error_code: string;
     error_message: string }
-  | { outcome: 'timed_out'; job_id: string; provider_task_id: string };
+  | { outcome: 'timed_out'; job_id: string; provider_task_id: string;
+    error_code?: string; error_message?: string };
 
 export type H3WorkerErrorCode =
   | 'H3_WORKER_MODE_UNSUPPORTED'
