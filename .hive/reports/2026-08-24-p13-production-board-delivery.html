@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard P1.3 制片墙交付报告</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0d12;--panel:#121722;--line:#293246;--ink:#edf2ff;--muted:#9eabc2;--violet:#8e7cff;--cyan:#51d8d1;--green:#68df9b;--amber:#f2bc62}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#242048 0,transparent 32rem),var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:1120px;margin:auto;padding:64px 28px 100px}header{border:1px solid var(--line);background:linear-gradient(135deg,rgba(142,124,255,.18),rgba(18,23,34,.9) 45%);border-radius:24px;padding:44px}h1{font-size:clamp(34px,6vw,68px);line-height:1.02;margin:10px 0 18px;letter-spacing:-.04em}h2{font-size:24px;margin:48px 0 18px}h3{font-size:17px;margin:26px 0 10px}.eyebrow{color:var(--cyan);font-size:12px;letter-spacing:.18em;text-transform:uppercase}.lead{max-width:780px;color:#cdd6e8;font-size:18px}.chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}.chip{border:1px solid var(--line);background:#171d2a;padding:7px 11px;border-radius:999px;color:#cbd5e7}.chip.good{border-color:#326b4a;color:var(--green)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{border:1px solid var(--line);background:rgba(18,23,34,.9);border-radius:18px;padding:20px}.card strong{display:block;font-size:20px;margin-bottom:4px}.card small{color:var(--muted)}table{width:100%;border-collapse:collapse;background:rgba(18,23,34,.82);border:1px solid var(--line)}th,td{padding:13px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}.done{color:var(--green)}code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:#d4ccff}.callout{border-left:3px solid var(--violet);background:#161a27;padding:16px 18px;border-radius:0 12px 12px 0}.risk{border-left-color:var(--amber)}ul{padding-left:20px}li+li{margin-top:8px}.score{font-size:30px;color:var(--green)}footer{margin-top:54px;color:var(--muted);font-size:13px}@media(max-width:760px){main{padding:24px 16px 64px}header{padding:28px 22px}.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+  </style>
+</head>
+<body><main>
+  <header>
+    <div class="eyebrow">H3Storyboard · P1.3 · 2026-08-24</div>
+    <h1>制片墙已经可以测试</h1>
+    <p class="lead">把 xyz-video-creator 的高密度画布展示融入 H3Storyboard，但继续由 Protocol、SQLite、Job、Asset、Take 与 QC 管理唯一真相。</p>
+    <div class="chips"><span class="chip good">默认 Production Board</span><span class="chip good">角色母图与多角度血缘</span><span class="chip good">100 Shot 零视频预载</span><span class="chip">H3 原声或静音</span></div>
+  </header>
+
+  <h2>交付范围</h2>
+  <div class="grid">
+    <div class="card"><small>VIEW 01</small><strong>制片墙</strong>角色大卡、场景资产横带、三列 Plan / Latest Take 分镜墙。</div>
+    <div class="card"><small>VIEW 02</small><strong>血缘流程</strong>保留 React Flow，懒加载并展示 Character → root → angle 与 Job/Asset/Take。</div>
+    <div class="card"><small>VIEW 03</small><strong>计划 / 实测</strong>继续做单镜精细编辑与导演裁决，不让 Take 覆盖 Plan。</div>
+  </div>
+
+  <h2>角色参考图链路</h2>
+  <table><thead><tr><th>环节</th><th>结果</th><th>不变量</th></tr></thead><tbody>
+    <tr><td>上传</td><td class="done">PNG / JPEG / WebP → candidate Asset + Reference</td><td>幂等 receipt、15 MiB、结构校验、安全路径</td></tr>
+    <tr><td>审批</td><td class="done">candidate → approved</td><td>复用 canonical Asset lifecycle；replacement 正常归档</td></tr>
+    <tr><td>母图</td><td class="done">每角色唯一 root primary</td><td>v19 修历史脏数据；partial unique index + trigger</td></tr>
+    <tr><td>多角度</td><td class="done">approved root → candidate angle</td><td>禁止 angle-from-angle；派生图永不升母图</td></tr>
+    <tr><td>H3 绑定</td><td class="done">只选 manifest 内 approved root image</td><td>角度图不做 fallback；选择顺序确定</td></tr>
+  </tbody></table>
+
+  <h2>原始要求 verdict</h2>
+  <table><thead><tr><th>要求</th><th>Verdict</th><th>说明</th></tr></thead><tbody>
+    <tr><td>xyz 风格画布</td><td class="done">完成</td><td>默认高密度制片墙，Flow 继续存在</td></tr>
+    <tr><td>角色参考图</td><td class="done">完成</td><td>上传、预览、审批、归档、多角度、血缘</td></tr>
+    <tr><td>批量 catalog</td><td class="done">完成</td><td>单项目请求返回 characters/references/assets/derivations</td></tr>
+    <tr><td>100 Shot</td><td class="done">完成</td><td>真实 SQLite fixture；墙面不挂视频、不拉媒体</td></tr>
+    <tr><td>Krea/Qwen 按钮</td><td>按范围跳过</td><td>没有持久 CharacterImageJob 前不展示假按钮</td></tr>
+    <tr><td>声音</td><td class="done">完成</td><td>没有新增声音路径；仍只允许 H3 原声或静音</td></tr>
+  </tbody></table>
+
+  <h2>质量门禁</h2>
+  <div class="grid">
+    <div class="card"><small>TYPE + BUILD</small><strong class="score">PASS</strong><code>pnpm check && pnpm build</code></div>
+    <div class="card"><small>VITEST</small><strong class="score">146</strong>passed / 1 opt-in skipped</div>
+    <div class="card"><small>PLAYWRIGHT</small><strong class="score">12</strong>真实浏览器用例通过</div>
+  </div>
+
+  <h2>Self-Review</h2>
+  <table><thead><tr><th>维度</th><th>第一轮</th><th>最终</th><th>闭环</th></tr></thead><tbody>
+    <tr><td>A 架构与维护性</td><td>C+</td><td class="done">A</td><td>graph/catalog/migrations 拆分；Flow 懒加载</td></tr>
+    <tr><td>B 真实 bug 与边界</td><td>C+</td><td class="done">A-</td><td>生命周期、母图、历史数据、PATCH 500 全部修复</td></tr>
+    <tr><td>C 测试质量</td><td>C+</td><td class="done">A</td><td>真 HTTP/SQLite/Browser；100 Shot、格式、键盘、错误路径</td></tr>
+    <tr><td>D spec / protocol</td><td>C+</td><td class="done">A-</td><td>Protocol 1.6、snake_case、v17–v19、音频边界</td></tr>
+  </tbody></table>
+
+  <h3>严重项 verdict</h3>
+  <ul>
+    <li><b>派生角度升母图：</b>已修。create/update/approve/compiler/UI preview/v19 migration 全链统一。</li>
+    <li><b>上传内容可被通用 PATCH 改写：</b>已修。Asset URI/hash 与 Reference asset/URI/kind/hash/lineage 分字段拦截并实测。</li>
+    <li><b>审批绕过 replacement：</b>已修。统一走 <code>updateAsset()</code>。</li>
+    <li><b>100 Shot 假性能：</b>已修。100 个持久 Job/Take，零墙面媒体预载。</li>
+  </ul>
+  <p class="callout"><b>综合评分 A-。</b>四个维度都高于 B-；无严重或中等遗留。</p>
+
+  <h2>明确未做与低风险</h2>
+  <p class="callout risk">未实现 CharacterImageJob、Krea/Qwen 执行器或 4090 调度，也没有假生成按钮。正常失败会清理文件；极端进程崩溃若发生在 rename 与 SQLite commit 之间，可能留下无 DB 引用文件，后续可用启动 janitor 清理。图片当前做容器级完整性校验，尚未引入完整像素解码库。</p>
+
+  <footer>H3Storyboard P1.3 · canonical data first · no TTS / BGM / ambience / SFX</footer>
+</main></body></html>

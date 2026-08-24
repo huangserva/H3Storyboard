@@ -30,7 +30,7 @@ describe('compileBindings', () => {
 
   it('resolves character references and orders frames before declared references', () => {
     const reference = { character_id: 'character', asset_id: 'character-asset',
-      sort_order: 0 } as CharacterReference;
+      derived_from: null, sort_order: 0 } as CharacterReference;
     const result = compileBindings({ shot: { semantic_references: [
       { purpose: 'reference_character', target: { type: 'character',
         character_id: 'character' } }, direct('first_frame', 'frame') ] },
@@ -91,9 +91,39 @@ describe('compileBindings', () => {
         character_id: 'character' } }] }, manifest_asset_ids: ['old', 'current'],
       assets: [{ ...asset('old'), status: 'archived' }, asset('current')],
       character_references: [
-        { character_id: 'character', asset_id: 'old', sort_order: 0 },
-        { character_id: 'character', asset_id: 'current', sort_order: 1 },
+        { character_id: 'character', asset_id: 'old', derived_from: null,
+          sort_order: 0 },
+        { character_id: 'character', asset_id: 'current', derived_from: null,
+          sort_order: 1 },
       ] as CharacterReference[], capability: capability(['r2v']) });
     expect(result.bindings[0]?.asset_id).toBe('current');
+  });
+
+  it('never promotes a derived angle when the root mother image is unavailable', () => {
+    expect(() => compileBindings({ shot: { semantic_references: [{
+      purpose: 'reference_character', target: { type: 'character',
+        character_id: 'character' } }] }, manifest_asset_ids: ['root', 'angle'],
+      assets: [{ ...asset('root'), status: 'archived' }, asset('angle')],
+      character_references: [
+        { character_id: 'character', asset_id: 'root', derived_from: null,
+          sort_order: 1 },
+        { character_id: 'character', asset_id: 'angle', derived_from: 'root-ref',
+          sort_order: 0 },
+      ] as CharacterReference[], capability: capability(['r2v']) }))
+      .toThrowError(expect.objectContaining({ code: 'BINDING_MISSING_INPUT' }));
+  });
+
+  it('skips non-image character references before choosing the primary input', () => {
+    const result = compileBindings({ shot: { semantic_references: [{
+      purpose: 'reference_character', target: { type: 'character',
+        character_id: 'character' } }] }, manifest_asset_ids: ['clip', 'portrait'],
+      assets: [{ ...asset('clip'), kind: 'video' }, asset('portrait')],
+      character_references: [
+        { character_id: 'character', asset_id: 'clip', derived_from: null,
+          sort_order: 0 },
+        { character_id: 'character', asset_id: 'portrait', derived_from: null,
+          sort_order: 1 },
+      ] as CharacterReference[], capability: capability(['r2v']) });
+    expect(result.bindings[0]?.asset_id).toBe('portrait');
   });
 });

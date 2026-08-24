@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard P1.3 · Krea2 / Qwen 角色参考图链路</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090b10;--panel:#121620;--panel2:#171c28;--ink:#f5f1e8;--muted:#a7adbb;--line:#303748;--cyan:#62e5da;--lime:#c9f36b;--amber:#efbd68;--red:#ff8d91;--violet:#aab3ff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 88% 0,#183c43 0,transparent 36rem),radial-gradient(circle at 0 45%,#2b2446 0,transparent 40rem),var(--bg);color:var(--ink);font:15px/1.68 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1180px,calc(100% - 30px));margin:48px auto 90px}.eyebrow{color:var(--lime);font:700 12px ui-monospace,monospace;letter-spacing:.16em}h1{max-width:1000px;margin:12px 0 20px;font-size:clamp(39px,6vw,70px);line-height:1.03;letter-spacing:-.045em}h2{margin:50px 0 16px;font-size:28px}h3{margin:28px 0 10px;color:var(--cyan)}p{max-width:1020px}.lede{color:#d0d4dc;font-size:20px}.callout{padding:23px 25px;border:1px solid #4f735b;border-radius:18px;background:linear-gradient(135deg,#17251f,#111820);font-size:18px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:20px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--panel2),var(--panel))}.card p{margin:7px 0;color:var(--muted)}.metric{color:var(--lime);font:800 28px ui-monospace,monospace}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#29331f;color:var(--lime);font:700 11px ui-monospace,monospace}.tag.warn{background:#3a2c1d;color:var(--amber)}.tag.no{background:#3a2228;color:var(--red)}table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0f131b}th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}th{color:var(--lime);background:#181e28;font-size:12px;letter-spacing:.06em}code{color:#b9eee7}.flow{display:flex;align-items:center;gap:9px;overflow:auto;padding:8px 0}.flow span{min-width:165px;padding:15px;border:1px solid var(--line);border-radius:12px;background:#141923;text-align:center}.flow i{color:var(--lime);font-style:normal}.fact{color:var(--cyan)}.inference{color:var(--amber)}.bad{color:var(--red)}ul,ol{padding-left:23px}li+li{margin-top:7px}.source{font:12px/1.55 ui-monospace,SFMono-Regular,monospace;color:#929aac;overflow-wrap:anywhere}.contract{padding:18px 20px;border-left:4px solid var(--violet);background:#151826;border-radius:0 14px 14px 0;white-space:pre-wrap;font:13px/1.65 ui-monospace,SFMono-Regular,monospace;color:#d8dcff}.footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}@media(max-width:900px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">RESEARCH REPORT · 2026-08-24 · P1.3</div>
+  <h1>角色参考图可以接入，<br>但要先拆掉“伪参考 provider”。</h1>
+  <p class="lede">我逐行核对了本地 <code>h3-film-studio</code>、<code>xyz-video-skill</code>、<code>director</code> 与当前 H3Storyboard。结论不是“复制一个 Krea 函数”，而是把三条性质不同的图像任务正式产品化：母图 T2I、Qwen 身份编辑、Krea i2i 派生。</p>
+  <div class="callout"><strong>核心判断：</strong><code>h3-film-studio/scripts/local_providers.py::image_krea</code> 虽然收到了角色参数，graph 却没有引用任何角色图。它只是 Krea2 T2I。真正锁身份的是独立 Qwen-Edit runner；Krea i2i 也是另一条旁路脚本。P1.3 不能把前者包装一下就宣称支持人物一致性。</div>
+
+  <h2>证据强度</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">FACT</span><div class="metric">3 graphs</div><p>三套 graph、模型名、采样参数、Comfy endpoint 均能从源码逐行核对。</p></div>
+    <div class="card"><span class="tag warn">CORRELATED</span><div class="metric">6 PNG</div><p>Krea master→i2i 的 6 张 480×864 成品仍在，但旧 runner 未留 request manifest。</p></div>
+    <div class="card"><span class="tag no">NOT PROVEN</span><div class="metric">0.42</div><p>只出现在方法文档；当前仓库没有对应 runner 或 prompt manifest，需重新 A/B。</p></div>
+  </div>
+
+  <h2>三个项目分别能贡献什么</h2>
+  <table><thead><tr><th>项目</th><th>可复用</th><th>不能照搬</th></tr></thead><tbody>
+    <tr><td><strong>h3-film-studio</strong><br><span class="source">963c4ff</span></td><td>Krea2、Qwen-Edit graph；Comfy 上传/提交/轮询/下载；真实参数与共卡纪律。</td><td><span class="bad">旁路脚本硬编码路径；无可靠任务恢复；Krea provider 忽略参考；失败可能退到 placeholder。</span></td></tr>
+    <tr><td><strong>xyz-video-skill</strong><br><span class="source">06837a0</span></td><td><code>reference_character</code> 的用途、source、subject 与角色路径解析；provider dispatch 形状。</td><td>跨模型 fallback 会改变风格；全部失败后 placeholder 不应成为 H3Storyboard 资产。</td></tr>
+    <tr><td><strong>director</strong><br><span class="source">cb7358b</span></td><td>一人一图、无遮挡、正面/3⁄4 优先、按剧情需要再补侧背/表情/换装的产品验收规则。</td><td>没有 Krea/Qwen 执行 provider，也没有任务、资产或恢复协议。</td></tr>
+  </tbody></table>
+
+  <h2>已核实 graph 与参数</h2>
+  <table><thead><tr><th>操作</th><th>精确 graph</th><th>参数与身份机制</th><th>证据</th></tr></thead><tbody>
+    <tr><td><strong>Krea master T2I</strong></td><td>UNET Krea2 Turbo → 可选 LoraLoader → CLIPTextEncode → EmptyLatent → KSampler → VAE Decode</td><td>8 steps · CFG 1 · euler_ancestral · sgm_uniform · denoise 1.0。没有参考图，seed 只能复现抽卡，不能锁身份。</td><td class="source">h3-film-studio/scripts/krea_t2i.py:52-108<br>scripts/local_providers.py:256-314</td></tr>
+    <tr><td><strong>Qwen identity edit</strong></td><td>Qwen Edit 2511 → AuraFlow shift 3.1 → CFGNorm 1；Qwen Edit Plus + multi-reference latent；image1 同时 VAEEncode</td><td>4 steps · CFG 1 · euler · simple · denoise 1.0。1–2 张参考图进入模型；这是现有真正的身份锁。</td><td class="source">scripts/qwen_edit_identity.py:49-80</td></tr>
+    <tr><td><strong>Krea variant i2i</strong></td><td>LoadImage → VAEEncode → Krea KSampler → VAE Decode</td><td>8 steps · CFG 1 · euler_ancestral · sgm_uniform；实际脚本 0.52–0.60，统一从同一 master 派生。</td><td class="source">scripts/krea_nude_realistic.py:162-179,236-265</td></tr>
+  </tbody></table>
+  <p><span class="fact">事实：</span>Qwen 项目复盘记录跨 seed 的脸、网巾/胡须、服装/发髻一致，并在后续人工验收记录“人物/服装终于一致”。<span class="source">reference/INTENT-jinpingmei.md:138-146,182-195</span></p>
+  <p><span class="inference">边界：</span>这证明方法可用，不等于现有脚本已成为生产 provider。它没有可恢复 job、稳定错误码、输入 hash、原子落库、尺寸契约或并发锁。</p>
+
+  <h2>参数裁决</h2>
+  <table><thead><tr><th>参数</th><th>建议</th><th>原因</th></tr></thead><tbody>
+    <tr><td>Seed</td><td>持久化明确整数；候选 seed family 可批量生成</td><td>禁止复制 <code>hash(output.name)</code>，Python hash 跨进程不稳定。Qwen/Krea runner 的显式 seed 族才可重放。</td></tr>
+    <tr><td>Krea i2i denoise</td><td>普通角色 0.42 作为待验证起点；大姿态可试 0.52–0.60；每张必须人工审</td><td>0.42 只有文档记录；0.52–0.60 有实际 runner。两者不能混称同一“已验证默认”。</td></tr>
+    <tr><td>Qwen denoise</td><td>固定 1.0，按 Qwen 多参考 latent graph 解释</td><td>不能把它和 Krea VAE i2i 的 denoise 直接比较。</td></tr>
+    <tr><td>LoRA</td><td>通用角色默认无成人 LoRA；由 Mode/profile 显式选</td><td>“刀斧手”是特定内容 profile。现有 local_krea 把它设为全局默认，不适合 H3Storyboard 通用角色库。</td></tr>
+    <tr><td>尺寸</td><td>请求、graph、输出三处校验；图片边长需满足后续 H3 尺寸规则</td><td>Qwen 脚本 W/H 常量未接进 graph，image2 也未走同一个 scale，必须真机 smoke。</td></tr>
+  </tbody></table>
+
+  <h2>P1.3 推荐用户流程</h2>
+  <div class="flow"><span>上传 / Krea 候选</span><i>→</i><span>人工批准 Master</span><i>→</i><span>Qwen / Krea 派生</span><i>→</i><span>候选对比</span><i>→</i><span>批准 + Freeze</span><i>→</i><span>H3 reference_character</span></div>
+  <ol>
+    <li><strong>母图候选：</strong>上传或 Krea2 T2I，一次按 seed family 出多张；全部只进入 candidate。</li>
+    <li><strong>批准 master：</strong>用户检查脸、发型、体型、服装、配色；批准后才成为可用 CharacterReference。</li>
+    <li><strong>身份编辑：</strong>换装、构图、多人物组合优先 Qwen identity edit，输入只允许 approved references。</li>
+    <li><strong>轻派生：</strong>同场景姿态/景别用 Krea i2i；UI 明示 denoise，不做暗中自增或自动批准。</li>
+    <li><strong>生成锁：</strong>只有 approved 且进入 frozen current-assets manifest 的图片能被 H3 编译为 <code>reference_character</code>。</li>
+  </ol>
+
+  <h2>不要复用 H3Job，建立 CharacterImageJob</h2>
+  <p>当前 <code>H3Job</code> 的 mode 和输出语义都是视频，硬塞图片会污染协议。建议独立 job，但复用 H3 worker 已经验证的 submit-intent、同任务恢复、lease、原子 completion 方法。</p>
+  <div class="contract">operation: master_t2i | identity_edit | variant_i2i
+provider: local_comfyui
+engine: krea2 | qwen_image_edit_2511
+project_id / character_id / idempotency_key
+prompt / seed / width / height / steps / cfg / sampler / scheduler
+denoise? / lora_profile? / lora_name? / lora_strength?
+source_reference_ids[] / immutable input hashes
+status / attempt / lease_token / provider_client_id / provider_job_id
+output_asset_id / output_reference_id
+error_code / error_message / timestamps</div>
+  <p><strong>完成门：</strong><code>prepare → preflight → 持久 submit intent → submit once → recover/poll same task → 临时下载 → PNG 解码/尺寸/非空/hash → atomic rename → 单个 SQLite transaction 创建 candidate Asset + CharacterReference lineage + complete job</code>。Provider completed 绝不等于人工 approved。</p>
+
+  <h2>错误与显存纪律</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">ERROR</span><p>稳定区分 input/capability/queue/GPU/HTTP/node/timeout/output；禁止只返回 false 后造 placeholder。</p></div>
+    <div class="card"><span class="tag">GPU LEASE</span><p>按 <code>gpu_host</code> 建共享 SQLite lease，让 Krea 8188 与 H3 8190 真正互斥。</p></div>
+    <div class="card"><span class="tag">OWN INSTANCE</span><p>只对配置为本项目所有的 endpoint 调 <code>/free</code>；绝不 kill ComfyUI 或他人任务。</p></div>
+  </div>
+  <ul>
+    <li>提交前同时查两端 queue/system stats；已有任务时返回 recoverable busy，不 free、不上传、不提交。</li>
+    <li>旧规范写“约 17GB 空闲再开跑”，应改成 provider profile 的可配置门槛，并用真机数据校准。</li>
+    <li>旧脚本会吞掉 <code>/free</code> 异常继续生成，生产实现必须 fail closed。</li>
+    <li>取消只处理本 job 的 prompt id；不能全局 interrupt，更不能 kill 进程。</li>
+  </ul>
+
+  <h2>现有 H3Storyboard 接入点</h2>
+  <table><thead><tr><th>直接复用</th><th>P1.3 新增</th></tr></thead><tbody>
+    <tr><td>Character / CharacterReference lineage；Asset candidate/approved/archived 与 replacement；frozen manifest；媒体 endpoint；H3 worker 的恢复/原子完成纪律。</td><td>项目级 character references batch API、图片上传、CharacterImageJob schema/store/worker、Krea/Qwen graph package、provenance UI、批准/替换入口、跨 H3/Krea GPU lease。</td></tr>
+  </tbody></table>
+  <p>CharacterReference 不需要再加一套独立 status：linked Asset 已经是审批真相；<code>derived_from</code> 继续表示同角色派生链。UI 应展示 linked asset 状态。</p>
+
+  <h2>不进入 P1.3 的东西</h2>
+  <ul>
+    <li><strong>绝不接入</strong>任何 TTS、BGM、Foley、雨声、环境声或跨模型声音 fallback。</li>
+    <li>image provider 只依赖图像配置，只输出 <code>image</code> Asset；不能 import 视频音频配置。</li>
+    <li>旧成品没有 prompt_id/request manifest，只能作为 legacy reference 导入，不能伪装成可重放 job。</li>
+  </ul>
+
+  <h2>需要真机补证的三件事</h2>
+  <ol>
+    <li>同一 master/prompt/seed 族做 denoise 0.35 / 0.42 / 0.50 A/B，比较身份、服装与姿态自由度。</li>
+    <li>通用无 LoRA 的 Krea master graph smoke，避免把成人 LoRA 变成全项目默认。</li>
+    <li>Qwen 1/2/3 reference 且不同尺寸的 graph smoke，确认统一 scale 与目标分辨率。</li>
+  </ol>
+
+  <div class="footer">研究索引：<code>.hive/research/2026-08-24-p13-krea-character-pipeline.md</code>。本轮只读外部项目，未调用 ComfyUI/4090，未修改任何外部仓库，也未触碰声音链。</div>
+</main></body></html>

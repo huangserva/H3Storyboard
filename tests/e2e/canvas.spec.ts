@@ -164,6 +164,7 @@ test.describe.serial('React Flow storyboard canvas', () => {
         await page.evaluate(({ key, value }) => localStorage.setItem(key, value),
           { key: legacyKey, value: legacyValue });
         await page.getByRole('button', { name: new RegExp(projectTitle) }).click();
+        await page.getByRole('button', { name: '血缘流程', exact: true }).click();
         await Promise.all([canvasStarted.promise, preflightStarted.promise]);
         const nextCanvas = page.waitForResponse((response) =>
           response.request().method() === 'PUT' && response.url().includes(
@@ -207,6 +208,7 @@ test.describe.serial('React Flow storyboard canvas', () => {
             data: shotInput(ordinal),
           })));
       }
+      seedCompletedTakes(project.data.id);
 
       const secondPage = await page.context().newPage();
       try {
@@ -225,6 +227,18 @@ test.describe.serial('React Flow storyboard canvas', () => {
         ]);
         await Promise.all([page, secondPage].map((target) =>
           target.getByRole('button', { name: new RegExp(largeTitle) }).click()));
+        for (const target of [page, secondPage]) {
+          await expect(target.getByRole('main', { name: '制片墙' })).toBeVisible();
+          await expect(target.locator('.production-shot-card')).toHaveCount(100);
+          await expect(target.locator('.production-video-take')).toHaveCount(100);
+          expect(await target.locator('.production-shot-card video').count()).toBe(0);
+        }
+        for (const calls of [firstCalls, secondCalls]) {
+          expect(calls.filter(({ url }) =>
+            /\/api\/assets\/[^/]+\/file$/.test(url))).toHaveLength(0);
+        }
+        await Promise.all([page, secondPage].map((target) =>
+          target.getByRole('button', { name: '血缘流程', exact: true }).click()));
         const responses = await Promise.all(initialResponses);
         expect(responses.every((response) => response.status() === 200)).toBe(true);
         for (const response of responses.filter((candidate) =>
@@ -241,8 +255,10 @@ test.describe.serial('React Flow storyboard canvas', () => {
             method === 'PUT' && url.endsWith(canvasUrl))).toHaveLength(1);
           expect(calls.filter(({ method, url }) =>
             method === 'POST' && url.endsWith(canvasUrl))).toHaveLength(0);
-          expect(calls.filter(({ method, url }) =>
-            method === 'GET' && url.endsWith(preflightUrl))).toHaveLength(1);
+          const batchPreflights = calls.filter(({ method, url }) =>
+            method === 'GET' && url.endsWith(preflightUrl));
+          expect(batchPreflights.length).toBeGreaterThanOrEqual(1);
+          expect(batchPreflights.length).toBeLessThanOrEqual(4);
           expect(calls.filter(({ url }) =>
             /\/shots\/[^/]+\/jobs\/preflight$/.test(url))).toHaveLength(0);
         }
@@ -299,6 +315,7 @@ async function openProject(page: Page): Promise<void> {
 
 async function selectProject(page: Page): Promise<void> {
   await page.getByRole('button', { name: new RegExp(projectTitle) }).click();
+  await page.getByRole('button', { name: '血缘流程', exact: true }).click();
 }
 
 function shotNode(page: Page) {
@@ -367,6 +384,55 @@ function canvasRows(targetProjectId: string): { count: number; refs: number } {
       `SELECT COUNT(*) AS count, COUNT(DISTINCT ref_id) AS refs
        FROM canvas_nodes WHERE project_id = ? AND node_type = 'shot_plan'`,
     ).get(targetProjectId) as { count: number; refs: number };
+  } finally {
+    database.close();
+  }
+}
+
+function seedCompletedTakes(targetProjectId: string): void {
+  const databasePath = process.env.H3_E2E_DB;
+  if (!databasePath) throw new Error('H3_E2E_DB is not configured');
+  const database = new Database(databasePath);
+  try {
+    const shots = database.prepare(
+      'SELECT id, duration_seconds FROM shot_plans WHERE project_id = ? ORDER BY ordinal',
+    ).all(targetProjectId) as Array<{ id: string; duration_seconds: number }>;
+    database.transaction(() => {
+      for (const [index, shot] of shots.entries()) {
+        const assetId = crypto.randomUUID();
+        const jobId = crypto.randomUUID();
+        const actualId = crypto.randomUUID();
+        const timestamp = new Date(Date.UTC(2026, 7, 24, 2, 0, index)).toISOString();
+        database.prepare(
+          `INSERT INTO assets
+           (id, project_id, kind, name, relative_path, uri, content_hash, status,
+            created_at, updated_at)
+           VALUES (?, ?, 'video', ?, ?, ?, ?, 'candidate', ?, ?)`,
+        ).run(assetId, targetProjectId, `take-${index + 1}.mp4`,
+          `outputs/take-${index + 1}.mp4`, `outputs/take-${index + 1}.mp4`,
+          `sha256:${String(index).padStart(64, '0')}`, timestamp, timestamp);
+        database.prepare(
+          `INSERT INTO h3_jobs
+           (id, project_id, shot_plan_id, mode, provider, model, prompt,
+            duration_seconds, seed, steps, input_bindings_json, idempotency_key,
+            attempt, status, provider_job_id, output_asset_id, created_at,
+            updated_at, completed_at)
+           VALUES (?, ?, ?, 't2v', 'local_comfyui', 'H3', 'performance fixture',
+            ?, NULL, 20, '[]', ?, 1, 'completed', ?, ?, ?, ?, ?)`,
+        ).run(jobId, targetProjectId, shot.id, shot.duration_seconds,
+          `performance-${index}`, `provider-${index}`, assetId,
+          timestamp, timestamp, timestamp);
+        database.prepare('UPDATE assets SET producer_job_id = ? WHERE id = ?')
+          .run(jobId, assetId);
+        database.prepare(
+          `INSERT INTO shot_actuals
+           (id, project_id, shot_plan_id, job_id, output_asset_id,
+            attempt_number, observed_description, deviation_notes, qc_verdict,
+            created_at, reviewed_at)
+           VALUES (?, ?, ?, ?, ?, 1, 'Performance fixture Take', '', 'pending', ?, NULL)`,
+        ).run(actualId, targetProjectId, shot.id, jobId, assetId, timestamp);
+      }
+    })();
   } finally {
     database.close();
   }

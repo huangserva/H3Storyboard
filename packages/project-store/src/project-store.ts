@@ -1,10 +1,6 @@
 import type {
   Asset,
-  BatchUpsertCanvasNodesInput,
-  BatchUpsertCanvasNodesResult,
-  CanvasNode,
   CurrentAssetsManifestSnapshot,
-  CreateCanvasNodeInput,
   CreateAssetInput,
   CreateH3JobInput,
   CreateProjectInput,
@@ -14,7 +10,6 @@ import type {
   Project,
   ProjectSnapshot,
   ReviewShotActualInput,
-  UpdateCanvasNodeInput,
   UpdateAssetInput,
   UpdateShotPlanInput,
   JobEvent,
@@ -32,6 +27,7 @@ import {
 } from './asset-operations.js';
 import { CanvasStore } from './canvas-store.js';
 import { CharacterStore } from './character-store.js';
+import { CharacterMediaStore } from './character-media-store.js';
 import {
   claimH3Job,
   claimNextH3Job,
@@ -84,6 +80,7 @@ export class ProjectStore {
   readonly production: ProductionStore;
   readonly takes: TakeStore;
   readonly characters: CharacterStore;
+  readonly characterMedia: CharacterMediaStore;
   readonly canvas: CanvasStore;
   #closed = false;
   constructor(databasePath: string) {
@@ -95,6 +92,7 @@ export class ProjectStore {
     this.production = new ProductionStore(this.#database);
     this.takes = new TakeStore(this.#database);
     this.characters = new CharacterStore(this.#database);
+    this.characterMedia = new CharacterMediaStore(this.#database);
     this.canvas = new CanvasStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
@@ -145,25 +143,6 @@ export class ProjectStore {
   getCurrentAssetsManifest(projectId: string,
     version: number): CurrentAssetsManifestSnapshot {
     return getCurrentAssetsManifest(this.#database, projectId, version);
-  }
-
-  listCanvasNodes(projectId: string): CanvasNode[] {
-    return this.canvas.list(projectId);
-  }
-
-  batchUpsertCanvasNodes(projectId: string,
-    input: BatchUpsertCanvasNodesInput): BatchUpsertCanvasNodesResult {
-    return this.canvas.batchUpsert(projectId, input);
-  }
-
-  createCanvasNode(projectId: string,
-    input: CreateCanvasNodeInput): CanvasNode {
-    return this.canvas.create(projectId, input);
-  }
-
-  updateCanvasNode(projectId: string,
-    input: UpdateCanvasNodeInput): CanvasNode {
-    return this.canvas.update(projectId, input);
   }
 
   createShotPlan(projectId: string, input: CreateShotPlanInput): ShotPlan {

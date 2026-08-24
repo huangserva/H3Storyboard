@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AssetKindSchema,
+  AssetSchema,
   IdSchema,
   NonEmptyTextSchema,
   TimestampSchema,
@@ -102,3 +103,47 @@ export const CharacterReferenceSchema = z.object({
   updated_at: TimestampSchema,
 });
 export type CharacterReference = z.infer<typeof CharacterReferenceSchema>;
+
+export const CharacterAssetDerivationSchema = z.object({
+  asset_id: IdSchema,
+  source_asset_id: IdSchema,
+  kind: z.enum(['character_angle_upload', 'identity_edit', 'variant_i2i']),
+  created_at: TimestampSchema,
+});
+export type CharacterAssetDerivation = z.infer<
+  typeof CharacterAssetDerivationSchema
+>;
+
+export const CharacterCatalogSchema = z.object({
+  characters: z.array(CharacterSchema),
+  references: z.array(CharacterReferenceSchema),
+  assets: z.array(AssetSchema),
+  asset_derivations: z.array(CharacterAssetDerivationSchema),
+});
+export type CharacterCatalog = z.infer<typeof CharacterCatalogSchema>;
+
+export const CharacterReferenceUploadResultSchema = z.object({
+  asset: AssetSchema,
+  reference: CharacterReferenceSchema,
+  asset_derivation: CharacterAssetDerivationSchema.nullable(),
+  replayed: z.boolean(),
+});
+export type CharacterReferenceUploadResult = z.infer<
+  typeof CharacterReferenceUploadResultSchema
+>;
+
+export const ApproveCharacterReferenceInputSchema = z.object({
+  make_primary: z.boolean().default(true),
+});
+export type ApproveCharacterReferenceInput = z.input<
+  typeof ApproveCharacterReferenceInputSchema
+>;
+
+export const ApproveCharacterReferenceResultSchema = z.object({
+  asset: AssetSchema,
+  reference: CharacterReferenceSchema,
+  manifest_stale: z.boolean(),
+});
+export type ApproveCharacterReferenceResult = z.infer<
+  typeof ApproveCharacterReferenceResultSchema
+>;

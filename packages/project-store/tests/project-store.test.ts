@@ -296,7 +296,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(16);
+    ).toBe(19);
     migratedVersion.close();
   });
 
@@ -362,7 +362,58 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(16);
+    ).get() as { version: number }).version).toBe(19);
+    migrated.close();
+  });
+
+  it('repairs legacy duplicate or derived primary character references', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'h3-store-v19-'));
+    directories.push(directory);
+    const databasePath = join(directory, 'project.db');
+    const first = new ProjectStore(databasePath);
+    const project = first.createProject({ title: 'Legacy character roots',
+      script_title: 'Character migration', script_content:
+        'A complete script used to repair legacy character primary references.' });
+    const character = first.characters.create(project.id, { name: 'Courier',
+      canonical_appearance: 'A courier in a dark raincoat.' });
+    const root = first.characters.createReference(project.id, character.id, {
+      uri: 'root.png', kind: 'image', content_hash: null,
+      derived_from: null, sort_order: 0 });
+    const duplicateRoot = first.characters.createReference(
+      project.id, character.id, { uri: 'duplicate-root.png', kind: 'image',
+        content_hash: null, derived_from: null, sort_order: 2 });
+    const derived = first.characters.createReference(project.id, character.id, {
+      uri: 'angle.png', kind: 'image', content_hash: null,
+      derived_from: root.id, sort_order: 1 });
+    first.close();
+
+    const raw = new Database(databasePath);
+    raw.prepare('DROP INDEX IF EXISTS idx_character_references_primary')
+      .run();
+    raw.exec(`
+      DROP TRIGGER IF EXISTS trg_character_reference_derived_primary_insert;
+      DROP TRIGGER IF EXISTS trg_character_reference_derived_primary_update;
+    `);
+    raw.prepare('UPDATE character_references SET created_at = ? WHERE id = ?')
+      .run('2026-08-24T00:00:00.000Z', root.id);
+    raw.prepare('UPDATE character_references SET created_at = ? WHERE id = ?')
+      .run('2026-08-24T00:00:01.000Z', duplicateRoot.id);
+    raw.prepare('UPDATE character_references SET sort_order = 0 WHERE id IN (?, ?)')
+      .run(duplicateRoot.id, derived.id);
+    raw.prepare('DELETE FROM schema_version WHERE version = 19').run();
+    raw.close();
+
+    const reopened = new ProjectStore(databasePath);
+    stores.push(reopened);
+    const references = reopened.characters.listReferences(project.id, character.id);
+    expect(references.filter(({ sort_order }) => sort_order === 0))
+      .toEqual([expect.objectContaining({ id: root.id, derived_from: null })]);
+    expect(references.find(({ id }) => id === derived.id)?.sort_order)
+      .toBeGreaterThan(0);
+    const migrated = new Database(databasePath, { readonly: true });
+    expect((migrated.prepare(
+      'SELECT MAX(version) AS version FROM schema_version',
+    ).get() as { version: number }).version).toBe(19);
     migrated.close();
   });
 

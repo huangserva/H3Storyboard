@@ -119,8 +119,12 @@ function resolveAsset(reference: SemanticReference,
   assets: ReadonlyMap<string, Asset>) {
   if (reference.target.type === 'asset') return reference.target.asset_id;
   const characterId = reference.target.character_id;
-  return characterReferences.filter(({ character_id, asset_id }) =>
+  return characterReferences.filter(({ character_id, asset_id, derived_from }) =>
     character_id === characterId && asset_id !== null &&
-    manifest.has(asset_id) && assets.get(asset_id)?.status === 'approved')
-    .sort((a, b) => a.sort_order - b.sort_order)[0]?.asset_id;
+    derived_from === null &&
+    manifest.has(asset_id) && assets.get(asset_id)?.status === 'approved' &&
+    assets.get(asset_id)?.kind === 'image')
+    .sort((a, b) => a.sort_order - b.sort_order ||
+      a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))[0]
+    ?.asset_id;
 }

@@ -5,6 +5,7 @@ import { errorResponse } from './api-error.js';
 import { sendJson } from './http.js';
 import { dispatchRoute } from './routes.js';
 import { serveMediaRoute } from './media-routes.js';
+import { serveCharacterUploadRoute } from './character-upload-routes.js';
 
 export interface ApiServerOptions {
   database_path: string;
@@ -106,6 +107,8 @@ export function createApiServer(options: ApiServerOptions): ApiServer {
 function buildHttpServer(store: ProjectStore, dataDirectory: string): Server {
   return createServer(async (request, response) => {
     try {
+      if (await serveCharacterUploadRoute(
+        request, response, store, dataDirectory)) return;
       if (await serveMediaRoute(request, response, store, dataDirectory)) return;
       const result = await dispatchRoute(request, store);
       sendJson(response, result.status, { data: result.body });

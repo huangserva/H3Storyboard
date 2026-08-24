@@ -103,6 +103,19 @@ export function updateAsset(db: Database.Database, projectId: string,
       project_id: projectId, asset_id: input.asset_id,
     });
     const existing = mapAsset(row);
+    const uploadManaged = Boolean(db.prepare(
+      'SELECT 1 FROM character_reference_uploads WHERE asset_id = ?',
+    ).get(existing.id));
+    if (uploadManaged && (
+      (input.uri !== undefined && input.uri !== existing.uri) ||
+      (input.content_hash !== undefined &&
+        input.content_hash !== existing.content_hash)
+    )) {
+      throw new StoreError('ASSET_IMMUTABLE',
+        'Uploaded character asset content is immutable', {
+          asset_id: existing.id,
+        });
+    }
     if (input.status !== undefined && input.status !== existing.status) {
       requireGenerationUnlocked(db, projectId);
     }

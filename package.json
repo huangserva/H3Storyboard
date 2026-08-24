@@ -18,7 +18,7 @@
     "dev:api": "pnpm check && pnpm --filter @h3storyboard/api dev:serve",
     "dev:studio": "pnpm check && pnpm --filter @h3storyboard/studio dev:serve",
     "demo:seed": "tsx scripts/seed-canvas-demo.ts",
-    "demo:canvas": "H3_CANVAS_DEMO_DB=\"${H3_CANVAS_DEMO_DB:-.h3storyboard/canvas-test.db}\" pnpm demo:seed && H3_STORYBOARD_DB=\"${H3_CANVAS_DEMO_DB:-.h3storyboard/canvas-test.db}\" H3_WORKER=0 pnpm --parallel --filter @h3storyboard/api --filter @h3storyboard/studio dev:serve",
+    "demo:canvas": "H3_CANVAS_DEMO_DB=\"${H3_CANVAS_DEMO_DB:-$PWD/.h3storyboard/canvas-test.db}\" pnpm demo:seed && H3_STORYBOARD_DB=\"${H3_CANVAS_DEMO_DB:-$PWD/.h3storyboard/canvas-test.db}\" H3_WORKER=0 pnpm --parallel --filter @h3storyboard/api --filter @h3storyboard/studio dev:serve",
     "check": "tsc -b --pretty false",
     "build": "tsc -b --pretty false && pnpm --filter @h3storyboard/studio build",
     "test": "tsc -b --pretty false && vitest run && playwright test",

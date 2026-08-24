@@ -52,7 +52,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.5 module ownership
+## Protocol 1.6 module ownership
 
 ```text
 packages/protocol
@@ -71,7 +71,7 @@ packages/task-engine
 apps/api
   small domain route dispatchers + default-on H3 worker (`H3_WORKER=0` disables)
 apps/studio
-  director UI consuming only Protocol 1.5 API shapes
+  director UI consuming only Protocol 1.6 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
@@ -90,7 +90,7 @@ rejects an audio handler or a missing video handler. `pnpm demo:canvas` always
 sets `H3_WORKER=0`, so opening the test canvas cannot submit to ComfyUI or wake
 the 4090. Demo state is not a fallback in the API or Studio runtime.
 
-Migrations v7–v16 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`.
+Migrations v7–v19 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`. V17 adds idempotent character-reference upload receipts, V18 records asset-level character angle derivations, and V19 repairs legacy duplicate/derived primary slots before enforcing one root primary per character.
 
 ## Initial deployment
 

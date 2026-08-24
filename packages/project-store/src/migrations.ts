@@ -14,11 +14,9 @@ import { createProductionContext } from './migration-v10.js';
 import { addSemanticBindings } from './migration-v11.js';
 import { addRepresentativeTakeGate } from './migration-v12.js';
 import { backfillSemanticReferences } from './migration-v13.js';
-import { addWorkerCancellationReason } from './migration-v14.js';
-import { addProviderSubmitIntent } from './migration-v15.js';
-import { addJobAudioMode } from './migration-v16.js';
+import { applyTailMigrations } from './migration-tail.js';
 
-const CURRENT_SCHEMA_VERSION = 16;
+const CURRENT_SCHEMA_VERSION = 19;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -278,17 +276,6 @@ export function migrateDatabase(db: Database.Database): void {
       backfillSemanticReferences(db);
       recordSchemaVersion(db, 13);
     }
-    if (!appliedVersions.has(14)) {
-      addWorkerCancellationReason(db);
-      recordSchemaVersion(db, 14);
-    }
-    if (!appliedVersions.has(15)) {
-      addProviderSubmitIntent(db);
-      recordSchemaVersion(db, 15);
-    }
-    if (!appliedVersions.has(16)) {
-      addJobAudioMode(db);
-      recordSchemaVersion(db, 16);
-    }
+    applyTailMigrations(db, appliedVersions);
   })();
 }

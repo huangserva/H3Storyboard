@@ -16,6 +16,7 @@ import './styles/characters.css';
 import './styles/assets.css';
 import './styles/modes.css';
 import './styles/production.css';
+import './styles/production-board.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');

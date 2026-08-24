@@ -10,7 +10,7 @@ import type {
   StoryboardEdgeKind,
   StoryboardViewEdge,
   StoryboardViewNode,
-} from './storyboard-graph.js';
+} from './storyboard-graph-types.js';
 
 export const SHOT_WIDTH = 260;
 export const SHOT_HEIGHT = 196;
@@ -36,7 +36,7 @@ export function appendShotLineage({ nodes, edges, shot, layout, persisted,
     (left, right) => left.created_at.localeCompare(right.created_at));
   const orderedActuals = [...actuals].sort(
     (left, right) => left.attempt_number - right.attempt_number);
-  const latestActual = latestVisibleActual(orderedActuals);
+  const latestActual = selectLatestActual(orderedActuals);
   const firstFrameId = shot.semantic_references.find(({ purpose, target }) =>
     purpose === 'first_frame' && target.type === 'asset')?.target;
   const firstFrameAsset = firstFrameId?.type === 'asset'
@@ -136,8 +136,8 @@ export function normalizedShotLayout(layout: CanvasNode): CanvasNode {
     height: Math.max(layout.height, SHOT_HEIGHT) };
 }
 
-function latestVisibleActual(actuals: ShotActual[]): ShotActual | undefined {
-  return actuals.filter(({ qc_verdict }) => qc_verdict !== 'rejected').at(-1);
+function selectLatestActual(actuals: ShotActual[]): ShotActual | undefined {
+  return actuals.at(-1);
 }
 
 function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {

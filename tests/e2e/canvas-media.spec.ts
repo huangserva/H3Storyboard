@@ -120,7 +120,7 @@ test.describe.serial('canvas media director experience', () => {
         .getByRole('button', { name: /^TAKE 01/ }).click();
       await expect(taskDrawer).toContainText('fixture-canvas-demo-take-01');
       await expect(taskDrawer).not.toContainText('fixture-canvas-demo-take-02');
-      await page.getByRole('button', { name: '画布', exact: true }).click();
+      await page.getByRole('button', { name: '血缘流程', exact: true }).click();
       const inspector = page.getByRole('complementary', { name: '节点详情' });
       await inspector.getByRole('button', { name: /TAKE 01 · REP/ }).click();
       await expect(inspector).toContainText('当前 Take');
@@ -162,6 +162,7 @@ async function openDemo(page: Page): Promise<void> {
 
 async function selectDemo(page: Page): Promise<void> {
   await page.getByRole('button', { name: new RegExp(DEMO_TITLE) }).click();
+  await page.getByRole('button', { name: '血缘流程', exact: true }).click();
   await expect(page.locator('.react-flow')).toBeVisible();
 }
 

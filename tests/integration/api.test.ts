@@ -56,7 +56,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const health = await fetch(`${first.origin}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({
-      data: { status: 'ok', protocol_version: '1.5' },
+      data: { status: 'ok', protocol_version: '1.6' },
     });
 
     const projectResponse = await postJson(`${first.origin}/api/projects`, {
@@ -685,7 +685,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(16);
+    expect(schemaVersion.version).toBe(19);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -764,6 +764,13 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
           sort_order: 0 },
       )).json() as { data: unknown }).data,
     );
+    const derivedPrimary = await postJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { uri: 'references/courier-invalid-primary.png', kind: 'image',
+        content_hash: null, derived_from: rootReference.id, sort_order: 0 },
+    );
+    await expectError(derivedPrimary, 422,
+      'CHARACTER_REFERENCE_DERIVATION_INVALID');
     const derivedResponse = await postJson(
       `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
       { uri: 'references/courier-profile.png', kind: 'image',
@@ -774,6 +781,47 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       (await derivedResponse.json() as { data: unknown }).data,
     );
     expect(derived.derived_from).toBe(rootReference.id);
+
+    const secondaryRoot = CharacterReferenceSchema.parse(
+      (await (await postJson(
+        `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+        { uri: 'references/courier-secondary-root.png', kind: 'image',
+          content_hash: null, derived_from: null, sort_order: 0 },
+      )).json() as { data: unknown }).data,
+    );
+    const referencesAfterPrimaryChange = CharacterReferenceSchema.array().parse(
+      (await (await fetch(
+        `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      )).json() as { data: unknown }).data,
+    );
+    const shiftedRoot = referencesAfterPrimaryChange.find(
+      ({ id }) => id === rootReference.id)!;
+    expect(shiftedRoot.sort_order).toBe(1);
+    expect(referencesAfterPrimaryChange.filter(
+      ({ sort_order }) => sort_order === 0)).toEqual([secondaryRoot]);
+    const convertPrimaryToDerived = await patchJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { reference_id: secondaryRoot.id, derived_from: rootReference.id },
+    );
+    await expectError(convertPrimaryToDerived, 422,
+      'CHARACTER_REFERENCE_DERIVATION_INVALID');
+    const restoreOriginalPrimary = await patchJson(
+      `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      { reference_id: rootReference.id, sort_order: 0 },
+    );
+    expect(restoreOriginalPrimary.status).toBe(200);
+    const referencesAfterRestore = CharacterReferenceSchema.array().parse(
+      (await (await fetch(
+        `${first.origin}/api/projects/${projectA.id}/characters/${character.id}/references`,
+      )).json() as { data: unknown }).data,
+    );
+    const restoredRoot = referencesAfterRestore.find(
+      ({ id }) => id === rootReference.id)!;
+    const demotedSecondary = referencesAfterRestore.find(
+      ({ id }) => id === secondaryRoot.id)!;
+    expect(referencesAfterRestore.filter(({ sort_order }) => sort_order === 0))
+      .toEqual([restoredRoot]);
+    expect(demotedSecondary.sort_order).toBe(1);
 
     const patchedReference = CharacterReferenceSchema.parse(
       (await (await patchJson(
@@ -861,7 +909,22 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     );
     expect(CharacterReferenceSchema.array().parse(
       (await listReferences.json() as { data: unknown }).data,
-    )).toEqual([rootReference, patchedReference]);
+    )).toEqual([restoredRoot, demotedSecondary, patchedReference]);
+
+    const catalog = await fetch(
+      `${second.origin}/api/projects/${projectA.id}/character_catalog`,
+    );
+    expect(await catalog.json()).toMatchObject({ data: {
+      characters: [{ id: character.id }],
+      references: [{ id: rootReference.id }, { id: secondaryRoot.id },
+        { id: patchedReference.id }],
+    } });
+    const foreignCatalog = await fetch(
+      `${second.origin}/api/projects/${projectB.id}/character_catalog`,
+    );
+    expect(await foreignCatalog.json()).toMatchObject({ data: {
+      references: [{ id: foreignReference.id }],
+    } });
   });
 
   test('freezes immutable approved asset manifests across lifecycle changes', async () => {
@@ -1109,7 +1172,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(16);
+    expect(schemaVersion.version).toBe(19);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {
@@ -1227,6 +1290,19 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       `${api.origin}/api/projects/${project.id}/characters/${lockedCharacter.id}/references`,
       { reference_id: lockedReference.id, sort_order: 1 });
     await expectError(lockedReferenceUpdate, 409, 'LOCK_ENGAGED');
+    const lockedReferenceUpload = await fetch(
+      `${api.origin}/api/projects/${project.id}/characters/` +
+      `${lockedCharacter.id}/reference_uploads`, { method: 'POST', headers: {
+        'content-type': 'image/png', 'x-file-name': 'locked-reference.png',
+        'x-idempotency-key': 'locked-reference-upload',
+      }, body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64') });
+    await expectError(lockedReferenceUpload, 409, 'LOCK_ENGAGED');
+    const lockedReferenceApproval = await postJson(
+      `${api.origin}/api/projects/${project.id}/characters/${lockedCharacter.id}` +
+      `/references/${lockedReference.id}/approve`, { make_primary: true });
+    await expectError(lockedReferenceApproval, 409, 'LOCK_ENGAGED');
     const mode = ModeSchema.array().parse((await (await fetch(
       `${api.origin}/api/modes`)).json() as { data: unknown }).data)
       .find(({ key }) => key === 'cinematic-drama')!;

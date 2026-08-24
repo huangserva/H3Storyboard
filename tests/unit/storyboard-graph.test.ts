@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CanvasNode, Character, ProjectSnapshot } from '@h3storyboard/protocol';
+import type { CanvasNode, Character, CharacterAssetDerivation,
+  CharacterReference, ProjectSnapshot } from '@h3storyboard/protocol';
 import { createInitialPositions } from '../../apps/studio/src/lib/canvas-layout.js';
 import { buildStoryboardGraph } from '../../apps/studio/src/lib/storyboard-graph.js';
 
@@ -197,7 +198,7 @@ describe('storyboard graph', () => {
       output_asset_id: orphanOutputId, idempotency_key: 'orphan-job' });
     input.snapshot.shot_actuals.push({ ...input.snapshot.shot_actuals[0]!,
       id: secondTakeId, job_id: secondJobId, output_asset_id: secondOutputId,
-      attempt_number: 2 });
+      attempt_number: 2, qc_verdict: 'rejected' });
     input.snapshot.shot_plans[1]!.semantic_references.push({
       purpose: 'reference_character',
       target: { type: 'character', character_id: missingCharacterId },
@@ -215,6 +216,8 @@ describe('storyboard graph', () => {
     expect(takes.map(({ id }) => id)).toEqual([
       `take:${IDS.take}`, `take:${secondTakeId}`,
     ]);
+    expect(graph.nodes.find(({ id }) => id === `shot:${IDS.shot1}`)
+      ?.preview_asset_id).toBe(secondOutputId);
     expect(jobs[1]!.x).toBeGreaterThan(takes[0]!.x + takes[0]!.width);
     expect(graph.nodes.some(({ id }) => id ===
       `character:${missingCharacterId}`)).toBe(false);
@@ -224,6 +227,49 @@ describe('storyboard graph', () => {
     const renderedIds = new Set(graph.nodes.map(({ id }) => id));
     expect(graph.edges.every(({ source, target }) =>
       renderedIds.has(source) && renderedIds.has(target))).toBe(true);
+  });
+
+  it('projects uploaded character assets and their durable identity lineage', () => {
+    const input = fixture();
+    const sourceId = crypto.randomUUID();
+    const angleId = crypto.randomUUID();
+    const sourceReferenceId = crypto.randomUUID();
+    const angleReferenceId = crypto.randomUUID();
+    const assetTemplate = input.snapshot.assets[0]!;
+    input.snapshot.assets.push(
+      { ...assetTemplate, id: sourceId, name: 'master.png' },
+      { ...assetTemplate, id: angleId, name: 'profile.png', status: 'candidate' },
+    );
+    const references = [{ id: sourceReferenceId, character_id: IDS.character,
+      asset_id: sourceId, uri: 'master.png', kind: 'image', content_hash: null,
+      derived_from: null, sort_order: 0, created_at: assetTemplate.created_at,
+      updated_at: assetTemplate.updated_at },
+    { id: angleReferenceId, character_id: IDS.character, asset_id: angleId,
+      uri: 'profile.png', kind: 'image', content_hash: null,
+      derived_from: sourceReferenceId, sort_order: 1,
+      created_at: assetTemplate.created_at,
+      updated_at: assetTemplate.updated_at }] as CharacterReference[];
+    const derivations = [{ asset_id: angleId, source_asset_id: sourceId,
+      kind: 'character_angle_upload',
+      created_at: assetTemplate.created_at }] as CharacterAssetDerivation[];
+
+    const graph = buildStoryboardGraph({ ...input,
+      characterReferences: references,
+      characterAssetDerivations: derivations });
+
+    expect(graph.nodes.map(({ id }) => id)).toEqual(expect.arrayContaining([
+      `asset:${sourceId}`, `asset:${angleId}`,
+    ]));
+    expect(graph.edges).toContainEqual(expect.objectContaining({
+      id: `edge:character-asset:${angleId}`,
+      source: `asset:${sourceId}`, target: `asset:${angleId}`,
+      kind: 'identity', label: 'character_angle_upload',
+    }));
+    expect(graph.edges).toContainEqual(expect.objectContaining({
+      id: `edge:character:${IDS.character}:asset:${sourceId}`,
+      source: `character:${IDS.character}`, target: `asset:${sourceId}`,
+      kind: 'identity', label: '身份母图',
+    }));
   });
 
   it('is deterministic for a 100-shot project', () => {

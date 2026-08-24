@@ -2,8 +2,8 @@ import { lazy, Suspense, useState } from 'react';
 import type { GenerationPreflight, ProjectSnapshot, ShotPlan,
   UpdateShotPlanInput } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
-import { InfiniteCanvas } from './InfiniteCanvas.js';
 import { PlannedShotPanel } from './PlannedShotPanel.js';
+import { ProductionBoardView } from './ProductionBoardView.js';
 import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { ShotProductionEditor } from './ShotProductionEditor.js';
@@ -12,6 +12,10 @@ import { useGenerationPreflights } from '../lib/use-generation-preflights.js';
 const ProductionBriefPanel = lazy(async () => {
   const module = await import('./ProductionBriefPanel.js');
   return { default: module.ProductionBriefPanel };
+});
+const InfiniteCanvas = lazy(async () => {
+  const module = await import('./InfiniteCanvas.js');
+  return { default: module.InfiniteCanvas };
 });
 
 interface DirectorWorkspaceProps {
@@ -44,7 +48,7 @@ export function DirectorWorkspace({
   onReviewActual,
   onGenerate,
 }: DirectorWorkspaceProps) {
-  const [view, setView] = useState<'director' | 'canvas'>('canvas');
+  const [view, setView] = useState<'board' | 'flow' | 'director'>('board');
   const [productionOpen, setProductionOpen] = useState(false);
   const [shotProductionOpen, setShotProductionOpen] = useState(false);
   const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
@@ -94,7 +98,10 @@ export function DirectorWorkspace({
         </div>
         <div className="legend">
           <div className="view-switcher" aria-label="工作区视图">
-            <button data-active={view === 'canvas'} onClick={() => setView('canvas')} type="button">画布</button>
+            <button data-active={view === 'board'} onClick={() => setView('board')}
+              type="button">制片墙</button>
+            <button data-active={view === 'flow'} onClick={() => setView('flow')}
+              type="button">血缘流程</button>
             <button data-active={view === 'director'} onClick={() => setView('director')} type="button">计划 / 实测</button>
           </div>
           <button className="button compact" type="button"
@@ -105,15 +112,22 @@ export function DirectorWorkspace({
         </div>
       </header>
 
-      {view === 'canvas' ? (
-        <InfiniteCanvas busy={busy} onNewShot={onNewShot} onSelectShot={onSelectShot}
-          selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
-          shotFocusRevision={shotFocusRevision}
-          preflights={preflights} onGenerate={onGenerate}
-          onSetup={() => setProductionOpen(true)}
-          onReviewActual={onReviewActual}
-          onMarkRepresentative={onMarkRepresentative}
-          onReviewRepresentative={onReviewRepresentative} />
+      {view === 'board' ? <ProductionBoardView snapshot={snapshot}
+        selectedShotId={selectedShot?.id ?? null} busy={busy}
+        preflights={preflights} onSelectShot={onSelectShot}
+        onGenerate={onGenerate} onSetup={() => setProductionOpen(true)} />
+        : view === 'flow' ? (
+        <Suspense fallback={<div className="progress-bar" />}>
+          <InfiniteCanvas busy={busy} onNewShot={onNewShot}
+            onSelectShot={onSelectShot}
+            selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
+            shotFocusRevision={shotFocusRevision}
+            preflights={preflights} onGenerate={onGenerate}
+            onSetup={() => setProductionOpen(true)}
+            onReviewActual={onReviewActual}
+            onMarkRepresentative={onMarkRepresentative}
+            onReviewRepresentative={onReviewRepresentative} />
+        </Suspense>
       ) : <div className="director-grid">
         <div className="comparison-grid">
           <PlannedShotPanel busy={busy} shot={selectedShot}

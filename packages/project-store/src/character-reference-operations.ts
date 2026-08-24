@@ -10,7 +10,22 @@ import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
 import { parseInput } from './input.js';
 import { mapCharacterReference } from './row-mappers.js';
-import { requireGenerationUnlocked } from './generation-locks.js';
+import { requireGenerationUnlocked, requireProject } from './generation-locks.js';
+
+export function listProjectCharacterReferences(
+  db: Database.Database,
+  projectId: string,
+): CharacterReference[] {
+  return db.transaction(() => {
+    requireProject(db, projectId);
+    return db.prepare(
+      `SELECT r.* FROM character_references r
+       JOIN characters c ON c.id = r.character_id
+       WHERE c.project_id = ?
+       ORDER BY c.created_at, c.id, r.sort_order, r.created_at, r.id`,
+    ).all(projectId).map(mapCharacterReference);
+  })();
+}
 
 function requireCharacter(
   db: Database.Database,
@@ -95,10 +110,21 @@ export function createCharacterReference(db: Database.Database, projectId: strin
   return db.transaction(() => {
     requireCharacter(db, projectId, characterId);
     requireGenerationUnlocked(db, projectId);
+    if (input.derived_from !== null && input.sort_order === 0) {
+      throw new StoreError('CHARACTER_REFERENCE_DERIVATION_INVALID',
+        'Derived angle references cannot occupy the primary mother-image slot');
+    }
     validateDerivedFrom(db, projectId, characterId, input.derived_from);
     validateAssetReference(db, projectId, input.asset_id, input.kind);
     const id = randomUUID();
     const now = new Date().toISOString();
+    if (input.derived_from === null && input.sort_order === 0) {
+      db.prepare(
+        `UPDATE character_references
+         SET sort_order = sort_order + 1, updated_at = ?
+         WHERE character_id = ?`,
+      ).run(now, characterId);
+    }
     db.prepare(
       `INSERT INTO character_references
        (id, character_id, asset_id, uri, kind, content_hash, derived_from,
@@ -123,21 +149,57 @@ export function updateCharacterReference(db: Database.Database, projectId: strin
     if (!row) throw new StoreError('CHARACTER_REFERENCE_NOT_FOUND',
       'Character reference does not exist', { reference_id: input.reference_id });
     const existing = mapCharacterReference(row);
+    const uploadManaged = Boolean(db.prepare(
+      'SELECT 1 FROM character_reference_uploads WHERE reference_id = ?',
+    ).get(existing.id));
+    if (uploadManaged && changesUploadedReferenceContent(existing, input)) {
+      throw new StoreError('CHARACTER_REFERENCE_IMMUTABLE',
+        'Uploaded reference content and lineage are immutable', {
+          reference_id: existing.id,
+        });
+    }
     const source = input.derived_from === undefined
       ? existing.derived_from : input.derived_from;
+    const sortOrder = input.sort_order ?? existing.sort_order;
+    if (source !== null && sortOrder === 0) {
+      throw new StoreError('CHARACTER_REFERENCE_DERIVATION_INVALID',
+        'Derived angle references cannot occupy the primary mother-image slot', {
+          reference_id: existing.id,
+        });
+    }
     validateDerivedFrom(db, projectId, characterId, source, existing.id);
     const assetId = input.asset_id === undefined ? existing.asset_id : input.asset_id;
     const kind = input.kind ?? existing.kind;
     validateAssetReference(db, projectId, assetId, kind);
     const now = new Date().toISOString();
+    if (source === null && sortOrder === 0 && existing.sort_order !== 0) {
+      db.prepare(
+        `UPDATE character_references
+         SET sort_order = sort_order + 1, updated_at = ?
+         WHERE character_id = ? AND id <> ? AND sort_order < ?`,
+      ).run(now, characterId, existing.id, existing.sort_order);
+    }
     db.prepare(
       `UPDATE character_references SET asset_id = ?, uri = ?, kind = ?, content_hash = ?,
        derived_from = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
     ).run(assetId, input.uri ?? existing.uri, kind,
       input.content_hash === undefined ? existing.content_hash : input.content_hash,
-      source, input.sort_order ?? existing.sort_order, now, existing.id);
+      source, sortOrder, now, existing.id);
     return mapCharacterReference(
       db.prepare('SELECT * FROM character_references WHERE id = ?').get(existing.id),
     );
   })();
+}
+
+function changesUploadedReferenceContent(
+  existing: CharacterReference,
+  input: UpdateCharacterReferenceInput,
+): boolean {
+  return (input.asset_id !== undefined && input.asset_id !== existing.asset_id) ||
+    (input.uri !== undefined && input.uri !== existing.uri) ||
+    (input.kind !== undefined && input.kind !== existing.kind) ||
+    (input.content_hash !== undefined &&
+      input.content_hash !== existing.content_hash) ||
+    (input.derived_from !== undefined &&
+      input.derived_from !== existing.derived_from);
 }

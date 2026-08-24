@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CharacterReference, ProjectSnapshot } from '@h3storyboard/protocol';
+import type { Asset, CharacterReference, ProjectSnapshot } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
 import type { StoryboardViewNode } from '../lib/storyboard-graph.js';
 import { CanvasTakeControls } from './CanvasTakeControls.js';
@@ -7,6 +7,7 @@ import { CanvasTakeControls } from './CanvasTakeControls.js';
 interface CanvasInspectorPanelProps {
   node: StoryboardViewNode | null;
   snapshot: ProjectSnapshot;
+  assets: Asset[];
   busy: boolean;
   characterReference: CharacterReference | null;
   onOpenMedia: (assetId: string) => void;
@@ -18,7 +19,7 @@ interface CanvasInspectorPanelProps {
     status: 'approved' | 'rejected') => Promise<boolean>;
 }
 
-export function CanvasInspectorPanel({ node, snapshot, busy, characterReference,
+export function CanvasInspectorPanel({ node, snapshot, assets, busy, characterReference,
   onOpenMedia, onReviewActual, onMarkRepresentative,
   onReviewRepresentative }: CanvasInspectorPanelProps) {
   const shotActuals = snapshot.shot_actuals.filter(
@@ -38,7 +39,7 @@ export function CanvasInspectorPanel({ node, snapshot, busy, characterReference,
   const previewAssetId = actual?.output_asset_id ?? node?.preview_asset_id
     ?? characterReference?.asset_id ?? null;
   const previewCandidate = previewAssetId
-    ? snapshot.assets.find(({ id }) => id === previewAssetId) ?? null : null;
+    ? assets.find(({ id }) => id === previewAssetId) ?? null : null;
   const preview = previewCandidate?.kind === 'image' ||
     previewCandidate?.kind === 'video' ? previewCandidate : null;
 

@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import type {
   Character,
   CharacterReference,
+  CharacterAssetDerivation,
+  Asset,
   CreateCharacterInput,
   UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 import * as api from './api.js';
+import { SharedRequestRegistry } from './shared-request-registry.js';
+
+const catalogLoads = new SharedRequestRegistry<Awaited<
+  ReturnType<typeof api.getCharacterCatalog>>>();
 
 function describeError(error: unknown): string {
   if (error instanceof api.ApiError) return `${error.message} · ${error.code}`;
@@ -15,6 +21,9 @@ function describeError(error: unknown): string {
 export function useCharacters(projectId: string) {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [references, setReferences] = useState<CharacterReference[]>([]);
+  const [referenceAssets, setReferenceAssets] = useState<Asset[]>([]);
+  const [assetDerivations, setAssetDerivations] = useState<
+    CharacterAssetDerivation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,24 +31,22 @@ export function useCharacters(projectId: string) {
     let active = true;
     setCharacters([]);
     setReferences([]);
+    setReferenceAssets([]);
+    setAssetDerivations([]);
     setError(null);
     setBusy(true);
-    void (async () => {
-      const loaded = await api.listCharacters(projectId);
-      const referenceResults = await Promise.allSettled(loaded.map((character) =>
-        api.listCharacterReferences(projectId, character.id)));
-      const loadedReferences = referenceResults.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value : []);
-      const referenceError = referenceResults.find(
-        (result): result is PromiseRejectedResult => result.status === 'rejected');
-      return { loaded, loadedReferences, referenceError };
-    })().then(
-      ({ loaded, loadedReferences, referenceError }) => {
+    const lease = catalogLoads.acquire(projectId, (signal) =>
+      api.getCharacterCatalog(projectId, signal));
+    void lease.promise.then((catalog) => ({ loaded: catalog.characters,
+      loadedReferences: catalog.references, loadedAssets: catalog.assets,
+      loadedDerivations: catalog.asset_derivations })).then(
+      ({ loaded, loadedReferences, loadedAssets, loadedDerivations }) => {
         if (!active) return;
         setCharacters(loaded);
         setReferences(loadedReferences);
-        setError(referenceError
-          ? `部分角色参考图加载失败 · ${describeError(referenceError.reason)}` : null);
+        setReferenceAssets(loadedAssets);
+        setAssetDerivations(loadedDerivations);
+        setError(null);
         setBusy(false);
       },
       (loadError: unknown) => {
@@ -48,7 +55,7 @@ export function useCharacters(projectId: string) {
         setBusy(false);
       },
     );
-    return () => { active = false; };
+    return () => { active = false; lease.release(); };
   }, [projectId]);
 
   const create = async (input: CreateCharacterInput) => {
@@ -83,5 +90,68 @@ export function useCharacters(projectId: string) {
     }
   };
 
-  return { characters, references, busy, error, create, update };
+  const uploadReference = async (characterId: string, file: File,
+    derivedFrom: string | null = null) => {
+    setBusy(true);
+    try {
+      const result = await api.uploadCharacterReference(
+        projectId, characterId, file, derivedFrom);
+      const catalog = await api.getCharacterCatalog(projectId);
+      setCharacters(catalog.characters);
+      setReferences(catalog.references);
+      setReferenceAssets(catalog.assets);
+      setAssetDerivations(catalog.asset_derivations);
+      setError(null);
+      return result;
+    } catch (operationError) {
+      setError(describeError(operationError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approveReference = async (characterId: string, referenceId: string,
+    makePrimary: boolean) => {
+    setBusy(true);
+    try {
+      const result = await api.approveCharacterReference(
+        projectId, characterId, referenceId, makePrimary);
+      const catalog = await api.getCharacterCatalog(projectId);
+      setCharacters(catalog.characters);
+      setReferences(catalog.references);
+      setReferenceAssets(catalog.assets);
+      setAssetDerivations(catalog.asset_derivations);
+      setError(null);
+      return result;
+    } catch (operationError) {
+      setError(describeError(operationError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const archiveReference = async (assetId: string) => {
+    setBusy(true);
+    try {
+      await api.archiveCharacterReferenceAsset(projectId, assetId);
+      const catalog = await api.getCharacterCatalog(projectId);
+      setCharacters(catalog.characters);
+      setReferences(catalog.references);
+      setReferenceAssets(catalog.assets);
+      setAssetDerivations(catalog.asset_derivations);
+      setError(null);
+      return true;
+    } catch (operationError) {
+      setError(describeError(operationError));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { characters, references, referenceAssets, assetDerivations,
+    busy, error, create, update,
+    uploadReference, approveReference, archiveReference };
 }

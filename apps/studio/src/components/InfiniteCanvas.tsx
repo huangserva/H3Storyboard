@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CharacterReference, GenerationPreflight, ProjectSnapshot, ShotPlan,
+import type { Asset, GenerationPreflight, ProjectSnapshot, ShotPlan,
   UpdateCanvasNodeInput } from '@h3storyboard/protocol';
 import { buildStoryboardGraph } from '../lib/storyboard-graph.js';
+import { selectApprovedRootReferences } from
+  '../lib/production-board-selectors.js';
 import { useCanvasNodes } from '../lib/use-canvas-nodes.js';
 import { useCharacters } from '../lib/use-characters.js';
 import { AssetLibraryPanel } from './AssetLibraryPanel.js';
@@ -35,29 +37,26 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
   const { nodes: canvasNodes, loading, error, persistNode, placeCharacter } =
     useCanvasNodes(snapshot);
   const characterStore = useCharacters(snapshot.project.id);
-  const graph = useMemo(() => buildStoryboardGraph({ snapshot, canvasNodes,
-    characters: characterStore.characters }),
-  [canvasNodes, characterStore.characters, snapshot]);
+  const assets = useMemo(() => mergeAssets(
+    snapshot.assets, characterStore.referenceAssets),
+  [snapshot.assets, characterStore.referenceAssets]);
+  const graphSnapshot = useMemo(() => ({ ...snapshot, assets }), [assets, snapshot]);
+  const graph = useMemo(() => buildStoryboardGraph({ snapshot: graphSnapshot,
+    canvasNodes, characters: characterStore.characters,
+    characterReferences: characterStore.references,
+    characterAssetDerivations: characterStore.assetDerivations }),
+  [canvasNodes, characterStore.assetDerivations, characterStore.characters,
+    characterStore.references, graphSnapshot]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     selectedShotId ? `shot:${selectedShotId}` : null);
   const [lightboxAssetId, setLightboxAssetId] = useState<string | null>(null);
-  const characterReferences = useMemo(() => {
-    const approvedAssets = new Set(snapshot.assets.filter(
-      ({ status }) => status === 'approved').map(({ id }) => id));
-    const selected = new Map<string, CharacterReference>();
-    for (const reference of [...characterStore.references].sort(
-      (left, right) => left.sort_order - right.sort_order)) {
-      if (reference.kind !== 'image' || !reference.asset_id ||
-        !approvedAssets.has(reference.asset_id) || selected.has(reference.character_id)) continue;
-      selected.set(reference.character_id, reference);
-    }
-    return selected;
-  }, [characterStore.references, snapshot.assets]);
+  const characterReferences = useMemo(() => selectApprovedRootReferences(
+    assets, characterStore.references), [assets, characterStore.references]);
   const selectedNode = graph.nodes.find(({ id }) => id === selectedNodeId) ?? null;
   const selectedCharacterReference = selectedNode?.character
     ? characterReferences.get(selectedNode.character.id) ?? null : null;
   const lightboxAsset = lightboxAssetId
-    ? snapshot.assets.find(({ id }) => id === lightboxAssetId) ?? null : null;
+    ? assets.find(({ id }) => id === lightboxAssetId) ?? null : null;
 
   useEffect(() => {
     if (!selectedShotId) return;
@@ -80,7 +79,7 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
 
   return <div className="canvas-layout">
     <AssetLibraryPanel projectId={snapshot.project.id} />
-    <StoryboardFlow key={snapshot.project.id} graph={graph} snapshot={snapshot}
+    <StoryboardFlow key={snapshot.project.id} graph={graph} snapshot={graphSnapshot}
       selectedNodeId={selectedNodeId} busy={busy} loading={loading} error={error}
       focusRevision={shotFocusRevision}
       preflights={preflights} characterReferences={characterReferences}
@@ -89,7 +88,8 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
       onSelect={(node) => { setSelectedNodeId(node?.id ?? null);
         if (node?.shot_id) onSelectShot(node.shot_id); }} />
     <div className="canvas-right-rail">
-      <CanvasInspectorPanel node={selectedNode} snapshot={snapshot} busy={busy}
+      <CanvasInspectorPanel node={selectedNode} snapshot={graphSnapshot} assets={assets}
+        busy={busy}
         characterReference={selectedCharacterReference}
         onOpenMedia={setLightboxAssetId} onReviewActual={onReviewActual}
         onMarkRepresentative={onMarkRepresentative}
@@ -104,4 +104,10 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
     {lightboxAsset ? <MediaLightbox asset={lightboxAsset}
       onClose={() => setLightboxAssetId(null)} /> : null}
   </div>;
+}
+
+function mergeAssets(snapshotAssets: Asset[], referenceAssets: Asset[]): Asset[] {
+  const byId = new Map(snapshotAssets.map((asset) => [asset.id, asset]));
+  for (const asset of referenceAssets) byId.set(asset.id, asset);
+  return [...byId.values()];
 }

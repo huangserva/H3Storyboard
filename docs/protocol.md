@@ -1,6 +1,6 @@
-# Protocol 1.5
+# Protocol 1.6
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.5 keeps the Protocol 1.4 H3-only final-audio policy and adds project-level batch contracts for idempotent canvas bootstrap and generation preflight reads.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.6 keeps the Protocol 1.5 batch canvas/preflight contracts and H3-only final-audio policy, and adds the project character catalog plus durable candidate upload, approval, and image-derivation contracts.
 
 ## Project lineage
 
@@ -89,9 +89,12 @@ Worker failures persist stable `H3_WORKER_*` or `H3_COMFY_*` codes. Input mode/s
 | `status` | `candidate | approved | archived` |
 | `created_at`, `updated_at` | ISO timestamps |
 
-`CharacterReference` stores `character_id`, nullable `asset_id`, compatible `uri`, media `kind`, nullable `content_hash`, nullable self-reference `derived_from`, `sort_order`, and timestamps. Derived references must remain in the same project and character lineage. Archived characters are immutable. During binding compilation, a character target resolves to the first reference by `sort_order` whose linked asset is both approved and present in the frozen manifest.
+`CharacterReference` stores `character_id`, nullable `asset_id`, compatible `uri`, media `kind`, nullable `content_hash`, nullable self-reference `derived_from`, `sort_order`, and timestamps. Derived references must remain in the same project and character lineage and can never occupy root slot `sort_order=0`. Archived characters are immutable. During binding compilation, a character target resolves to the first root mother-image reference by `sort_order` whose linked image asset is both approved and present in the frozen manifest; a derived angle is never promoted as fallback identity.
 
-Routes: `GET|POST|PATCH /api/projects/:project_id/characters` and `GET|POST|PATCH /api/projects/:project_id/characters/:character_id/references`.
+Routes: `GET|POST|PATCH /api/projects/:project_id/characters`, `GET /api/projects/:project_id/character_catalog`, `GET|POST|PATCH /api/projects/:project_id/characters/:character_id/references`, raw-image `POST /api/projects/:project_id/characters/:character_id/reference_uploads`, and transactional `POST /api/projects/:project_id/characters/:character_id/references/:reference_id/approve`.
+
+Protocol 1.6 adds the project-scoped character catalog, persistent uploaded reference assets, idempotent upload receipts, explicit candidate approval, and asset-level multi-angle derivation lineage. A derived upload is accepted only when its source is an approved image-backed reference in the same character.
+Uploaded reference content and lineage are immutable after registration; only display ordering may change. Root mother images may be promoted with `make_primary=true`; derived angle images are approved with `make_primary=false` so subsequent angles continue to derive from the canonical root rather than from another angle.
 
 ## Asset lifecycle and current-assets manifest
 

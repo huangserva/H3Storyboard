@@ -2,12 +2,9 @@ import type {
   Asset,
   CanvasNode,
   Character,
-  H3Job,
-  Project,
+  CharacterAssetDerivation,
+  CharacterReference,
   ProjectSnapshot,
-  ScriptVersion,
-  ShotActual,
-  ShotPlan,
 } from '@h3storyboard/protocol';
 import {
   appendShotLineage,
@@ -15,65 +12,38 @@ import {
   normalizedShotLayout,
   scriptNode,
 } from './storyboard-lineage.js';
-export type StoryboardNodeKind =
-  | 'script' | 'scene' | 'asset' | 'character' | 'shot' | 'job' | 'take';
-export type StoryboardEdgeKind =
-  | 'structure' | 'reference' | 'identity' | 'generation' | 'output' | 'continuity';
-interface ViewNodeBase {
-  id: string;
-  kind: StoryboardNodeKind;
-  entity_id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  z_index: number;
-  persisted_node_id: string | null;
-  title: string;
-  kicker: string;
-  summary: string;
-  status: string;
-  approved: boolean;
-  preview_asset_id: string | null;
-  shot_id: string | null;
-}
-export type StoryboardViewNode = ViewNodeBase & {
-  project?: Project;
-  script?: ScriptVersion;
-  scene_id?: string;
-  asset?: Asset;
-  asset_role?: 'reference' | 'output';
-  preview_asset?: Asset | null;
-  character?: Character;
-  shot?: ShotPlan;
-  shot_jobs?: H3Job[];
-  shot_actuals?: ShotActual[];
-  job?: H3Job;
-  take?: ShotActual;
-};
-
-export interface StoryboardViewEdge {
-  id: string;
-  source: string;
-  target: string;
-  kind: StoryboardEdgeKind;
-  label: string;
-  animated: boolean;
-}
-
-export interface StoryboardGraph {
-  nodes: StoryboardViewNode[];
-  edges: StoryboardViewEdge[];
-}
+import type {
+  StoryboardGraph,
+  StoryboardViewEdge,
+  StoryboardViewNode,
+} from './storyboard-graph-types.js';
+import {
+  appendCharacterNodes,
+  appendCharacterAssetDerivationEdges,
+  appendCharacterReferenceEdges,
+  appendRelationshipEdges,
+  appendSceneNodes,
+  groupBy,
+} from './storyboard-structure.js';
+export type {
+  StoryboardEdgeKind,
+  StoryboardGraph,
+  StoryboardNodeKind,
+  StoryboardViewEdge,
+  StoryboardViewNode,
+} from './storyboard-graph-types.js';
 
 interface BuildGraphInput {
   snapshot: ProjectSnapshot;
   canvasNodes: CanvasNode[];
   characters: Character[];
+  characterReferences?: CharacterReference[];
+  characterAssetDerivations?: CharacterAssetDerivation[];
 }
 
 export function buildStoryboardGraph({ snapshot, canvasNodes,
-  characters }: BuildGraphInput): StoryboardGraph {
+  characters, characterReferences = [],
+  characterAssetDerivations = [] }: BuildGraphInput): StoryboardGraph {
   const nodes: StoryboardViewNode[] = [];
   const edges: StoryboardViewEdge[] = [];
   const layoutByRef = new Map(canvasNodes.map((node) => [node.ref_id, node]));
@@ -117,6 +87,9 @@ export function buildStoryboardGraph({ snapshot, canvasNodes,
       referencedAssets.add(dependency.reference_asset_id);
     }
   }
+  for (const reference of characterReferences) {
+    if (reference.asset_id) referencedAssets.add(reference.asset_id);
+  }
   for (const persisted of canvasNodes.filter(
     ({ node_type }) => node_type === 'character')) {
     referencedCharacters.add(persisted.ref_id);
@@ -152,98 +125,9 @@ export function buildStoryboardGraph({ snapshot, canvasNodes,
 
   appendRelationshipEdges(edges, snapshot,
     new Set(nodes.map(({ id }) => id)));
+  appendCharacterReferenceEdges(edges, characterReferences,
+    new Set(nodes.map(({ id }) => id)));
+  appendCharacterAssetDerivationEdges(edges, characterAssetDerivations,
+    new Set(nodes.map(({ id }) => id)));
   return { nodes, edges };
-}
-
-function appendSceneNodes(nodes: StoryboardViewNode[], edges: StoryboardViewEdge[],
-  snapshot: ProjectSnapshot, shotLayouts: Map<string, CanvasNode>): void {
-  for (const [sceneId, shots] of groupShotsByScene(snapshot.shot_plans)) {
-    const layouts = shots.map((shot) => normalizedShotLayout(shotLayouts.get(shot.id)!));
-    const x = Math.min(...layouts.map((node) => node.x)) - 30;
-    const y = Math.min(...layouts.map((node) => node.y)) - 64;
-    const right = Math.max(...layouts.map((node) => node.x + node.width));
-    const bottom = Math.max(...layouts.map((node) => node.y + node.height));
-    nodes.push({ id: `scene:${sceneId}`, kind: 'scene', entity_id: sceneId,
-      x, y, width: right - x + 30, height: bottom - y + 30, z_index: -10,
-      persisted_node_id: null, title: sceneId, kicker: 'SCENE GROUP',
-      summary: `${shots.length} SHOTS`, status: 'planned', approved: false,
-      preview_asset_id: null, shot_id: null, scene_id: sceneId });
-    edges.push(edge(`edge:script:${snapshot.script_version.id}:scene:${sceneId}`,
-      `script:${snapshot.script_version.id}`, `scene:${sceneId}`, 'structure', '场景'));
-  }
-}
-
-function appendCharacterNodes(nodes: StoryboardViewNode[], canvasNodes: CanvasNode[],
-  referencedIds: Set<string>, characterById: Map<string, Character>,
-  minX: number, minY: number): void {
-  const layoutByRef = new Map(canvasNodes.map((node) => [node.ref_id, node]));
-  let index = 0;
-  for (const characterId of referencedIds) {
-    const character = characterById.get(characterId);
-    if (!character) continue;
-    const layout = layoutByRef.get(character.id);
-    nodes.push({ id: `character:${character.id}`, kind: 'character',
-      entity_id: character.id, x: layout?.x ?? minX - 700,
-      y: layout?.y ?? minY + index * 240, width: Math.max(layout?.width ?? 0, 230),
-      height: Math.max(layout?.height ?? 0, 210), z_index: layout?.z_index ?? 1,
-      persisted_node_id: layout?.id ?? null, title: character.name,
-      kicker: 'CHARACTER BIBLE', summary: character.canonical_appearance,
-      status: character.status, approved: character.status === 'approved',
-      preview_asset_id: null, shot_id: null, character });
-    index += 1;
-  }
-}
-
-function appendRelationshipEdges(edges: StoryboardViewEdge[], snapshot: ProjectSnapshot,
-  renderedNodeIds: Set<string>): void {
-  for (const shot of snapshot.shot_plans) {
-    edges.push(edge(`edge:scene:${shot.scene_id}:shot:${shot.id}`,
-      `scene:${shot.scene_id}`, `shot:${shot.id}`, 'structure', '镜头'));
-    shot.semantic_references.forEach((reference, index) => {
-      const target = reference.target;
-      const entityId = target.type === 'asset' ? target.asset_id :
-        target.character_id;
-      const prefix = target.type === 'asset' ? 'asset' : 'character';
-      const source = `${prefix}:${entityId}`;
-      if (!renderedNodeIds.has(source)) return;
-      edges.push(edge(`edge:${prefix}:${entityId}:shot:${shot.id}:${index}`,
-        source, `shot:${shot.id}`,
-        target.type === 'asset' ? 'reference' : 'identity', reference.purpose));
-    });
-    shot.continuity_dependencies.forEach((dependency, index) => {
-      const takeSource = `take:${dependency.source_take_id}`;
-      if (renderedNodeIds.has(takeSource)) {
-        edges.push(edge(`edge:continuity:take:${dependency.source_take_id}:shot:${shot.id}:${index}`,
-          takeSource, `shot:${shot.id}`,
-          'continuity', dependency.boundary));
-      }
-      const assetSource = `asset:${dependency.reference_asset_id}`;
-      if (renderedNodeIds.has(assetSource)) {
-        edges.push(edge(`edge:continuity:asset:${dependency.reference_asset_id}:shot:${shot.id}:${index}`,
-          assetSource, `shot:${shot.id}`,
-          'continuity', `${dependency.boundary} 参考帧`));
-      }
-    });
-  }
-}
-
-function groupShotsByScene(shots: ShotPlan[]): Map<string, ShotPlan[]> {
-  return groupBy([...shots].sort((left, right) => left.ordinal - right.ordinal),
-    ({ scene_id }) => scene_id);
-}
-
-function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
-  const groups = new Map<string, T[]>();
-  for (const item of items) {
-    const key = keyOf(item);
-    const group = groups.get(key);
-    if (group) group.push(item);
-    else groups.set(key, [item]);
-  }
-  return groups;
-}
-
-function edge(id: string, source: string, target: string,
-  kind: StoryboardEdgeKind, label: string, animated = false): StoryboardViewEdge {
-  return { id, source, target, kind, label, animated };
 }
