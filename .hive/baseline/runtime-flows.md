@@ -35,3 +35,16 @@ Studio create job -> SQLite immutable draft -> lease worker claim -> ComfyUI
 submit/poll/download -> 同一 immediate transaction 创建 candidate video Asset、
 completed H3Job、pending ShotActual -> Studio snapshot 刷新 -> 显式 QC / 代表 Take。
 最终音频只能是 H3 原始输出音轨或静音。
+
+## Flow 4: 本地画布体验项目
+
+```
+pnpm demo:canvas
+  -> 幂等 seed 独立 canvas-test.db
+  -> 校验 MP4 有 video handler 且无 audio handler
+  -> 用真实 Store 生命周期建立 completed Job / Take / QC
+  -> H3_WORKER=0 启动 API + Studio
+  -> Range 媒体端点 -> 画布卡片 / Inspector / Lightbox
+```
+
+此链路不调用 ComfyUI/4090；两段演示 Take 永远静音。

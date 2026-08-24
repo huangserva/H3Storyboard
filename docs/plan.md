@@ -36,7 +36,14 @@ closes bug findings W1–W10 with migration v15 submit intent, crash recovery,
 lease heartbeat/cancel behavior, attempt-owned output paths, and graph-derived
 capability inventory. A post-fix real i2v run completed end to end on 2026-08-12.
 
-## M2 — multimodal H3
+## M2 — infinite canvas Studio
+
+- [x] P1 React Flow product canvas with Script → Scene → Shot → Job → Asset → Take/QC projection and H3-native-or-silent audio invariant.
+- [x] P1.1 idempotent canvas batch bootstrap and project-level generation preflight; 100 Shot startup remains two requests per tab.
+- [x] P1.2 test-ready real-media canvas: approved character references, exact Job/Asset/Take lineage, lightboxes, Take/QC/representative controls, repeat focus, and an isolated worker-off demo.
+- [ ] P1.3 denser xyz/OiiOii-inspired character, scene, and storyboard presentation; batch character-reference loading and graph-builder split first.
+
+## M3 — multimodal H3
 
 - [ ] `v2v` and `rv2v`.
 - [ ] Video and audio reference slots.

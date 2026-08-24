@@ -18,12 +18,14 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
       job={job} preflight={data.preflight}
       onGenerate={(reason) => data.preflight
         ? data.onGenerate(view.shot!, data.preflight, reason)
-        : Promise.resolve(false)} onSetup={data.onSetup} /></>;
+        : Promise.resolve(false)} onSetup={data.onSetup}
+      onOpenMedia={data.onOpenMedia} /></>;
   }
 
   if (view.kind === 'character' && view.character) {
     return <>{handles}<CanvasCharacterCard character={view.character}
-      selected={selected} /></>;
+      reference={data.characterReference} selected={selected}
+      onOpenMedia={data.onOpenMedia} /></>;
   }
 
   if (view.kind === 'scene') {
@@ -32,15 +34,18 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
     </section></>;
   }
 
-  const preview = view.preview_asset ?? null;
+  const preview = view.preview_asset?.kind === 'image' ||
+    view.preview_asset?.kind === 'video' ? view.preview_asset : null;
   return <>{handles}<article className="flow-entity-node" data-kind={view.kind}
     data-status={view.status} data-selected={selected}>
     <header><span>{view.kicker}</span><i>{view.status}</i></header>
-    {preview ? <div className="flow-entity-preview">
+    {preview ? <div className="flow-entity-preview"><button
+      aria-label={`打开 ${preview.name}`} className="canvas-media-trigger nodrag nopan"
+      onClick={() => data.onOpenMedia(preview.id)} type="button">
       {preview.kind === 'image' ? <img alt="" loading="lazy"
-        src={assetFileUrl(preview.id)} /> : preview.kind === 'video'
-        ? <video muted playsInline preload="metadata" src={assetFileUrl(preview.id)} />
-        : null}
+        src={assetFileUrl(preview.id)} />
+        : <video muted playsInline preload="metadata" src={assetFileUrl(preview.id)} />}
+      </button>
     </div> : null}
     <h3>{view.title}</h3>
     <p>{view.summary}</p>

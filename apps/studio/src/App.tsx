@@ -12,6 +12,7 @@ export function App() {
   const [projectComposerOpen, setProjectComposerOpen] = useState(false);
   const [shotComposerOpen, setShotComposerOpen] = useState(false);
   const [modesOpen, setModesOpen] = useState(false);
+  const [shotFocusRevision, setShotFocusRevision] = useState(0);
   const suggestedScene =
     studio.selectedShot?.scene_id ?? studio.snapshot?.shot_plans.at(-1)?.scene_id ?? 'SCENE-01';
 
@@ -28,7 +29,10 @@ export function App() {
         <ProjectRail
           busy={studio.busy}
           onSelectProject={(id) => void studio.selectProject(id)}
-          onSelectShot={studio.selectShot}
+          onSelectShot={(id) => {
+            studio.selectShot(id);
+            setShotFocusRevision((value) => value + 1);
+          }}
           projects={studio.projects}
           selectedShotId={studio.selectedShotId}
           snapshot={studio.snapshot}
@@ -43,6 +47,7 @@ export function App() {
           onReviewActual={studio.reviewActual}
           onGenerate={studio.generate}
           selectedShot={studio.selectedShot}
+          shotFocusRevision={shotFocusRevision}
           snapshot={studio.snapshot}
         />
       </main>

@@ -47,7 +47,8 @@ last_review: 2026-08-24
 - [x] 双击节点聚焦、原点复位、拖拽提升并持久化 z-index
 - [x] Actual 面板可切换并内嵌播放同镜真实 Take（Range 流式媒体端点），资产库图片可预览，pending QC 操作可见
 - [x] 画布视觉整改：两侧资产/角色面板改独立占位且默认折叠；分镜卡显示 Take 首帧或真实 first_frame；缺文件缩略图显示稳定占位
-- [ ] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P0 方案见 2026-08-13 OiiOii 调研；其中生成/新 Take、preflight 提示、per-job 进度与完成后 Take 自动刷新已于 2026-08-14 实质落地，待质量门与四路 review 后勾选；inspector 等其余 P0 范围仍待 user 拍板）
+- [x] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P1.2 已用真实媒体 fixture、精确 Job→Asset→Take 血缘和浏览器穿透收口）
+- [x] P1.2 可测试画布：真实角色参考、两条可解码静音 MP4、媒体 lightbox、Take/QC/代表片、同镜重复聚焦、幂等离线 demo；`H3_WORKER=0`，不访问 4090
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列
@@ -68,7 +69,7 @@ last_review: 2026-08-24
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M2 — P1/P1.1 已完成并通过质量门；下一步是 P1.2 真实媒体浏览器 fixture 与 P1.3 更高密度卡内操作。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+M2 — P1/P1.1/P1.2 已完成并通过质量门，当前画布可直接本地体验；下一步是 P1.3 更高密度角色/场景/分镜展示与批量角色参考 API。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
@@ -113,7 +114,7 @@ M2 — P1/P1.1 已完成并通过质量门；下一步是 P1.2 真实媒体浏�
 - 调研双产出：`research/2026-08-11-comfyui-h3-adapter-contract.md` + `reports/2026-08-11-comfyui-h3-adapter-contract.html`。
 
 ## 2026-08-11 M1B-2 H3 lease worker 交付状态
-- commit `dbc2559`：`task-engine` 新增接口驱动的 H3 worker；API 仅在 `H3_WORKER=1` 时装配，默认关闭。
+- commit `dbc2559`：`task-engine` 新增接口驱动的 H3 worker；该提交最初为 opt-in。2026-08-14 的 runtime 决策已改为默认装配，只有显式 `H3_WORKER=0` 才关闭。
 - submit 后先持久化既有 `provider_job_id`；过期 lease reclaim 保留并继续 poll 同一 task。migration v14 只补 `cancel_reason`，不重复已有 task/output 列。
 - 下载非空 → 项目相对路径落盘 → 真实 sha256 → candidate canonical asset → pending take → completed job；三条 DB 记录在一个 immediate transaction 内可见。
 - 真实 HTTP stub + SQLite 覆盖成功、恢复零重提交、零字节失败无半成品、hash、取消原因；Protocol 升至 1.2，Studio task drawer 显示 worker/job/provider task 状态。
@@ -154,3 +155,10 @@ M2 — P1/P1.1 已完成并通过质量门；下一步是 P1.2 真实媒体浏�
 - preflight 在一个一致性读事务内复用 project/brief/lock/manifest/asset/character context，按 Shot ordinal 返回；Studio 首载与 StrictMode replay 共用请求，项目切换会终止旧请求。
 - `pnpm check && pnpm build && pnpm test` 全绿：Vitest 124 passed / 1 skipped，Playwright 5 passed。四路最终评分 A=B-、B=B-、C=B+、D=A，无严重项遗留。
 - 证据双产出：`research/2026-08-24-p11-batch-canvas-preflight.md` + `reports/2026-08-24-p11-batch-canvas-preflight.html`。
+
+## 2026-08-24 M2 P1.2 可测试画布交付状态
+- `pnpm demo:canvas` 幂等创建独立 `canvas-test.db`，真实 Store 生命周期形成 3 个 Plan、2 个 completed Job、2 个独立 Take；两段 MP4 为真实可解码视频且无音轨。
+- Character approved reference、Job→output Asset→Take、Inspector、lightbox、Take/QC/代表片与刷新持久化已进入同一 React Flow 画布；计划分镜不会被实测结果覆盖。
+- Demo 强制 `H3_WORKER=0` 且忽略继承的 `H3_STORYBOARD_DB`；production-start 测试用 ComfyUI sentinel 证明零请求。媒体 Range、symlink containment、中断流 FD 释放均有真 HTTP + SQLite 回归。
+- `pnpm check && pnpm build && pnpm test` 全绿：Vitest 133 passed / 1 skipped，Playwright 8 passed。四路最终评分 A=B+、B=B+、C=B+、D=A-，无严重项或 M+1 blocker。
+- 证据双产出：`research/2026-08-24-p12-canvas-test-ready.md` + `reports/2026-08-24-p12-canvas-test-ready.html`。

@@ -14,6 +14,7 @@ interface CanvasShotCardProps {
   preflight: GenerationPreflight | null;
   onGenerate: (reason: string | null) => Promise<boolean>;
   onSetup: () => void;
+  onOpenMedia: (assetId: string) => void;
 }
 
 export function CanvasShotCard({
@@ -27,6 +28,7 @@ export function CanvasShotCard({
   preflight,
   onGenerate,
   onSetup,
+  onOpenMedia,
 }: CanvasShotCardProps) {
   const latestActual = actuals.filter(({ qc_verdict }) => qc_verdict !== 'rejected')
     .reduce<ShotActual | null>(
@@ -45,10 +47,15 @@ export function CanvasShotCard({
         <span>SHOT {String(shot.ordinal).padStart(2, '0')}</span>
         <i data-compile-ready={compileReady}>{compileReady ? '可编译' : '缺输入'}</i>
       </header>
-      <div className="canvas-card-frame" aria-hidden="true">
-        {previewAsset?.kind === 'video' ? <video muted playsInline preload="metadata"
-          src={assetFileUrl(previewAsset.id)} /> : previewAsset?.kind === 'image'
-          ? <img alt="" loading="lazy" src={assetFileUrl(previewAsset.id)} /> : null}
+      <div className="canvas-card-frame">
+        {previewAsset && previewAsset.kind !== 'audio'
+          ? <button aria-label={`打开 ${previewAsset.name}`}
+          className="canvas-media-trigger nodrag nopan"
+          onClick={() => onOpenMedia(previewAsset.id)} type="button">
+          {previewAsset.kind === 'video' ? <video muted playsInline preload="metadata"
+            src={assetFileUrl(previewAsset.id)} />
+            : <img alt="" loading="lazy" src={assetFileUrl(previewAsset.id)} />}
+          </button> : null}
         <b>{shot.shot_size}</b>
         <span>{shot.duration_seconds}s</span>
       </div>

@@ -1,7 +1,7 @@
 import type { ProjectStore } from '@h3storyboard/project-store';
 import { RelativeAssetPathSchema } from '@h3storyboard/protocol';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { ApiError } from './api-error.js';
@@ -21,12 +21,21 @@ export async function serveMediaRoute(request: IncomingMessage,
   if (!parsed.success) throw invalidPath(assetId);
   const filePath = resolve(root, parsed.data);
   if (!filePath.startsWith(`${root}${sep}`)) throw invalidPath(assetId);
+  let canonicalPath: string;
   let size: number;
   try {
-    const info = await stat(filePath);
+    const [canonicalRoot, resolvedFile] = await Promise.all([
+      realpath(root), realpath(filePath),
+    ]);
+    if (!resolvedFile.startsWith(`${canonicalRoot}${sep}`)) {
+      throw invalidPath(assetId);
+    }
+    canonicalPath = resolvedFile;
+    const info = await stat(canonicalPath);
     if (!info.isFile()) throw new Error('not a file');
     size = info.size;
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(404, 'ASSET_FILE_NOT_FOUND',
       'Asset file does not exist on disk', { asset_id: assetId });
   }
@@ -44,7 +53,7 @@ export async function serveMediaRoute(request: IncomingMessage,
     headers['content-length'] = size;
     response.writeHead(200, headers);
   }
-  await pipeFile(filePath, response, range);
+  await pipeFile(canonicalPath, response, range);
   return true;
 }
 
@@ -64,8 +73,25 @@ function pipeFile(path: string, response: ServerResponse,
   range: { start: number; end: number } | null) {
   return new Promise<void>((resolvePipe, reject) => {
     const stream = createReadStream(path, range ?? undefined);
-    stream.once('error', reject);
-    response.once('finish', resolvePipe);
+    let settled = false;
+    const settle = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      stream.removeListener('error', onError);
+      response.removeListener('finish', onFinish);
+      response.removeListener('close', onClose);
+      if (error) reject(error); else resolvePipe();
+    };
+    const onError = (error: Error) => settle(error);
+    const onFinish = () => settle();
+    const onClose = () => {
+      stream.unpipe(response);
+      stream.destroy();
+      settle();
+    };
+    stream.once('error', onError);
+    response.once('finish', onFinish);
+    response.once('close', onClose);
     stream.pipe(response);
   });
 }

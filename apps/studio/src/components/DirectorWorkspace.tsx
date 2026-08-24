@@ -17,6 +17,7 @@ const ProductionBriefPanel = lazy(async () => {
 interface DirectorWorkspaceProps {
   snapshot: ProjectSnapshot | null;
   selectedShot: ShotPlan | null;
+  shotFocusRevision: number;
   busy: boolean;
   onNewShot: () => void;
   onSelectShot: (id: string) => void;
@@ -33,6 +34,7 @@ interface DirectorWorkspaceProps {
 export function DirectorWorkspace({
   snapshot,
   selectedShot,
+  shotFocusRevision,
   busy,
   onNewShot,
   onSelectShot,
@@ -58,9 +60,11 @@ export function DirectorWorkspace({
   );
   const displayedActual = actuals.find(({ id }) => id === selectedActualId)
     ?? currentActual;
-  const displayedJob = (snapshot?.h3_jobs ?? []).filter(
-    ({ shot_plan_id }) => shot_plan_id === selectedShot?.id,
-  ).at(-1) ?? null;
+  const shotJobs = (snapshot?.h3_jobs ?? []).filter(
+    ({ shot_plan_id }) => shot_plan_id === selectedShot?.id);
+  const displayedJob = displayedActual
+    ? shotJobs.find(({ id }) => id === displayedActual.job_id) ?? null
+    : shotJobs.at(-1) ?? null;
   const outputAsset = snapshot?.assets.find(
     ({ id }) => id === displayedActual?.output_asset_id) ?? null;
 
@@ -104,8 +108,12 @@ export function DirectorWorkspace({
       {view === 'canvas' ? (
         <InfiniteCanvas busy={busy} onNewShot={onNewShot} onSelectShot={onSelectShot}
           selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
+          shotFocusRevision={shotFocusRevision}
           preflights={preflights} onGenerate={onGenerate}
-          onSetup={() => setProductionOpen(true)} />
+          onSetup={() => setProductionOpen(true)}
+          onReviewActual={onReviewActual}
+          onMarkRepresentative={onMarkRepresentative}
+          onReviewRepresentative={onReviewRepresentative} />
       ) : <div className="director-grid">
         <div className="comparison-grid">
           <PlannedShotPanel busy={busy} shot={selectedShot}

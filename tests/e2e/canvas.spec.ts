@@ -52,6 +52,47 @@ test.describe.serial('React Flow storyboard canvas', () => {
       }).toBeLessThan(0.01);
     });
 
+  test('replays an exact rail focus requested while a drag is persisting',
+    async ({ page }) => {
+      await openProject(page);
+      const patchStarted = deferred();
+      const releasePatch = deferred();
+      let heldPatch = false;
+      await page.route('**/api/projects/*/canvas_nodes', async (route) => {
+        const outgoing = route.request();
+        if (!heldPatch && outgoing.method() === 'PATCH' &&
+          outgoing.url().includes(`/projects/${projectId}/`)) {
+          heldPatch = true;
+          patchStarted.resolve();
+          await releasePatch.promise;
+        }
+        await route.continue();
+      });
+
+      try {
+        const viewport = page.locator('.react-flow__viewport');
+        const focusedTransform = await viewport.getAttribute('style');
+        await dragBy(page, shotNode(page), 64, 42);
+        await patchStarted.promise;
+        await page.getByRole('button', { name: 'Fit View' }).click();
+        await expect.poll(() => viewport.getAttribute('style'))
+          .not.toBe(focusedTransform);
+        const overviewTransform = await viewport.getAttribute('style');
+
+        await page.getByRole('button', { name: /01 雨夜相遇/ }).click();
+        await page.evaluate(() => new Promise<void>((resolveFrame) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame()))));
+        expect(await viewport.getAttribute('style')).toBe(overviewTransform);
+
+        releasePatch.resolve();
+        await expect.poll(() => viewport.getAttribute('style'))
+          .not.toBe(overviewTransform);
+      } finally {
+        releasePatch.resolve();
+        await page.unrouteAll({ behavior: 'wait' });
+      }
+    });
+
   test('shows a real persistence error and rolls the failed drag back',
     async ({ page }) => {
       await openProject(page);

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  CharacterReference,
   GenerationPreflight,
   ProjectSnapshot,
   ShotPlan,
@@ -13,6 +14,7 @@ import {
   MiniMap,
   Panel,
   ReactFlow,
+  type ReactFlowInstance,
   useNodesState,
   type Edge,
   type NodeMouseHandler,
@@ -29,23 +31,26 @@ interface StoryboardFlowProps {
   graph: StoryboardGraph;
   snapshot: ProjectSnapshot;
   selectedNodeId: string | null;
+  focusRevision: number;
   busy: boolean;
   loading: boolean;
   error: string | null;
   preflights: Map<string, GenerationPreflight>;
+  characterReferences: Map<string, CharacterReference>;
   onNewShot: () => void;
   onSelect: (node: StoryboardViewNode | null) => void;
   onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
     reason: string | null) => Promise<boolean>;
   onSetup: () => void;
+  onOpenMedia: (assetId: string) => void;
   onPersist: (input: UpdateCanvasNodeInput) => Promise<void>;
 }
 
 const nodeTypes = { storyboard: CanvasFlowNode };
 
 export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
-  loading, error, preflights, onNewShot, onSelect, onGenerate, onSetup,
-  onPersist }: StoryboardFlowProps) {
+  focusRevision, loading, error, preflights, characterReferences, onNewShot, onSelect,
+  onGenerate, onSetup, onOpenMedia, onPersist }: StoryboardFlowProps) {
   const projectedNodes = useMemo(() => graph.nodes.map((view): StoryboardFlowNode => ({
     id: view.id,
     type: 'storyboard',
@@ -61,10 +66,18 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
     ariaLabel: `${view.kicker}: ${view.title}`,
     data: { view, busy,
       preflight: view.shot_id ? preflights.get(view.shot_id) ?? null : null,
-      onGenerate, onSetup },
-  })), [busy, graph.nodes, onGenerate, onSetup, preflights, selectedNodeId]);
+      characterReference: view.kind === 'character'
+        ? characterReferences.get(view.entity_id) ?? null : null,
+      onGenerate, onSetup, onOpenMedia },
+  })), [busy, characterReferences, graph.nodes, onGenerate, onOpenMedia,
+    onSetup, preflights, selectedNodeId]);
   const [nodes, setNodes, onNodesChange] = useNodesState(projectedNodes);
+  const [fitRevision, setFitRevision] = useState(0);
   const edges = useMemo(() => graph.edges.map(toFlowEdge), [graph.edges]);
+  const flowInstance = useRef<ReactFlowInstance<StoryboardFlowNode, Edge> | null>(
+    null);
+  const fittedTarget = useRef('');
+  const pendingFit = useRef(false);
   const dragSessions = useRef(new Map<string, number>());
   const dragStartPositions = useRef(new Map<string, { x: number; y: number }>());
   const nextDragSession = useRef(0);
@@ -80,12 +93,34 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
     });
   }), [projectedNodes, setNodes]);
 
+  useEffect(() => {
+    if (loading || graph.nodes.length === 0) return;
+    const target = `${graph.nodes.length}:${selectedNodeId ?? 'overview'}:${focusRevision}`;
+    if (fittedTarget.current === target) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (dragSessions.current.size > 0) {
+        pendingFit.current = true;
+        return;
+      }
+      fittedTarget.current = target;
+      pendingFit.current = false;
+      const instance = flowInstance.current;
+      const selected = selectedNodeId ? instance?.getNode(selectedNodeId) : null;
+      void instance?.fitView(selected ? { nodes: [selected], padding: 0.4,
+        minZoom: 0.72, maxZoom: 1.05, duration: 0 } : {
+        padding: 0.12, minZoom: 0.18, maxZoom: 0.9, duration: 220,
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitRevision, focusRevision, graph.nodes.length, loading, selectedNodeId]);
+
   const onNodeClick: NodeMouseHandler<StoryboardFlowNode> = (_event, node) => {
     onSelect(node.data.view);
   };
 
   return <div className="storyboard-flow" data-empty={graph.nodes.length <= 1}>
     <ReactFlow<StoryboardFlowNode, Edge> nodes={nodes} edges={edges}
+      onInit={(instance) => { flowInstance.current = instance; }}
       nodeTypes={nodeTypes} onNodesChange={onNodesChange}
       onNodeClick={onNodeClick} onPaneClick={() => onSelect(null)}
       onNodeDragStart={(_event, node) => {
@@ -113,9 +148,10 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
             if (dragSessions.current.get(node.id) !== session) return;
             dragSessions.current.delete(node.id);
             dragStartPositions.current.delete(node.id);
+            if (pendingFit.current) setFitRevision((value) => value + 1);
           });
       }}
-      fitView fitViewOptions={{ padding: 0.12, minZoom: 0.52, maxZoom: 0.9 }}
+      fitView fitViewOptions={{ padding: 0.12, minZoom: 0.18, maxZoom: 0.9 }}
       minZoom={0.18} maxZoom={2.4} onlyRenderVisibleElements
       nodesConnectable={false} edgesReconnectable={false}
       deleteKeyCode={null} selectionKeyCode={null}

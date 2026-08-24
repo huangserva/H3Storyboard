@@ -111,7 +111,8 @@ export class ProjectStore {
   createProject(input: CreateProjectInput): Project {
     return createProject(this.#database, input);
   }
-
+  runImmediate<T>(operation: () => T): T {
+    return this.#database.transaction(operation).immediate(); }
   listProjects(): Project[] {
     return listProjects(this.#database);
   }

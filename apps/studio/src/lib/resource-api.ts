@@ -1,6 +1,7 @@
 import { BatchUpsertCanvasNodesResultSchema } from '@h3storyboard/protocol';
 import type { Asset, BatchUpsertCanvasNodesInput,
-  BatchUpsertCanvasNodesResult, CanvasNode, Character, CreateAssetInput,
+  BatchUpsertCanvasNodesResult, CanvasNode, Character, CharacterReference,
+  CreateAssetInput,
   CreateCanvasNodeInput, CreateCharacterInput, CurrentAssetsManifestSnapshot,
   UpdateAssetInput, UpdateCanvasNodeInput, UpdateCharacterInput,
 } from '@h3storyboard/protocol';
@@ -45,6 +46,11 @@ export async function updateCharacter(projectId: string,
   return request<Character>(`/api/projects/${projectId}/characters`, {
     method: 'PATCH', body: JSON.stringify(input),
   });
+}
+export async function listCharacterReferences(projectId: string,
+  characterId: string): Promise<CharacterReference[]> {
+  return request<CharacterReference[]>(`/api/projects/${encodeURIComponent(projectId)}` +
+    `/characters/${encodeURIComponent(characterId)}/references`);
 }
 export async function listAssets(projectId: string): Promise<Asset[]> {
   return request<Asset[]>(`/api/projects/${projectId}/assets`);

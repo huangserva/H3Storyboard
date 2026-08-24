@@ -19,6 +19,12 @@
 - [x] **全栈工程师2** dispatch `ef22abdf` — 任务：Studio 生成按钮全链路（重派——上一 worker 中途退出，git log 确认零提交落地，从头开始，不要假设有半成品）。
 ## Done
 
+### 2026-08-24 · M2 P1.2 可直接测试画布（done）
+- [x] 真实 approved Character reference 与静音 MP4 fixture；幂等独立 seed，强制 `H3_WORKER=0`，零 4090 请求。
+- [x] Job→output Asset→Take 精确血缘、Inspector/lightbox、Take/QC/代表片与刷新持久化。
+- [x] 真 HTTP + SQLite + Chrome 覆盖媒体解码/Range/中断释放、同镜重选、拖拽中 refocus 与 100 Shot；Vitest 133 passed / 1 skipped，Playwright 8 passed。
+- [x] 架构/bug/测试/spec 四路独立 review 均达到 B- 以上，无严重项。
+
 ### 2026-08-12 · M1B 单镜 H3 闭环（done，commit 4055bc0 收官）
 三种模式（i2v/fl2v/r2v+hybrid）真机证据齐全；四路 review W1–W10 整改闭环，92 tests：
 - [x] M1B-1 ComfyUI contract adapter（e0c4f1c）· M1B-2 lease worker + 完成管线（dbc2559，v14）· M1B-3a 真机 i2v 首跑（3031a56）· M1B-3b HybridLoader + r2v 对照（9aec643）· M1B-4 fl2v（545fc5a）· review 整改 W1–W10（4055bc0，v15）

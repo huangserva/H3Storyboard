@@ -11,6 +11,7 @@ import './styles/drawers.css';
 import './styles/overlays.css';
 import './styles/responsive.css';
 import './styles/canvas.css';
+import './styles/canvas-media.css';
 import './styles/characters.css';
 import './styles/assets.css';
 import './styles/modes.css';

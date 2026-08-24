@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type {
   Character,
+  CharacterReference,
   CreateCharacterInput,
   UpdateCharacterInput,
 } from '@h3storyboard/protocol';
@@ -13,16 +14,32 @@ function describeError(error: unknown): string {
 
 export function useCharacters(projectId: string) {
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [references, setReferences] = useState<CharacterReference[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    setCharacters([]);
+    setReferences([]);
+    setError(null);
     setBusy(true);
-    void api.listCharacters(projectId).then(
-      (loaded) => {
+    void (async () => {
+      const loaded = await api.listCharacters(projectId);
+      const referenceResults = await Promise.allSettled(loaded.map((character) =>
+        api.listCharacterReferences(projectId, character.id)));
+      const loadedReferences = referenceResults.flatMap((result) =>
+        result.status === 'fulfilled' ? result.value : []);
+      const referenceError = referenceResults.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected');
+      return { loaded, loadedReferences, referenceError };
+    })().then(
+      ({ loaded, loadedReferences, referenceError }) => {
         if (!active) return;
         setCharacters(loaded);
+        setReferences(loadedReferences);
+        setError(referenceError
+          ? `部分角色参考图加载失败 · ${describeError(referenceError.reason)}` : null);
         setBusy(false);
       },
       (loadError: unknown) => {
@@ -66,5 +83,5 @@ export function useCharacters(projectId: string) {
     }
   };
 
-  return { characters, busy, error, create, update };
+  return { characters, references, busy, error, create, update };
 }

@@ -1,15 +1,47 @@
-import type { ProjectSnapshot } from '@h3storyboard/protocol';
+import { useEffect, useState } from 'react';
+import type { CharacterReference, ProjectSnapshot } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
 import type { StoryboardViewNode } from '../lib/storyboard-graph.js';
+import { CanvasTakeControls } from './CanvasTakeControls.js';
 
 interface CanvasInspectorPanelProps {
   node: StoryboardViewNode | null;
   snapshot: ProjectSnapshot;
+  busy: boolean;
+  characterReference: CharacterReference | null;
+  onOpenMedia: (assetId: string) => void;
+  onReviewActual: (actualId: string,
+    verdict: 'approved' | 'rejected') => Promise<boolean>;
+  onMarkRepresentative: (actualId: string,
+    representative: boolean) => Promise<boolean>;
+  onReviewRepresentative: (actualId: string,
+    status: 'approved' | 'rejected') => Promise<boolean>;
 }
 
-export function CanvasInspectorPanel({ node, snapshot }: CanvasInspectorPanelProps) {
-  const preview = node?.preview_asset_id
-    ? snapshot.assets.find(({ id }) => id === node.preview_asset_id) : null;
+export function CanvasInspectorPanel({ node, snapshot, busy, characterReference,
+  onOpenMedia, onReviewActual, onMarkRepresentative,
+  onReviewRepresentative }: CanvasInspectorPanelProps) {
+  const shotActuals = snapshot.shot_actuals.filter(
+    ({ shot_plan_id }) => shot_plan_id === node?.shot_id,
+  ).sort((left, right) => left.attempt_number - right.attempt_number);
+  const relatedActuals = node?.job
+    ? shotActuals.filter(({ job_id }) => job_id === node.job?.id)
+    : node?.asset_role === 'output' && node.asset
+      ? shotActuals.filter(({ output_asset_id }) => output_asset_id === node.asset?.id)
+      : node?.shot || node?.take ? shotActuals : [];
+  const defaultActual = node?.take ?? relatedActuals.at(-1) ?? null;
+  const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
+  useEffect(() => setSelectedActualId(defaultActual?.id ?? null),
+    [defaultActual?.id, node?.id]);
+  const actual = relatedActuals.find(({ id }) => id === selectedActualId)
+    ?? defaultActual;
+  const previewAssetId = actual?.output_asset_id ?? node?.preview_asset_id
+    ?? characterReference?.asset_id ?? null;
+  const previewCandidate = previewAssetId
+    ? snapshot.assets.find(({ id }) => id === previewAssetId) ?? null : null;
+  const preview = previewCandidate?.kind === 'image' ||
+    previewCandidate?.kind === 'video' ? previewCandidate : null;
+
   return <aside className="canvas-inspector" aria-label="节点详情">
     <header><div><span className="eyebrow">NODE INSPECTOR</span>
       <strong>节点详情</strong></div><span className="audio-policy-badge">H3 AUDIO ONLY</span></header>
@@ -18,9 +50,12 @@ export function CanvasInspectorPanel({ node, snapshot }: CanvasInspectorPanelPro
       <div className="inspector-title"><span>{node.kicker}</span><h2>{node.title}</h2>
         <i data-status={node.status}>{node.status}</i></div>
       {preview ? <div className="inspector-preview">
-        {preview.kind === 'image' ? <img alt={preview.name} src={assetFileUrl(preview.id)} />
-          : preview.kind === 'video' ? <video controls playsInline preload="metadata"
-            src={assetFileUrl(preview.id)} /> : null}
+        {preview.kind === 'image'
+          ? <img alt={preview.name} src={assetFileUrl(preview.id)} />
+          : <video controls playsInline preload="metadata"
+            src={assetFileUrl(preview.id)} />}
+        <button className="inspector-preview-open" onClick={() => onOpenMedia(preview.id)}
+          type="button">全屏查看</button>
       </div> : null}
       <p className="inspector-summary">{node.summary}</p>
       {node.script ? <dl><dt>脚本状态</dt><dd>{node.script.status}</dd>
@@ -30,7 +65,8 @@ export function CanvasInspectorPanel({ node, snapshot }: CanvasInspectorPanelPro
         <dt>景别 / 运镜</dt><dd>{node.shot.shot_size} · {node.shot.camera_movement}</dd>
         <dt>时长</dt><dd>{node.shot.duration_seconds}s</dd>
         <dt>对白</dt><dd>{node.shot.dialogue || '无'}</dd>
-        <dt>声音提示</dt><dd>{node.shot.sound || '无'}<small>仅作剧本记录，不会自动混音</small></dd>
+        <dt>声音提示</dt><dd>{node.shot.sound || '无'}
+          <small>仅作剧本记录，不会自动混音</small></dd>
         <dt>连续性</dt><dd>{node.shot.continuity_mode}</dd></dl> : null}
       {node.asset ? <dl><dt>素材类型</dt><dd>{node.asset.kind}</dd>
         <dt>清单状态</dt><dd>{node.asset.status}</dd>
@@ -44,10 +80,15 @@ export function CanvasInspectorPanel({ node, snapshot }: CanvasInspectorPanelPro
           ? '仅保留 H3 原生输出声音' : '静音'}</dd>
         <dt>Provider ID</dt><dd>{node.job.provider_job_id ?? '尚未提交'}</dd>
         <dt>错误</dt><dd>{node.job.error_code ?? '无'}</dd></dl> : null}
-      {node.take ? <dl><dt>QC</dt><dd>{node.take.qc_verdict}</dd>
-        <dt>代表 Take</dt><dd>{node.take.representative_status}</dd>
-        <dt>实测描述</dt><dd>{node.take.observed_description}</dd>
-        <dt>偏差</dt><dd>{node.take.deviation_notes || '无'}</dd></dl> : null}
+      {actual ? <><dl><dt>当前 Take</dt><dd>TAKE {actual.attempt_number}</dd>
+        <dt>QC</dt><dd>{actual.qc_verdict}</dd>
+        <dt>代表 Take</dt><dd>{actual.representative_status}</dd>
+        <dt>实测描述</dt><dd>{actual.observed_description}</dd>
+        <dt>偏差</dt><dd>{actual.deviation_notes || '无'}</dd></dl>
+        <CanvasTakeControls actual={actual} actuals={relatedActuals} busy={busy}
+          onSelect={setSelectedActualId} onReviewActual={onReviewActual}
+          onMarkRepresentative={onMarkRepresentative}
+          onReviewRepresentative={onReviewRepresentative} /></> : null}
     </div>}
     <footer className="inspector-audio-rule"><strong>声音硬规则</strong>
       <p>最终视频只能使用 H3 原始输出中已有的声音，或保持静音。禁止 TTS、配音、音乐、环境声、雨声和音效叠加。</p>

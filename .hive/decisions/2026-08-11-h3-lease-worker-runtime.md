@@ -1,8 +1,10 @@
 # 决策：H3 lease worker 归属 task-engine，由 API 进程按环境开关装配
 
 **日期**: 2026-08-11
-**状态**: accepted（orch 架构 review 通过 2026-08-11；M1B-3a 真机结果已回填）
+**状态**: superseded（worker 归属仍有效；默认开关已由 `2026-08-14-studio-generation-worker-runtime.md` 修订）
 **关联**: plan.md → M1B-2
+
+> 注意：本文件记录 2026-08-11 的阶段性 opt-in 决策。当前运行时默认启动 worker，只有显式设置 `H3_WORKER=0` 才关闭；以 2026-08-14 决策和 `apps/api/src/main.ts` 为准。
 
 ## 背景
 M1B-2 需要持久 lease、submit-once/poll-same-task、文件落盘和原子完成管线。`project-store` 已依赖 `task-engine` 的状态机，若 worker 反向直接依赖 `project-store` 会形成循环；独立常驻进程又会扩大本地部署面。当前产品是单机 API + SQLite，worker 必须默认关闭，避免在没有 GPU 窗口时意外提交。

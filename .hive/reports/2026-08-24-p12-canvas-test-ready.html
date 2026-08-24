@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard · P1.2 可直接测试画布</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080b0a;--panel:#111713;--ink:#f3efe5;--muted:#9aa59f;--line:#2b3932;--acid:#c9f36b;--teal:#55d7be;--amber:#e0b66b;--violet:#a8afff;--red:#ff8c85}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0,#1c3b2d 0,transparent 34rem),radial-gradient(circle at 0 48%,#242340 0,transparent 36rem),var(--bg);color:var(--ink);font:15px/1.68 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1180px,calc(100% - 32px));margin:48px auto 88px}.eyebrow{color:var(--acid);font:700 12px ui-monospace,monospace;letter-spacing:.14em}h1{max-width:1000px;margin:14px 0 18px;font-size:clamp(38px,6vw,68px);line-height:1.03;letter-spacing:-.045em}h2{margin:48px 0 15px;font-size:27px}.lede{max-width:980px;color:#c8d0cb;font-size:20px}.callout{margin:26px 0;padding:23px 25px;border:1px solid #536b35;border-radius:18px;background:linear-gradient(135deg,#1b291d,#121915);font-size:18px}.callout strong,.good{color:var(--teal)}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{padding:21px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(150deg,#18201b,var(--panel))}.metric{color:var(--acid);font:800 29px ui-monospace,monospace}.card p{margin:6px 0;color:var(--muted)}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#29361d;color:var(--acid);font:700 11px ui-monospace,monospace}table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0f1411}th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}th{color:var(--acid);background:#171e19;font-size:12px;letter-spacing:.06em}code{color:#bceab9}.flow{display:flex;align-items:center;gap:9px;overflow:auto;padding:8px 0}.flow span{min-width:170px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#121814;text-align:center}.flow i{color:var(--acid);font-style:normal}.score{display:grid;grid-template-columns:70px 58px 1fr;gap:13px;padding:14px 0;border-bottom:1px solid var(--line)}.score:last-child{border:0}.grade{color:var(--acid);font:800 22px ui-monospace,monospace}.small{color:var(--muted);font-size:13px}ul{padding-left:22px}li+li{margin-top:7px}.warn{color:var(--amber)}.footer{margin-top:46px;padding-top:19px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}@media(max-width:960px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:680px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}.score{grid-template-columns:54px 48px 1fr}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">DELIVERY REPORT · 2026-08-24 · M2 / P1.2</div>
+  <h1>画布不再是结构原型，<br>现在可以直接看片、切 Take、做 QC。</h1>
+  <p class="lede">P1.2 把线上 H3Storyboard 的 React Flow 画布推进到可体验状态：真实角色参考、真实静音视频、精确 Job→Asset→Take 血缘、Inspector、媒体大图、QC 与代表片全部在同一导演视图中工作。</p>
+  <div class="callout"><strong>可测试结论：</strong>运行 <code>pnpm demo:canvas</code>，打开 <code>http://127.0.0.1:5174</code> 并选择“上海雨夜 · 画布体验项目”。Demo 使用独立 SQLite、强制 <code>H3_WORKER=0</code>；不会访问 ComfyUI/4090，也没有任何音轨、TTS、音乐、雨声或环境声。</div>
+
+  <h2>交付指标</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">REAL MEDIA</span><div class="metric">2 + 2</div><p>2 张 approved 角色图、2 条可解码静音 MP4。</p></div>
+    <div class="card"><span class="tag">LINEAGE</span><div class="metric">2 exact</div><p>两组 Job→output Asset→Take 逐一浏览器验证。</p></div>
+    <div class="card"><span class="tag">QUALITY GATE</span><div class="metric">141 pass</div><p>Vitest 133 + Playwright 8；另 1 个外部 probe 按设计跳过。</p></div>
+    <div class="card"><span class="tag">GPU / AUDIO</span><div class="metric">0 / 0</div><p>零 4090 请求，演示 MP4 零音轨。</p></div>
+  </div>
+
+  <h2>真实运行链路</h2>
+  <div class="flow"><span>approved CharacterReference</span><i>→</i><span>ShotPlan</span><i>→</i><span>completed H3Job</span><i>→</i><span>output Asset</span><i>→</i><span>ShotActual / Take / QC</span></div>
+  <table><thead><tr><th>区域</th><th>用户现在能做什么</th><th>数据真相</th></tr></thead><tbody>
+    <tr><td>角色卡</td><td>直接看到 approved 定妆图，点击进入 lightbox 检查身份与服装</td><td>CharacterReference + approved image Asset；candidate/archived 不冒充定妆</td></tr>
+    <tr><td>Job / Output / Take</td><td>沿关系线查看任务、输出与每个 Take；视频可卡内预览和全屏解码</td><td>全部由 ProjectSnapshot 派生；不另建画布业务状态</td></tr>
+    <tr><td>Inspector</td><td>切换 Take、APPROVE/REJECT、标记/撤销代表片、批准开闸</td><td>ShotActual/QC/representative 写回 SQLite；ShotPlan 保持不变</td></tr>
+    <tr><td>导航与拖拽</td><td>重复点击同一镜头重新聚焦；拖拽保存中再点镜头也会在保存后正确聚焦</td><td>canvas_nodes 只持久 authored Shot/Character 坐标；derived 节点确定性重建</td></tr>
+  </tbody></table>
+
+  <h2>安全的本地体验项目</h2>
+  <ul>
+    <li><strong>数据库隔离：</strong>Seeder 只使用 <code>H3_CANVAS_DEMO_DB</code>，忽略继承的 <code>H3_STORYBOARD_DB</code>，默认写入 <code>.h3storyboard/canvas-test.db</code>。</li>
+    <li><strong>生成隔离：</strong><code>demo:canvas</code> 显式设置 <code>H3_WORKER=0</code>；built API + ComfyUI sentinel 测试证明 draft job 保持离线、零 provider 请求。</li>
+    <li><strong>声音隔离：</strong>两个 Job 都持久化 <code>audio_mode=silent</code>；安装前拒绝 MP4 audio handler，浏览器实际解码视频。没有外部声音处理链。</li>
+    <li><strong>重复运行：</strong>同一路径重复或并发 seed 返回同一套稳定 ID；用户额外创建的 Shot 不会被删除。</li>
+    <li><strong>失败纪律：</strong>残缺活动库只拒绝、不删除；新建事务失败回滚；媒体用临时文件 + 原子 rename，symlink 逃逸被拒绝。</li>
+  </ul>
+
+  <h2>质量门</h2>
+  <table><thead><tr><th>门禁</th><th>结果</th><th>证据</th></tr></thead><tbody>
+    <tr><td><code>pnpm check</code></td><td class="good">通过</td><td>Protocol/API/Store/Scripts/Studio 全 workspace 类型检查</td></tr>
+    <tr><td><code>pnpm build</code></td><td class="good">通过</td><td>335 modules；保留 540.87 kB chunk warning</td></tr>
+    <tr><td>Vitest</td><td class="good">133 passed / 1 skipped</td><td>19 files；真 HTTP + SQLite、worker-off、媒体 Range/FD/symlink、seed 事务</td></tr>
+    <tr><td>Playwright</td><td class="good">8 passed</td><td>真实 Chrome：图片/视频解码、两组 lineage、QC/刷新、drag-refocus、100 Shot</td></tr>
+    <tr><td>文件限制</td><td class="good">通过</td><td>UI 均 ≤250；ProjectStore 299/300；route endpoint 数未超限</td></tr>
+  </tbody></table>
+
+  <h2>Self-Review</h2>
+  <section class="card">
+    <div class="score"><strong>A</strong><span class="grade">B+</span><div><strong>架构与可维护性</strong><br><span class="small">媒体/Take 已拆组件；保留 character refs N+1、graph 249/250、ProjectStore 299/300，P1.3 前先拆。</span></div></div>
+    <div class="score"><strong>B</strong><span class="grade">B+</span><div><strong>真实 bug 与边界</strong><br><span class="small">关闭环境污染、残缺库删除、错误 lineage、FD/symlink、时长、聚焦和额外 Shot；保留 demo lock/MP4 parser/orphan 低风险。</span></div></div>
+    <div class="score"><strong>C</strong><span class="grade">B+</span><div><strong>测试质量</strong><br><span class="small">首轮 C+；补 FD 直接观测、双 lineage 解码、drag-pending refocus、稳定错误码后升 B+。</span></div></div>
+    <div class="score"><strong>D</strong><span class="grade">A-</span><div><strong>Spec / 协议对齐</strong><br><span class="small">Exact Take→Job、Plan/Actual、H3-only audio、worker-off 与当前 runtime 文档均复核；仅 stale-lock TOCTOU 为低风险。</span></div></div>
+  </section>
+  <p><strong>严重项 verdict：</strong>四路最终没有严重项、没有 M+1 blocker，没有任何“下次再修”的严重反馈。Take→Job 与 worker 文档漂移已修；综合评分 B+。</p>
+
+  <h2>原始任务逐条 verdict</h2>
+  <table><thead><tr><th>任务</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+    <tr><td>以上线 H3Storyboard 为唯一基础</td><td class="good">完成</td><td>在 P1.1 commit <code>68c800e</code> 上增量实现；未合并旧仓库历史</td></tr>
+    <tr><td>吸收 xyz 的强画布展示/操作方式</td><td class="good">P1.2 完成</td><td>真实媒体卡、Inspector、lightbox、Take/QC；P1.3 再做高密度角色/场景/分镜墙</td></tr>
+    <tr><td>人物一致、血缘准确</td><td class="good">完成</td><td>approved reference 与角色描述/服装一致；两组 Job/Asset/Take 逐一断言</td></tr>
+    <tr><td>除 H3 声音外不加任何声音</td><td class="good">完成</td><td>本 demo 选择静音：MP4 无 audio track；零 TTS/BGM/雨声/环境声/SFX</td></tr>
+    <tr><td>做到可以直接进行画布测试</td><td class="good">完成</td><td>幂等一条命令启动；真实媒体/SQLite/HTTP/Chrome 全量门禁通过</td></tr>
+  </tbody></table>
+
+  <h2>改动、删除与明确未做</h2>
+  <ul>
+    <li><strong>改动：</strong>画布媒体组件与样式、Inspector/Take 控制、角色 reference 加载、同镜聚焦、媒体 route、demo seeder/fixture、测试与 PM 文档。</li>
+    <li><strong>移动：</strong>纯 Store fixture 测试从 <code>tests/integration</code> 移至 <code>tests/unit</code>；真实 HTTP+SQLite 仍由 media/production-start/Playwright 穿透。</li>
+    <li><strong>删除：</strong>没有删除用户代码、测试、项目或资产。</li>
+    <li><strong>未做：</strong>没有访问 4090、没有生成视频、没有 schema migration、没有生产 demo fallback、没有外部音轨与后期混音。</li>
+  </ul>
+
+  <h2>已知但不阻断测试</h2>
+  <ul>
+    <li>P1.3 前必须增加 character reference batch API，并拆分 249 行 graph builder；ProjectStore 也只剩 1 行余量。</li>
+    <li>Demo stale-lock 的极端 owner 交接仍有 TOCTOU；专用 demo 库与 SQLite immediate 防止重复业务真相，若复用到生产必须 owner-token 化。</li>
+    <li>MP4 seed 校验是轻量 handler 扫描；当前 fixture 已由真实 Chrome 解码。kill -9 仍可能留下无 DB 引用的 demo 媒体，可做只读 orphan audit。</li>
+    <li>candidate/archived reference、QC REJECT、409/500 UI 恢复未做专门浏览器 E2E；底层状态/HTTP 已有部分覆盖，列入 P1.3。</li>
+  </ul>
+  <div class="footer">研究索引：<code>.hive/research/2026-08-24-p12-canvas-test-ready.md</code>。唯一产品主线仍是线上 H3Storyboard；xyz 提供展示设计，不提供业务真相。</div>
+</main></body></html>

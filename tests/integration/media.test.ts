@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, symlink, truncate, writeFile } from
+  'node:fs/promises';
+import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -61,6 +63,40 @@ describe('asset media HTTP endpoint with real files and SQLite', () => {
     expect(response.status).toBe(422);
     expect(await errorCode(response)).toBe('ASSET_FILE_PATH_INVALID');
   });
+
+  test('rejects a symlink that resolves outside the project data directory',
+    async () => {
+      const fixture = await createMediaFixture(false);
+      const outside = await mkdtemp(join(tmpdir(), 'h3-media-outside-'));
+      directories.add(outside);
+      const outsideFile = join(outside, 'private.mp4');
+      await writeFile(outsideFile, 'private');
+      await mkdir(dirname(fixture.filePath), { recursive: true });
+      await symlink(outsideFile, fixture.filePath);
+
+      const response = await fetch(
+        `${fixture.origin}/api/assets/${fixture.assetId}/file`);
+      expect(response.status).toBe(422);
+      expect(await errorCode(response)).toBe('ASSET_FILE_PATH_INVALID');
+    });
+
+  test('settles an aborted media response and keeps serving ranges', async () => {
+    const fixture = await createMediaFixture();
+    await truncate(fixture.filePath, 512 * 1024 * 1024);
+    const fileDescriptorsBefore = await openFileDescriptorCount();
+    const mediaUrl = `${fixture.origin}/api/assets/${fixture.assetId}/file`;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await abortAfterFirstChunk(mediaUrl);
+    }
+    await expect.poll(openFileDescriptorCount).toBeLessThanOrEqual(
+      fileDescriptorsBefore + 3);
+
+    const response = await fetch(mediaUrl, {
+      headers: { range: 'bytes=0-31' },
+    });
+    expect(response.status).toBe(206);
+    expect((await response.arrayBuffer()).byteLength).toBe(32);
+  });
 });
 
 async function createMediaFixture(write = true, start = true) {
@@ -82,7 +118,23 @@ async function createMediaFixture(write = true, start = true) {
   if (start) servers.add(server);
   const address = start ? await server.start() : { origin: '' };
   return { directory, databasePath, assetId: asset.id, server,
-    origin: address.origin };
+    origin: address.origin, filePath: join(directory, relativePath) };
+}
+
+function abortAfterFirstChunk(url: string): Promise<void> {
+  return new Promise((resolveAbort, reject) => {
+    const request = get(url, (response) => {
+      response.once('data', () => response.destroy());
+      response.once('close', resolveAbort);
+      response.once('error', reject);
+    });
+    request.once('error', reject);
+  });
+}
+
+async function openFileDescriptorCount(): Promise<number> {
+  return (await readdir(process.platform === 'linux' ? '/proc/self/fd' :
+    '/dev/fd')).length;
 }
 
 async function errorCode(response: Response) {
