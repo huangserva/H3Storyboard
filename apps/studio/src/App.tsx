@@ -13,11 +13,12 @@ export function App() {
   const [shotComposerOpen, setShotComposerOpen] = useState(false);
   const [modesOpen, setModesOpen] = useState(false);
   const [shotFocusRevision, setShotFocusRevision] = useState(0);
+  const [canvasFocusMode, setCanvasFocusMode] = useState(false);
   const suggestedScene =
     studio.selectedShot?.scene_id ?? studio.snapshot?.shot_plans.at(-1)?.scene_id ?? 'SCENE-01';
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-canvas-focus={canvasFocusMode}>
       <AppHeader
         onNewProject={() => setProjectComposerOpen(true)}
         onOpenModes={() => setModesOpen(true)}
@@ -28,7 +29,10 @@ export function App() {
       <main className="studio-layout">
         <ProjectRail
           busy={studio.busy}
-          onSelectProject={(id) => void studio.selectProject(id)}
+          onSelectProject={(id) => {
+            setCanvasFocusMode(false);
+            void studio.selectProject(id);
+          }}
           onSelectShot={(id) => {
             studio.selectShot(id);
             setShotFocusRevision((value) => value + 1);
@@ -39,6 +43,8 @@ export function App() {
         />
         <DirectorWorkspace
           busy={studio.busy}
+          canvasFocusMode={canvasFocusMode}
+          onCanvasFocusModeChange={setCanvasFocusMode}
           onNewShot={() => setShotComposerOpen(true)}
           onSelectShot={studio.selectShot}
           onUpdateShot={studio.updateShot}

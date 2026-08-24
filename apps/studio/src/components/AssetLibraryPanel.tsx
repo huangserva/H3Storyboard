@@ -3,11 +3,19 @@ import type { AssetKind } from '@h3storyboard/protocol';
 import { useAssets } from '../lib/use-assets.js';
 import { AssetThumbnail } from './AssetThumbnail.js';
 
-export function AssetLibraryPanel({ projectId }: { projectId: string }) {
+interface AssetLibraryPanelProps {
+  projectId: string;
+  forceOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function AssetLibraryPanel({ projectId, forceOpen = false,
+  onClose }: AssetLibraryPanelProps) {
   const store = useAssets(projectId);
   const [open, setOpen] = useState(false);
   const [uri, setUri] = useState('');
   const [kind, setKind] = useState<AssetKind>('image');
+  const expanded = forceOpen || open;
   const latestVersion = Math.max(0, ...store.manifests.map(
     ({ manifest }) => manifest.manifest_version,
   ));
@@ -18,14 +26,15 @@ export function AssetLibraryPanel({ projectId }: { projectId: string }) {
   };
 
   return (
-    <aside className="asset-library" data-open={open}
+    <aside aria-label="资产库" className="asset-library" data-open={expanded}
       onPointerDown={(event) => event.stopPropagation()}
       onWheel={(event) => event.stopPropagation()}>
       <header><div><span className="eyebrow">CURRENT ASSETS</span>
         <strong>资产库 · MANIFEST V{latestVersion || '—'}</strong></div>
-        <button type="button" onClick={() => setOpen((current) => !current)}>
-          {open ? '收起' : '展开'}</button></header>
-      {open ? <>
+        <button aria-label={forceOpen ? '收起资产库' : undefined} type="button"
+          onClick={() => forceOpen ? onClose?.() : setOpen((current) => !current)}>
+          {expanded ? '收起' : '展开'}</button></header>
+      {expanded ? <>
         <form className="asset-form" onSubmit={submit}>
           <select value={kind} onChange={(event) => setKind(event.target.value as AssetKind)}>
             <option value="image">IMAGE</option><option value="video">VIDEO</option>

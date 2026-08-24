@@ -69,7 +69,25 @@ describe('batch canvas and generation preflight HTTP contracts', () => {
         ]),
       });
 
-      const thirdShot = await createShot(first.origin, project, 3);
+      const untouchedThirdShot = await createShot(first.origin, project, 3);
+      const initialThird = canvasInput(untouchedThirdShot, 760);
+      await put(`${first.origin}/api/projects/${project}/canvas_nodes`, {
+        nodes: [initialThird],
+      });
+      const layoutMigration = await put(
+        `${first.origin}/api/projects/${project}/canvas_nodes`, { nodes: [{
+          ...initialThird, x: 800, width: 300, height: 248, z_index: 3,
+          update_layout_if_untouched: true,
+        }] });
+      expect(await batchCanvasBody(layoutMigration)).toMatchObject({
+        updated_count: 1,
+        canvas_nodes: expect.arrayContaining([expect.objectContaining({
+          ref_id: untouchedThirdShot, x: 800, width: 300, height: 248,
+          z_index: 3,
+        })]),
+      });
+
+      const thirdShot = await createShot(first.origin, project, 4);
       const second = await startApi(databasePath);
       const concurrent = await Promise.all(Array.from({ length: 20 }, (_, index) =>
         put(`${index % 2 === 0 ? first.origin : second.origin}` +
@@ -94,7 +112,7 @@ describe('batch canvas and generation preflight HTTP contracts', () => {
 
       const foreignProject = await createProject(first.origin, 'Foreign canvas');
       const foreignShot = await createShot(first.origin, foreignProject, 1);
-      const fourthShot = await createShot(first.origin, project, 4);
+      const fourthShot = await createShot(first.origin, project, 5);
       const duplicate = await put(
         `${first.origin}/api/projects/${project}/canvas_nodes`, { nodes: [
           canvasInput(fourthShot, 1_100), canvasInput(fourthShot, 1_140),

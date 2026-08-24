@@ -23,6 +23,7 @@ export type CreateCanvasNodeInput = z.infer<
 
 export const UpsertCanvasNodeInputSchema = CreateCanvasNodeInputSchema.extend({
   update_position_if_untouched: z.boolean().optional().default(false),
+  update_layout_if_untouched: z.boolean().optional().default(false),
 });
 export type UpsertCanvasNodeInput = z.input<
   typeof UpsertCanvasNodeInputSchema

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard P1.4 · 沉浸式画布交付</title>
+<style>
+:root{color-scheme:dark;--bg:#080b0a;--panel:#111714;--panel2:#17211c;--ink:#f0eee7;--muted:#9da69f;--line:#304039;--acid:#c9f36b;--teal:#53d5bd;--amber:#e9b968;--red:#ff8177}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 0,#173f36 0,transparent 34rem),var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1120px,calc(100% - 30px));margin:46px auto 90px}.eyebrow{color:var(--acid);font:700 12px ui-monospace,monospace;letter-spacing:.15em}h1{margin:10px 0 18px;font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.045em}h2{margin:44px 0 14px;font-size:27px}.lede{color:#d2d8d3;font-size:19px}.callout,.card{border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,var(--panel2),var(--panel));padding:20px}.callout{border-color:#507051;font-size:18px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.metric{color:var(--acid);font:800 25px ui-monospace,monospace}.card p{color:var(--muted);margin:7px 0}.tag{display:inline-block;border-radius:999px;background:#28381f;color:var(--acid);font:700 10px ui-monospace,monospace;padding:4px 9px}table{width:100%;border-collapse:collapse;border:1px solid var(--line);background:#0e1311}th,td{border:1px solid var(--line);padding:12px 13px;text-align:left;vertical-align:top}th{background:#17211d;color:var(--acid);font-size:12px}code{color:#b4eee4;overflow-wrap:anywhere}.ok{color:var(--acid)}.warn{color:var(--amber)}ul{padding-left:22px}.review{border-style:dashed;border-color:#6b6545}.footer{margin-top:45px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px}@media(max-width:860px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+</style></head><body><main>
+<div class="eyebrow">DELIVERY REPORT · 2026-08-24 · P1.4</div>
+<h1>画布不再只是“放大”：<br>它现在有两级沉浸工作流。</h1>
+<p class="lede">P1.4 保留 H3Storyboard 的真实 React Flow 血缘与 Plan / Take 分离，同时把 xyz-video-creator 值得保留的媒体优先展示方式融入现有产品。没有迁入旧项目的 TTS、BGM、同步 SSE 或计划/结果混合模型。</p>
+<div class="callout"><strong>交付结论：</strong>画布专注、浏览器全屏、大媒体卡、当前场景聚焦、抽屉检查器、旧布局迁移和 H3-only 播放门禁均已落地，可直接在 <code>http://127.0.0.1:5174</code> 测试。</div>
+
+<h2>核心能力</h2><div class="grid">
+<div class="card"><span class="tag">LEVEL 1</span><div class="metric">F / Esc</div><p>专注模式隐藏 Header、项目栏、资产栏与常驻 Inspector。选中节点后 Inspector 才从右侧出现。</p></div>
+<div class="card"><span class="tag">LEVEL 2</span><div class="metric">Fullscreen API</div><p>第二个动作进入浏览器全屏；首个 Esc 退出浏览器全屏，第二个 Esc 退出画布专注。</p></div>
+<div class="card"><span class="tag">MEDIA FIRST</span><div class="metric">300 × 248</div><p>分镜与输出卡扩大，媒体预览成为主要视觉层；当前场景与全景各有明确相机动作。</p></div>
+</div>
+
+<h2>原始任务逐条 verdict</h2>
+<table><thead><tr><th>要求</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+<tr><td>一键铺满应用窗口并隐藏四组 UI</td><td class="ok">完成</td><td><code>data-canvas-focus</code> 驱动应用壳；Header、项目栏、工作台栏、左右侧栏均退出布局。</td></tr>
+<tr><td>选中节点时 Inspector 抽屉出现</td><td class="ok">完成</td><td>进入专注先清空选择；选节点显示右抽屉，关闭后焦点回到“当前场景”。</td></tr>
+<tr><td>F 进入、Esc 退出</td><td class="ok">完成</td><td>输入框、contenteditable 与 dialog 内不劫持；fullscreen pending 时锁定，避免非法组合。</td></tr>
+<tr><td>浏览器全屏第二动作</td><td class="ok">完成</td><td>使用 <code>document.documentElement.requestFullscreen()</code>，保证 portal 弹窗仍在全屏树内；拒绝权限显示明确错误。</td></tr>
+<tr><td>大媒体卡</td><td class="ok">完成</td><td>Shot 300×248、媒体区 ≥128px；job/asset/take/character 同步提高可读尺寸。</td></tr>
+<tr><td>场景聚焦</td><td class="ok">完成</td><td>“当前场景”对 scene group 精确 fit；普通节点选择不再抢夺相机。</td></tr>
+</tbody></table>
+
+<h2>重要修正</h2><ul>
+<li><strong>旧画布迁移：</strong>新增 <code>update_layout_if_untouched</code>，只对从未被用户移动的 SQLite 行迁移 x/y/尺寸/z-index；已手调布局不覆盖。</li>
+<li><strong>Take 一致性：</strong>Plan 卡预览与页脚都选最新非 rejected Take，避免“拒绝画面 + NO TAKE/另一 Take”的矛盾。</li>
+<li><strong>全屏状态机：</strong>请求中的按钮和快捷键锁定；浏览器全屏、专注模式和弹窗不会形成三栏重新出现的非法状态。</li>
+<li><strong>焦点可达：</strong>关闭资产/Inspector 或用 F/Esc 改模式后，焦点回到画布或对应工具按钮，不留在隐藏子树。</li>
+<li><strong>声音硬门禁：</strong>仅当视频 Asset 的 <code>producer_job_id</code> 对应 H3 job 且 <code>audio_mode=h3_native</code> 时允许声音。外部视频、silent Take、无 producer 视频全部由 <code>PolicyVideo</code> 强制静音；没有 TTS、配音、音乐、环境声或雨声。</li>
+</ul>
+
+<h2>测试证据</h2>
+<table><thead><tr><th>层</th><th>结果</th><th>覆盖</th></tr></thead><tbody>
+<tr><td>TypeScript / Build</td><td class="ok">通过</td><td><code>pnpm check</code> 与生产 Vite build。</td></tr>
+<tr><td>Vitest</td><td class="ok">35 files · 229 passed · 1 skipped</td><td>相机目标、音频策略、布局迁移及全部既有 unit/integration；迁移使用真 HTTP + SQLite。</td></tr>
+<tr><td>Playwright</td><td class="ok">20 passed</td><td>两级全屏、F/Esc、输入/弹窗保护、fullscreen 拒绝与 pending、场景中心、媒体卡、760px 窗口、布局保存、100-shot、Plan/Take、H3-only 静音。</td></tr>
+</tbody></table>
+
+<h2>改动、删除与保留边界</h2><ul>
+<li>新增专注工具栏、Fullscreen hook、相机选择器、声音策略与独立 focus/inspector CSS；<code>canvas.css</code> 中相应规则迁出，没有删除产品能力。</li>
+<li>没有删除现有测试；新增 P1.4 浏览器用例、相机 unit、声音策略 unit，并增强旧布局和媒体测试。</li>
+<li>没有调用 4090、没有触发 H3 生成、没有新增或修改任何音频资产。</li>
+<li>未做：390px 手机触控专用体验、画布 undo/multi-select，以及把 100-shot 用例扩成全屏交互性能基准；它们不阻塞桌面画布测试。<code>StoryboardFlow.tsx</code> 当前 246/250 行，下一次功能扩展前应拆 viewport controller。</li>
+</ul>
+
+<h2>Self-Review</h2><div class="card review"><span class="tag">4 INDEPENDENT REVIEWS</span>
+<table><thead><tr><th>维度</th><th>首轮 → 最终</th><th>关键 verdict</th></tr></thead><tbody>
+<tr><td>A 架构/维护性</td><td>C+ → <strong>B</strong></td><td>非法全屏组合、选中跳镜、默认抽屉、矮屏裁切均修；文件均未超硬上限。</td></tr>
+<tr><td>B 真 bug/边界</td><td>C+ → <strong>B+</strong></td><td>portal 不可见、门禁快捷键、resize refit、并发 fullscreen、pending 竞态与技术节点 stale fit 均修。</td></tr>
+<tr><td>C 测试质量</td><td>C+ → <strong>B-</strong></td><td>补拒绝/pending、输入/dialog、两级 Esc、场景居中、窄窗及真 HTTP+SQLite 布局迁移；保留移动端与百镜沉浸基准为非阻塞项。</td></tr>
+<tr><td>D 产品/spec 对齐</td><td>C → <strong>A</strong></td><td>修 rejected Take 预览、旧 DB 布局、焦点归还，并封死 Inspector、Lightbox、Actual 面板的非 H3 音频。</td></tr>
+</tbody></table>
+<p><strong>严重项 verdict：</strong>全屏 portal、旧布局重叠、Plan/Take 预览矛盾、fullscreen 非法状态与非 H3 视频可解静音全部已修，并由最终门禁覆盖。<br><strong>综合评分：</strong>B+。四个维度均达到交付要求。</p></div>
+<div class="footer">索引：<code>.hive/research/2026-08-24-p14-immersive-canvas.md</code> · 分支：<code>codex/p0-p1-h3-canvas</code> · 本报告基于最终代码、全量门禁与四路独立复核。</div>
+</main></body></html>

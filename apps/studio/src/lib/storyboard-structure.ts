@@ -50,9 +50,9 @@ export function appendCharacterNodes(
     if (!character) continue;
     const layout = layoutByRef.get(character.id);
     nodes.push({ id: `character:${character.id}`, kind: 'character',
-      entity_id: character.id, x: layout?.x ?? minX - 700,
-      y: layout?.y ?? minY + index * 240, width: Math.max(layout?.width ?? 0, 230),
-      height: Math.max(layout?.height ?? 0, 210), z_index: layout?.z_index ?? 1,
+      entity_id: character.id, x: layout?.x ?? minX - 760,
+      y: layout?.y ?? minY + index * 300, width: Math.max(layout?.width ?? 0, 280),
+      height: Math.max(layout?.height ?? 0, 260), z_index: layout?.z_index ?? 1,
       persisted_node_id: layout?.id ?? null, title: character.name,
       kicker: 'CHARACTER BIBLE', summary: character.canonical_appearance,
       status: character.status, approved: character.status === 'approved',

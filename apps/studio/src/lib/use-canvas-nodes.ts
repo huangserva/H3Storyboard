@@ -9,8 +9,8 @@ import * as api from './api.js';
 import { KeyedSerialQueue } from './keyed-serial-queue.js';
 import { SharedRequestRegistry } from './shared-request-registry.js';
 
-const CARD_WIDTH = 260;
-const CARD_HEIGHT = 196;
+const CARD_WIDTH = 300;
+const CARD_HEIGHT = 248;
 const canvasLoads = new SharedRequestRegistry<CanvasNode[]>();
 
 async function loadNodes(snapshot: ProjectSnapshot,
@@ -31,7 +31,7 @@ async function loadNodes(snapshot: ProjectSnapshot,
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
         z_index: shot.ordinal,
-        update_position_if_untouched: legacy !== undefined,
+        update_layout_if_untouched: true,
       } as const] : [];
   });
   const result = await api.batchUpsertCanvasNodes(projectId, { nodes }, signal);
@@ -112,7 +112,7 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
       ).length;
       const result = await api.batchUpsertCanvasNodes(snapshot.project.id, {
         nodes: [{ node_type: 'character', ref_id: characterId, x: 640,
-          y: 100 + characterCount * 244, width: 240, height: 220,
+          y: 100 + characterCount * 300, width: 280, height: 260,
           z_index: Math.max(0, ...nodes.map(({ z_index }) => z_index)) + 1 }],
       });
       const placed = result.canvas_nodes.find(({ node_type, ref_id }) =>

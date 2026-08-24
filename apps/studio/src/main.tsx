@@ -11,12 +11,14 @@ import './styles/drawers.css';
 import './styles/overlays.css';
 import './styles/responsive.css';
 import './styles/canvas.css';
+import './styles/canvas-inspector.css';
 import './styles/canvas-media.css';
 import './styles/characters.css';
 import './styles/assets.css';
 import './styles/modes.css';
 import './styles/production.css';
 import './styles/production-board.css';
+import './styles/canvas-focus.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');

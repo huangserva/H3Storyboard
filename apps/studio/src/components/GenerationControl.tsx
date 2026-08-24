@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { GenerationPreflight, H3Job } from '@h3storyboard/protocol';
 
@@ -30,6 +30,15 @@ export function GenerationControl({ compact = false, busy, job, preflight,
     (!preflight.ready && !setupRequired);
   const label = job ? '新 Take' : '生成';
 
+  useEffect(() => {
+    if (!overrideOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOverrideOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [overrideOpen]);
+
   const trigger = () => {
     if (setupRequired) { onSetup(); return; }
     if (preflight?.gate_override_required) { setOverrideOpen(true); return; }
@@ -50,7 +59,8 @@ export function GenerationControl({ compact = false, busy, job, preflight,
       {active ? '生成中…' : label}</button>
     {preflight?.blocking_error ? <small>{preflight.blocking_error.message}</small> : null}
     {overrideOpen ? createPortal(<div className="modal-backdrop" role="presentation">
-      <form className="generation-modal" onSubmit={submitOverride}>
+      <form aria-label="代表 Take 门禁原因" aria-modal="true"
+        className="generation-modal" onSubmit={submitOverride} role="dialog">
         <span className="eyebrow">REPRESENTATIVE GATE</span>
         <h3>为什么需要跳过代表 Take 门禁？</h3>
         <p>该镜头已有生成记录，但还没有获批的代表 Take。原因会随新 job 永久保存。</p>

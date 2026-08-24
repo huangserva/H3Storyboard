@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Asset, CharacterReference, ProjectSnapshot } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
+import { allowsH3NativeAudio } from '../lib/h3-audio-policy.js';
 import type { StoryboardViewNode } from '../lib/storyboard-graph.js';
 import { CanvasTakeControls } from './CanvasTakeControls.js';
+import { PolicyVideo } from './PolicyVideo.js';
 
 interface CanvasInspectorPanelProps {
   node: StoryboardViewNode | null;
@@ -10,6 +12,7 @@ interface CanvasInspectorPanelProps {
   assets: Asset[];
   busy: boolean;
   characterReference: CharacterReference | null;
+  onClose?: () => void;
   onOpenMedia: (assetId: string) => void;
   onReviewActual: (actualId: string,
     verdict: 'approved' | 'rejected') => Promise<boolean>;
@@ -20,7 +23,7 @@ interface CanvasInspectorPanelProps {
 }
 
 export function CanvasInspectorPanel({ node, snapshot, assets, busy, characterReference,
-  onOpenMedia, onReviewActual, onMarkRepresentative,
+  onClose, onOpenMedia, onReviewActual, onMarkRepresentative,
   onReviewRepresentative }: CanvasInspectorPanelProps) {
   const shotActuals = snapshot.shot_actuals.filter(
     ({ shot_plan_id }) => shot_plan_id === node?.shot_id,
@@ -42,10 +45,15 @@ export function CanvasInspectorPanel({ node, snapshot, assets, busy, characterRe
     ? assets.find(({ id }) => id === previewAssetId) ?? null : null;
   const preview = previewCandidate?.kind === 'image' ||
     previewCandidate?.kind === 'video' ? previewCandidate : null;
+  const previewAudioAllowed = preview
+    ? allowsH3NativeAudio(preview, snapshot.h3_jobs) : false;
 
   return <aside className="canvas-inspector" aria-label="节点详情">
     <header><div><span className="eyebrow">NODE INSPECTOR</span>
-      <strong>节点详情</strong></div><span className="audio-policy-badge">H3 AUDIO ONLY</span></header>
+      <strong>节点详情</strong></div><div className="canvas-inspector-actions">
+      <span className="audio-policy-badge">H3 AUDIO ONLY</span>
+      {onClose ? <button aria-label="关闭节点详情" onClick={onClose}
+        type="button">×</button> : null}</div></header>
     {!node ? <div className="inspector-empty"><b>选择一个节点</b>
       <p>查看剧本、素材、分镜、H3 任务与 Take 的真实关系。</p></div> : <div className="inspector-content">
       <div className="inspector-title"><span>{node.kicker}</span><h2>{node.title}</h2>
@@ -53,7 +61,7 @@ export function CanvasInspectorPanel({ node, snapshot, assets, busy, characterRe
       {preview ? <div className="inspector-preview">
         {preview.kind === 'image'
           ? <img alt={preview.name} src={assetFileUrl(preview.id)} />
-          : <video controls playsInline preload="metadata"
+          : <PolicyVideo allowH3Audio={previewAudioAllowed}
             src={assetFileUrl(preview.id)} />}
         <button className="inspector-preview-open" onClick={() => onOpenMedia(preview.id)}
           type="button">全屏查看</button>

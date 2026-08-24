@@ -60,6 +60,8 @@ test.describe.serial('canvas media director experience', () => {
         const outputDialog = page.getByRole('dialog', { name: /媒体预览/ });
         await expect.poll(() => outputDialog.locator('video').evaluate(
           (video: HTMLVideoElement) => video.videoWidth)).toBeGreaterThan(0);
+        await expect.poll(() => outputDialog.locator('video').evaluate(
+          (video: HTMLVideoElement) => video.muted)).toBe(true);
         await outputDialog.getByRole('button', { name: '关闭媒体预览' }).click();
 
         await page.getByRole('button', { name: 'Fit View' }).click();
@@ -70,7 +72,7 @@ test.describe.serial('canvas media director experience', () => {
           name: `TAKE ${takeNumber}` })).toBeVisible();
         await take.getByRole('button', { name: /^打开 / }).click();
         const takeDialog = page.getByRole('dialog', { name: /媒体预览/ });
-        await expect(takeDialog).toContainText('H3 原声 / 静音');
+        await expect(takeDialog).toContainText('静音');
         await expect.poll(() => takeDialog.locator('video').evaluate(
           (video: HTMLVideoElement) => video.videoWidth)).toBeGreaterThan(0);
         await takeDialog.getByRole('button', { name: '关闭媒体预览' }).click();
@@ -80,7 +82,7 @@ test.describe.serial('canvas media director experience', () => {
       await expect(inspector.getByRole('heading', { name: '雨巷重逢' })).toBeVisible();
       await inspector.getByRole('button', { name: '全屏查看' }).click();
       const videoDialog = page.getByRole('dialog', { name: /媒体预览/ });
-      await expect(videoDialog).toContainText('H3 原声 / 静音');
+      await expect(videoDialog).toContainText('静音');
       await expect.poll(() => videoDialog.locator('video').evaluate(
         (video: HTMLVideoElement) => video.videoWidth)).toBeGreaterThan(0);
       const snapshot = await projectSnapshot(request);
@@ -116,6 +118,8 @@ test.describe.serial('canvas media director experience', () => {
       await page.getByRole('button', { name: '计划 / 实测' }).click();
       const taskDrawer = page.locator('.task-drawer');
       await expect(taskDrawer).toContainText('fixture-canvas-demo-take-02');
+      await expect.poll(() => page.locator('.actual-preview video').evaluate(
+        (video: HTMLVideoElement) => video.muted)).toBe(true);
       await page.getByRole('navigation', { name: '选择 Take' })
         .getByRole('button', { name: /^TAKE 01/ }).click();
       await expect(taskDrawer).toContainText('fixture-canvas-demo-take-01');

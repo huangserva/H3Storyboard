@@ -2,13 +2,15 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { Asset } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
+import { PolicyVideo } from './PolicyVideo.js';
 
 interface MediaLightboxProps {
   asset: Asset;
+  audioAllowed: boolean;
   onClose: () => void;
 }
 
-export function MediaLightbox({ asset, onClose }: MediaLightboxProps) {
+export function MediaLightbox({ asset, audioAllowed, onClose }: MediaLightboxProps) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -26,13 +28,14 @@ export function MediaLightbox({ asset, onClose }: MediaLightboxProps) {
         className="media-lightbox" role="dialog">
         <header><div><span className="eyebrow">CANONICAL MEDIA</span>
           <strong>{asset.name}</strong></div>
-          <div><span className="audio-policy-badge">H3 原声 / 静音</span>
+          <div><span className="audio-policy-badge">
+            {audioAllowed ? 'H3 原声' : '静音'}</span>
             <button aria-label="关闭媒体预览" className="icon-button"
               onClick={onClose} type="button">×</button></div></header>
         <div className="media-lightbox-stage">
           {asset.kind === 'image'
             ? <img alt={asset.name} src={assetFileUrl(asset.id)} />
-            : asset.kind === 'video' ? <video controls playsInline preload="metadata"
+            : asset.kind === 'video' ? <PolicyVideo allowH3Audio={audioAllowed}
               src={assetFileUrl(asset.id)} />
               : <p>外部音频资产不能进入 H3 画布播放链路。</p>}
         </div>

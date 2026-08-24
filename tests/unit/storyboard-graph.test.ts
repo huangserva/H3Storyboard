@@ -139,8 +139,8 @@ describe('storyboard graph', () => {
     input.canvasNodes = input.snapshot.shot_plans.map((shot, index) => ({
       ...canvas(`default-canvas-${index}`, 'shot_plan', shot.id,
         positions[shot.id]!.x, positions[shot.id]!.y),
-      width: 260,
-      height: 196,
+      width: 300,
+      height: 248,
     }));
 
     const graph = buildStoryboardGraph(input);
@@ -217,7 +217,7 @@ describe('storyboard graph', () => {
       `take:${IDS.take}`, `take:${secondTakeId}`,
     ]);
     expect(graph.nodes.find(({ id }) => id === `shot:${IDS.shot1}`)
-      ?.preview_asset_id).toBe(secondOutputId);
+      ?.preview_asset_id).toBe(firstOutput.id);
     expect(jobs[1]!.x).toBeGreaterThan(takes[0]!.x + takes[0]!.width);
     expect(graph.nodes.some(({ id }) => id ===
       `character:${missingCharacterId}`)).toBe(false);

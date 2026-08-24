@@ -102,7 +102,7 @@ export function buildStoryboardGraph({ snapshot, canvasNodes,
     const asset = assetById.get(assetId);
     if (!asset) continue;
     nodes.push({ id: `asset:${asset.id}`, kind: 'asset', entity_id: asset.id,
-      x: minX - 260, y: minY + 260 + assetIndex * 150, width: 190, height: 126,
+      x: minX - 300, y: minY + 280 + assetIndex * 210, width: 250, height: 186,
       z_index: 1, persisted_node_id: null, title: asset.name,
       kicker: `${asset.kind.toUpperCase()} REFERENCE`, summary: asset.uri,
       status: asset.status, approved: asset.status === 'approved',

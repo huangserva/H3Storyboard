@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Asset, GenerationPreflight, ProjectSnapshot, ShotPlan } from
   '@h3storyboard/protocol';
 import { selectProductionScenes } from '../lib/production-board-selectors.js';
+import { allowsH3NativeAudio } from '../lib/h3-audio-policy.js';
 import * as api from '../lib/api.js';
 import { useCharacterImageJobs } from '../lib/use-character-image-jobs.js';
 import { useCharacters } from '../lib/use-characters.js';
@@ -136,6 +137,7 @@ export function ProductionBoardView({ snapshot, selectedShotId, busy,
         }} />)}
     </div>
     {lightboxAsset ? <MediaLightbox asset={lightboxAsset}
+      audioAllowed={allowsH3NativeAudio(lightboxAsset, snapshot.h3_jobs)}
       onClose={() => setLightboxAssetId(null)} /> : null}
   </main>{generatorCharacter ? <CharacterImageGenerationPanel
     key={generatorCharacter.id} character={generatorCharacter}

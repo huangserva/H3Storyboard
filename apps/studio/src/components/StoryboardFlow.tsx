@@ -24,14 +24,21 @@ import type {
   StoryboardViewEdge,
   StoryboardViewNode,
 } from '../lib/storyboard-graph.js';
+import { selectCanvasFocusNodeId } from '../lib/storyboard-focus.js';
 import { CanvasFlowNode } from './CanvasFlowNode.js';
+import { CanvasViewportToolbar } from './CanvasViewportToolbar.js';
 import type { StoryboardFlowNode } from './storyboard-flow-types.js';
 
 interface StoryboardFlowProps {
   graph: StoryboardGraph;
   snapshot: ProjectSnapshot;
   selectedNodeId: string | null;
+  activeSceneId: string | null;
   focusRevision: number;
+  focusMode: boolean;
+  browserFullscreen: boolean;
+  browserFullscreenBusy: boolean;
+  assetDrawerOpen: boolean;
   busy: boolean;
   loading: boolean;
   error: string | null;
@@ -43,14 +50,20 @@ interface StoryboardFlowProps {
     reason: string | null) => Promise<boolean>;
   onSetup: () => void;
   onOpenMedia: (assetId: string) => void;
+  onToggleAssetDrawer: () => void;
+  onToggleFocusMode: () => void;
+  onToggleBrowserFullscreen: () => void;
   onPersist: (input: UpdateCanvasNodeInput) => Promise<void>;
 }
 
 const nodeTypes = { storyboard: CanvasFlowNode };
 
 export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
-  focusRevision, loading, error, preflights, characterReferences, onNewShot, onSelect,
-  onGenerate, onSetup, onOpenMedia, onPersist }: StoryboardFlowProps) {
+  activeSceneId, focusRevision, focusMode, browserFullscreen,
+  browserFullscreenBusy, assetDrawerOpen,
+  loading, error, preflights, characterReferences, onSelect, onGenerate, onSetup,
+  onNewShot, onOpenMedia, onToggleAssetDrawer, onToggleFocusMode,
+  onToggleBrowserFullscreen, onPersist }: StoryboardFlowProps) {
   const projectedNodes = useMemo(() => graph.nodes.map((view): StoryboardFlowNode => ({
     id: view.id,
     type: 'storyboard',
@@ -77,10 +90,30 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   const flowInstance = useRef<ReactFlowInstance<StoryboardFlowNode, Edge> | null>(
     null);
   const fittedTarget = useRef('');
+  const activeSceneIdRef = useRef(activeSceneId);
+  const selectedNodeIdRef = useRef(selectedNodeId);
   const pendingFit = useRef(false);
   const dragSessions = useRef(new Map<string, number>());
   const dragStartPositions = useRef(new Map<string, { x: number; y: number }>());
   const nextDragSession = useRef(0);
+  activeSceneIdRef.current = activeSceneId;
+  selectedNodeIdRef.current = selectedNodeId;
+
+  const fitOverview = (duration = 220) => {
+    void flowInstance.current?.fitView({ padding: 0.12, minZoom: 0.18,
+      maxZoom: 0.9, duration });
+  };
+
+  const fitFocusTarget = (targetId: string | null, duration = 220) => {
+    const instance = flowInstance.current;
+    const target = targetId ? instance?.getNode(targetId) : null;
+    if (!instance || !target) {
+      fitOverview(duration);
+      return;
+    }
+    void instance.fitView({ nodes: [target], padding: 0.16,
+      minZoom: 0.46, maxZoom: 1.05, duration });
+  };
 
   useEffect(() => setNodes((current) => {
     const currentById = new Map(current.map((node) => [node.id, node]));
@@ -95,7 +128,8 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
 
   useEffect(() => {
     if (loading || graph.nodes.length === 0) return;
-    const target = `${graph.nodes.length}:${selectedNodeId ?? 'overview'}:${focusRevision}`;
+    const target = `${graph.nodes.length}:${fitRevision}:${focusRevision}:` +
+      `${focusMode}:${browserFullscreen}`;
     if (fittedTarget.current === target) return;
     const frame = window.requestAnimationFrame(() => {
       if (dragSessions.current.size > 0) {
@@ -104,15 +138,13 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
       }
       fittedTarget.current = target;
       pendingFit.current = false;
-      const instance = flowInstance.current;
-      const selected = selectedNodeId ? instance?.getNode(selectedNodeId) : null;
-      void instance?.fitView(selected ? { nodes: [selected], padding: 0.4,
-        minZoom: 0.72, maxZoom: 1.05, duration: 0 } : {
-        padding: 0.12, minZoom: 0.18, maxZoom: 0.9, duration: 220,
-      });
+      const selectedId = focusMode ? null : selectedNodeIdRef.current;
+      fitFocusTarget(selectCanvasFocusNodeId(
+        graph.nodes, selectedId, activeSceneIdRef.current), selectedId ? 0 : 220);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [fitRevision, focusRevision, graph.nodes.length, loading, selectedNodeId]);
+  }, [browserFullscreen, fitRevision, focusMode, focusRevision, graph.nodes,
+    loading]);
 
   const onNodeClick: NodeMouseHandler<StoryboardFlowNode> = (_event, node) => {
     onSelect(node.data.view);
@@ -163,11 +195,21 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
       <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2}
         nodeColor={(node) => minimapColor(
           (node as StoryboardFlowNode).data.view.kind)} />
-      <Panel position="top-left" className="flow-toolbar">
+      <Panel position="top-left" className="flow-toolbar canvas-context-bar">
         <div><span>UNIVERSAL STORYBOARD</span>
-          <small>素材 → 分镜 → H3 JOB → TAKE / QC</small></div>
-        <button className="button button-primary compact" disabled={busy}
-          onClick={onNewShot} type="button">＋ 新增镜头</button>
+          <small>媒体优先 · 角色 → 场景 → 分镜 → 成片</small></div>
+      </Panel>
+      <Panel position="top-right">
+        <CanvasViewportToolbar sceneLabel={activeSceneId ?? 'ALL SCENES'}
+          focusMode={focusMode} browserFullscreen={browserFullscreen}
+          browserFullscreenBusy={browserFullscreenBusy}
+          assetDrawerOpen={assetDrawerOpen}
+          onToggleAssetDrawer={onToggleAssetDrawer}
+          onFocusScene={() => fitFocusTarget(selectCanvasFocusNodeId(
+            graph.nodes, null, activeSceneId))}
+          onFitOverview={() => fitOverview()}
+          onToggleFocusMode={onToggleFocusMode}
+          onToggleBrowserFullscreen={onToggleBrowserFullscreen} />
       </Panel>
     </ReactFlow>
     {loading ? <div className="canvas-status">正在加载持久化布局…</div> : null}

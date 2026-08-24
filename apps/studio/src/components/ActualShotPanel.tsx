@@ -1,5 +1,6 @@
 import type { Asset, ShotActual } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
+import { PolicyVideo } from './PolicyVideo.js';
 
 interface ActualShotPanelProps {
   actual: ShotActual | null;
@@ -7,6 +8,7 @@ interface ActualShotPanelProps {
   hasSelectedShot: boolean;
   busy: boolean;
   outputAsset: Asset | null;
+  audioAllowed: boolean;
   onReviewActual: (actualId: string,
     verdict: 'approved' | 'rejected') => Promise<boolean>;
   onSelectActual: (actualId: string) => void;
@@ -16,7 +18,7 @@ interface ActualShotPanelProps {
 }
 
 export function ActualShotPanel({ actual, actuals, hasSelectedShot, busy,
-  outputAsset, onReviewActual, onSelectActual, onMarkRepresentative,
+  outputAsset, audioAllowed, onReviewActual, onSelectActual, onMarkRepresentative,
   onReviewRepresentative }: ActualShotPanelProps) {
   if (!actual) {
     return (
@@ -48,7 +50,7 @@ export function ActualShotPanel({ actual, actuals, hasSelectedShot, busy,
           {item.is_representative ? ' · REP' : ''}</button>)}
       </nav> : null}
       <div className="actual-preview">
-        {outputAsset?.kind === 'video' ? <video controls preload="metadata"
+        {outputAsset?.kind === 'video' ? <PolicyVideo allowH3Audio={audioAllowed}
           src={assetFileUrl(outputAsset.id)} /> : outputAsset?.kind === 'image'
           ? <img alt={`Take ${actual.attempt_number}`} src={assetFileUrl(outputAsset.id)} />
           : <span>TAKE {String(actual.attempt_number).padStart(2, '0')}</span>}

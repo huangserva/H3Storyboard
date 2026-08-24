@@ -26,8 +26,8 @@ describe('infinite canvas layout', () => {
     ]);
 
     expect(positions['shot-1']).toEqual({ x: 80, y: 100 });
-    expect(positions['shot-2']).toEqual({ x: 364, y: 100 });
-    expect(positions['shot-3']).toEqual({ x: 80, y: 440 });
+    expect(positions['shot-2']).toEqual({ x: 420, y: 100 });
+    expect(positions['shot-3']).toEqual({ x: 80, y: 490 });
   });
 
   it('ignores malformed persisted card positions', () => {

@@ -272,8 +272,8 @@ test.describe.serial('React Flow storyboard canvas', () => {
             .toContainText('请先');
         }
         expect(canvasRows(project.data.id)).toEqual({ count: 100, refs: 100 });
-        await expect(page.getByText(
-          '素材 → 分镜 → H3 JOB → TAKE / QC')).toBeVisible();
+        await expect(page.getByRole('toolbar', { name: '画布视图工具' }))
+          .toBeVisible();
       } finally {
         await secondPage.close();
       }

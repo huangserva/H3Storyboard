@@ -94,17 +94,19 @@ export function batchUpsertCanvasNodes(
         createdCount += 1;
         continue;
       }
-      if (!node.update_position_if_untouched) continue;
+      if (!node.update_position_if_untouched &&
+        !node.update_layout_if_untouched) continue;
       const existing = canvasNodeByReference(
         db, projectId, node.node_type, node.ref_id);
       if (existing.created_at !== existing.updated_at ||
-        !positionChanged(existing, node)) continue;
+        !requestedLayoutChanged(existing, node)) continue;
+      const layout = node.update_layout_if_untouched ? node : existing;
       db.prepare(
         `UPDATE canvas_nodes
-         SET x = ?, y = ?, updated_at = ?
+         SET x = ?, y = ?, width = ?, height = ?, z_index = ?, updated_at = ?
          WHERE id = ? AND project_id = ?`,
-      ).run(node.x, node.y, nextTimestamp(existing.updated_at),
-        existing.id, projectId);
+      ).run(node.x, node.y, layout.width, layout.height, layout.z_index,
+        nextTimestamp(existing.updated_at), existing.id, projectId);
       updatedCount += 1;
     }
 
@@ -208,9 +210,14 @@ function canvasNodeByReference(db: Database.Database, projectId: string,
   ).get(projectId, nodeType, refId));
 }
 
-function positionChanged(existing: CanvasNode,
-  candidate: CreateCanvasNodeInput): boolean {
-  return existing.x !== candidate.x || existing.y !== candidate.y;
+function requestedLayoutChanged(existing: CanvasNode,
+  candidate: CreateCanvasNodeInput & {
+    update_layout_if_untouched: boolean;
+  }): boolean {
+  return existing.x !== candidate.x || existing.y !== candidate.y ||
+    (candidate.update_layout_if_untouched && (
+      existing.width !== candidate.width || existing.height !== candidate.height ||
+      existing.z_index !== candidate.z_index));
 }
 
 function nextTimestamp(previous: string): string {

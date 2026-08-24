@@ -8,6 +8,7 @@ import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { ShotProductionEditor } from './ShotProductionEditor.js';
 import { useGenerationPreflights } from '../lib/use-generation-preflights.js';
+import { allowsH3NativeAudio } from '../lib/h3-audio-policy.js';
 
 const ProductionBriefPanel = lazy(async () => {
   const module = await import('./ProductionBriefPanel.js');
@@ -23,6 +24,8 @@ interface DirectorWorkspaceProps {
   selectedShot: ShotPlan | null;
   shotFocusRevision: number;
   busy: boolean;
+  canvasFocusMode: boolean;
+  onCanvasFocusModeChange: (active: boolean) => void;
   onNewShot: () => void;
   onSelectShot: (id: string) => void;
   onUpdateShot: (input: UpdateShotPlanInput) => Promise<boolean>;
@@ -40,6 +43,8 @@ export function DirectorWorkspace({
   selectedShot,
   shotFocusRevision,
   busy,
+  canvasFocusMode,
+  onCanvasFocusModeChange,
   onNewShot,
   onSelectShot,
   onUpdateShot,
@@ -72,6 +77,11 @@ export function DirectorWorkspace({
   const outputAsset = snapshot?.assets.find(
     ({ id }) => id === displayedActual?.output_asset_id) ?? null;
 
+  const changeView = (next: 'board' | 'flow' | 'director') => {
+    setView(next);
+    if (next !== 'flow') onCanvasFocusModeChange(false);
+  };
+
   if (!snapshot) {
     return (
       <section className="no-project-view">
@@ -98,11 +108,12 @@ export function DirectorWorkspace({
         </div>
         <div className="legend">
           <div className="view-switcher" aria-label="工作区视图">
-            <button data-active={view === 'board'} onClick={() => setView('board')}
+            <button data-active={view === 'board'} onClick={() => changeView('board')}
               type="button">制片墙</button>
-            <button data-active={view === 'flow'} onClick={() => setView('flow')}
+            <button data-active={view === 'flow'} onClick={() => changeView('flow')}
               type="button">血缘流程</button>
-            <button data-active={view === 'director'} onClick={() => setView('director')} type="button">计划 / 实测</button>
+            <button data-active={view === 'director'}
+              onClick={() => changeView('director')} type="button">计划 / 实测</button>
           </div>
           <button className="button compact" type="button"
             onClick={() => setProductionOpen(true)}>BRIEF / LOCK</button>
@@ -119,6 +130,8 @@ export function DirectorWorkspace({
         : view === 'flow' ? (
         <Suspense fallback={<div className="progress-bar" />}>
           <InfiniteCanvas busy={busy} onNewShot={onNewShot}
+            canvasFocusMode={canvasFocusMode}
+            onCanvasFocusModeChange={onCanvasFocusModeChange}
             onSelectShot={onSelectShot}
             selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
             shotFocusRevision={shotFocusRevision}
@@ -139,6 +152,8 @@ export function DirectorWorkspace({
             onSetup={() => setProductionOpen(true)} />
           <ActualShotPanel actual={displayedActual} busy={busy}
             actuals={actuals}
+            audioAllowed={outputAsset
+              ? allowsH3NativeAudio(outputAsset, snapshot.h3_jobs) : false}
             hasSelectedShot={Boolean(selectedShot)}
             outputAsset={outputAsset}
             onReviewActual={onReviewActual}

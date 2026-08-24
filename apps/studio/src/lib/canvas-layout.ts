@@ -67,11 +67,11 @@ export function createInitialPositions(shots: LayoutShot[]): CanvasPositions {
   for (const scene of scenes.values()) {
     scene.forEach((shot, index) => {
       positions[shot.id] = {
-        x: 80 + (index % 3) * 284,
-        y: sceneY + Math.floor(index / 3) * 224,
+        x: 80 + (index % 3) * 340,
+        y: sceneY + Math.floor(index / 3) * 290,
       };
     });
-    sceneY += 340 + Math.max(0, Math.ceil(scene.length / 3) - 1) * 224;
+    sceneY += 390 + Math.max(0, Math.ceil(scene.length / 3) - 1) * 290;
   }
   return positions;
 }

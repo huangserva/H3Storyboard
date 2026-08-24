@@ -219,9 +219,10 @@ before writing, then performs the batch in one immediate SQLite transaction.
 Missing nodes are inserted; existing nodes are preserved by default, making two
 tabs safe to load concurrently. `update_position_if_untouched = true` may update
 only the x/y of an otherwise untouched row (the Studio uses this for one-time
-localStorage migration). It never changes size or z-index and cannot overwrite
-a previously modified row. The response returns the complete project canvas
-plus `created_count` and `updated_count`. A validation or
+localStorage migration). `update_layout_if_untouched = true` may instead update
+x/y, size and z-index together for a one-time product layout migration. Neither
+flag can overwrite a previously modified row. The response returns the complete
+project canvas plus `created_count` and `updated_count`. A validation or
 reference failure rolls back the whole batch.
 
 `GET /api/projects/:project_id/jobs/preflights` returns `{project_id, items}` in
