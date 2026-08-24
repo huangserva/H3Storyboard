@@ -109,8 +109,8 @@ export function ShotPlanForm({
               <textarea value={dialogue} onChange={(event) => setDialogue(event.target.value)} placeholder="没有可留空" />
             </label>
             <label>
-              <span>声音</span>
-              <textarea value={sound} onChange={(event) => setSound(event.target.value)} placeholder="环境声、音效、音乐提示" />
+              <span>剧本声音提示（不混音）</span>
+              <textarea value={sound} onChange={(event) => setSound(event.target.value)} placeholder="仅作剧本记录；最终只允许 H3 原声或静音" />
             </label>
           </div>
           <label>

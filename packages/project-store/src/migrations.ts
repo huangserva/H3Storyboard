@@ -16,8 +16,9 @@ import { addRepresentativeTakeGate } from './migration-v12.js';
 import { backfillSemanticReferences } from './migration-v13.js';
 import { addWorkerCancellationReason } from './migration-v14.js';
 import { addProviderSubmitIntent } from './migration-v15.js';
+import { addJobAudioMode } from './migration-v16.js';
 
-const CURRENT_SCHEMA_VERSION = 15;
+const CURRENT_SCHEMA_VERSION = 16;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (
@@ -196,6 +197,11 @@ function migrateLegacyActiveJobs(db: Database.Database): void {
   }
 }
 
+function recordSchemaVersion(db: Database.Database, version: number): void {
+  db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
+    .run(version, new Date().toISOString());
+}
+
 export function migrateDatabase(db: Database.Database): void {
   db.transaction(() => {
     db.exec(`
@@ -220,95 +226,69 @@ export function migrateDatabase(db: Database.Database): void {
     }
     if (!appliedVersions.has(1)) {
       db.exec(MIGRATION_V1);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(1, new Date().toISOString());
+      recordSchemaVersion(db, 1);
     }
     if (!appliedVersions.has(2)) {
       db.exec(MIGRATION_V2);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(2, new Date().toISOString());
+      recordSchemaVersion(db, 2);
     }
     if (!appliedVersions.has(3)) {
       db.exec(MIGRATION_V3);
       migrateLegacyActiveJobs(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(3, new Date().toISOString());
+      recordSchemaVersion(db, 3);
     }
     if (!appliedVersions.has(4)) {
       backfillLegacyLeaseEvents(db);
       migrateContinuityContract(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(4, new Date().toISOString());
+      recordSchemaVersion(db, 4);
     }
     if (!appliedVersions.has(5)) {
       migrateAssetProducers(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(5, new Date().toISOString());
+      recordSchemaVersion(db, 5);
     }
     if (!appliedVersions.has(6)) {
       createCanvasNodes(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(6, new Date().toISOString());
+      recordSchemaVersion(db, 6);
     }
     if (!appliedVersions.has(7)) {
       createCharacters(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(7, new Date().toISOString());
+      recordSchemaVersion(db, 7);
     }
     if (!appliedVersions.has(8)) {
       addAssetLifecycle(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(8, new Date().toISOString());
+      recordSchemaVersion(db, 8);
     }
     if (!appliedVersions.has(9)) {
       createModes(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(9, new Date().toISOString());
+      recordSchemaVersion(db, 9);
     }
     if (!appliedVersions.has(10)) {
       createProductionContext(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(10, new Date().toISOString());
+      recordSchemaVersion(db, 10);
     }
     if (!appliedVersions.has(11)) {
       addSemanticBindings(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(11, new Date().toISOString());
+      recordSchemaVersion(db, 11);
     }
     if (!appliedVersions.has(12)) {
       addRepresentativeTakeGate(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(12, new Date().toISOString());
+      recordSchemaVersion(db, 12);
     }
     if (!appliedVersions.has(13)) {
       backfillSemanticReferences(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(13, new Date().toISOString());
+      recordSchemaVersion(db, 13);
     }
     if (!appliedVersions.has(14)) {
       addWorkerCancellationReason(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(14, new Date().toISOString());
+      recordSchemaVersion(db, 14);
     }
     if (!appliedVersions.has(15)) {
       addProviderSubmitIntent(db);
-      db.prepare(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-      ).run(15, new Date().toISOString());
+      recordSchemaVersion(db, 15);
+    }
+    if (!appliedVersions.has(16)) {
+      addJobAudioMode(db);
+      recordSchemaVersion(db, 16);
     }
   })();
 }

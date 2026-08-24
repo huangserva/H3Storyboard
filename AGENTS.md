@@ -17,6 +17,13 @@ H3Storyboard is a local-first director workbench. It keeps planned shots and gen
 9. Errors use stable codes. Do not classify errors by matching message strings.
 10. Existing user projects and assets are append-only by default. Destructive cleanup requires explicit confirmation.
 
+## Audio invariant
+
+- Final video may contain only audio samples already present in the original H3-generated output.
+- Never add TTS, dubbing, voice cloning, music, ambience, rain, room tone, SFX, Foley, or synthetic noise.
+- A generation job must persist whether it requests H3 native audio or silence. Worker configuration must not change that decision after the job is created.
+- If H3 audio is unusable, the only allowed replacement is silence.
+
 ## Milestone gate
 
 Before declaring a milestone complete:

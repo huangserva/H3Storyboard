@@ -84,11 +84,20 @@ function addShotPlanIssues(
     reference_bindings: z.infer<typeof AssetBindingSchema>[];
   },
   context: z.RefinementCtx,
+  forbidExternalAudio: boolean,
 ): void {
   for (const issue of validateH3BindingList(value.reference_bindings)) {
     context.addIssue({
       code: 'custom',
       message: `${issue.code}: ${issue.message}`,
+      path: ['reference_bindings'],
+    });
+  }
+  if (forbidExternalAudio && value.reference_bindings.some(
+    ({ asset_kind }) => asset_kind === 'audio')) {
+    context.addIssue({
+      code: 'custom',
+      message: 'H3_EXTERNAL_AUDIO_FORBIDDEN: shot plans may use only H3-native audio or silence',
       path: ['reference_bindings'],
     });
   }
@@ -122,7 +131,7 @@ function addShotPlanIssues(
 
 export const CreateShotPlanInputSchema = z
   .object(shotPlanFields)
-  .superRefine(addShotPlanIssues);
+  .superRefine((value, context) => addShotPlanIssues(value, context, true));
 export type CreateShotPlanInput = z.infer<typeof CreateShotPlanInputSchema>;
 
 export const UpdateShotPlanInputSchema = z.object({
@@ -145,7 +154,7 @@ export const ShotPlanSchema = z
     created_at: TimestampSchema,
     updated_at: TimestampSchema,
   })
-  .superRefine(addShotPlanIssues);
+  .superRefine((value, context) => addShotPlanIssues(value, context, false));
 export type ShotPlan = z.infer<typeof ShotPlanSchema>;
 
 export const QcVerdictSchema = z.enum(['pending', 'approved', 'rejected']);

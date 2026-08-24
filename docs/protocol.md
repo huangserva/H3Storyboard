@@ -1,6 +1,6 @@
-# Protocol 1.3
+# Protocol 1.4
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.3 retains the M0 planned/actual and M1A production invariants and closes the M1B submit/recovery audit window with a durable provider client id.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.4 makes the final-audio policy durable: a job chooses original H3 output audio or silence, and no external audio binding may enter generation.
 
 ## Project lineage
 
@@ -34,7 +34,7 @@ Every uploaded reference has one ordered `AssetBinding`:
 }
 ```
 
-The array is the upload order and the prompt-reference order. Ordinals must be contiguous from zero. Limits are 9 images, 3 videos, 3 audio files, and 12 mixed files total.
+The array is the upload order and the prompt-reference order. Ordinals must be contiguous from zero. The historical asset model can still describe audio files, but H3 job input rejects every audio binding. Reference limits are 9 images, 3 videos, and 12 mixed image/video files total.
 
 | mode | minimum valid reference contract |
 |---|---|
@@ -45,7 +45,7 @@ The array is the upload order and the prompt-reference order. Ordinals must be c
 | `v2v` | 1–3 videos and no image |
 | `rv2v` | at least one image and one video |
 
-Audio may accompany the reference modes within H3 limits; it cannot be the only input. Provider adapters may advertise a narrower capability set but may not weaken this contract.
+New shot plans and every job reject external audio bindings. Every job persists `audio_mode = h3_native | silent`. `h3_native` preserves only audio produced inside the original H3 output; `silent` disables H3 audio generation. Worker configuration cannot override that immutable decision. TTS, dubbing, voice cloning, music, ambience, rain, room tone, Foley, SFX, and synthetic noise are forbidden. Provider adapters may advertise a narrower capability set but may not weaken this contract.
 
 Assets store project-relative paths and content hashes. A generated video records its unique `producer_job_id`; one output asset cannot be claimed by two jobs. A derived boundary frame additionally stores `derived_from_asset_id` plus `derivation_kind = first_frame | last_frame | frame_extract`; the store verifies that its source is a video in the same project.
 

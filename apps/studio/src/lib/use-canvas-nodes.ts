@@ -6,6 +6,8 @@ import type {
 } from '@h3storyboard/protocol';
 import { createInitialPositions, parseStoredPositions } from './canvas-layout.js';
 import * as api from './api.js';
+import { mapWithConcurrency } from './bounded-map.js';
+import { KeyedSerialQueue } from './keyed-serial-queue.js';
 
 const CARD_WIDTH = 260;
 const CARD_HEIGHT = 196;
@@ -19,29 +21,25 @@ async function loadNodes(snapshot: ProjectSnapshot): Promise<CanvasNode[]> {
   const defaults = createInitialPositions(snapshot.shot_plans);
   const existing = await api.listCanvasNodes(projectId);
   const byRefId = new Map(existing.map((node) => [node.ref_id, node]));
-  const nodes: CanvasNode[] = existing.filter(
+  const characterNodes = existing.filter(
     ({ node_type }) => node_type === 'character',
   );
-
-  for (const shot of snapshot.shot_plans) {
+  const shotNodes = await mapWithConcurrency(snapshot.shot_plans, 6,
+    async (shot): Promise<CanvasNode | null> => {
     const persisted = byRefId.get(shot.id);
     const legacy = stored[shot.id];
     if (persisted) {
-      nodes.push(
-        legacy
-          ? await api.updateCanvasNode(projectId, {
-              node_id: persisted.id,
-              x: legacy.x,
-              y: legacy.y,
-            })
-          : persisted,
-      );
-      continue;
+      return legacy
+        ? api.updateCanvasNode(projectId, {
+            node_id: persisted.id,
+            x: legacy.x,
+            y: legacy.y,
+          })
+        : persisted;
     }
     const position = legacy ?? defaults[shot.id];
-    if (!position) continue;
-    nodes.push(
-      await api.createCanvasNode(projectId, {
+    if (!position) return null;
+    return api.createCanvasNode(projectId, {
         node_type: 'shot_plan',
         ref_id: shot.id,
         x: position.x,
@@ -49,11 +47,11 @@ async function loadNodes(snapshot: ProjectSnapshot): Promise<CanvasNode[]> {
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
         z_index: shot.ordinal,
-      }),
-    );
-  }
+      });
+  });
   if (serialized !== null) localStorage.removeItem(storageKey);
-  return nodes;
+  return [...characterNodes, ...shotNodes.filter(
+    (node): node is CanvasNode => node !== null)];
 }
 function describeError(error: unknown): string {
   if (error instanceof api.ApiError) return `${error.message} · ${error.code}`;
@@ -65,6 +63,9 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const persistQueue = useRef(new KeyedSerialQueue<string>());
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const loadKey = useMemo(
     () => `${snapshot.project.id}:${snapshot.shot_plans.map(({ id }) => id).join(',')}`,
     [snapshot.project.id, snapshot.shot_plans],
@@ -77,7 +78,7 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
     setError(null);
     let pending = pendingLoads.get(loadKey);
     if (!pending) {
-      pending = loadNodes(snapshot).finally(() => pendingLoads.delete(loadKey));
+      pending = loadNodes(snapshotRef.current).finally(() => pendingLoads.delete(loadKey));
       pendingLoads.set(loadKey, pending);
     }
     void pending.then(
@@ -92,7 +93,7 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
         setLoading(false);
       },
     );
-  }, [loadKey, snapshot]);
+  }, [loadKey]);
 
   const updateLocalNode = (
     nodeId: string,
@@ -103,17 +104,19 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
     );
   };
 
-  const persistNode = async (input: UpdateCanvasNodeInput) => {
-    try {
-      const updated = await api.updateCanvasNode(snapshot.project.id, input);
-      setNodes((current) =>
-        current.map((node) => node.id === updated.id ? updated : node),
-      );
-      setError(null);
-    } catch (persistError) {
-      setError(describeError(persistError));
-    }
-  };
+  const persistNode = (input: UpdateCanvasNodeInput) =>
+    persistQueue.current.run(input.node_id, async () => {
+      try {
+        const updated = await api.updateCanvasNode(snapshot.project.id, input);
+        setNodes((current) =>
+          current.map((node) => node.id === updated.id ? updated : node),
+        );
+        setError(null);
+      } catch (persistError) {
+        setError(describeError(persistError));
+        throw persistError;
+      }
+    });
 
   const placeCharacter = async (characterId: string) => {
     if (nodes.some((node) =>

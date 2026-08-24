@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard · 原声硬约束与产品画布交付</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090c0b;--panel:#111613;--panel2:#171d19;--ink:#f0ede3;--muted:#909b95;--line:#2b3530;--acid:#c9f36b;--teal:#53d5bd;--violet:#9da8ff;--amber:#d7ad6a;--red:#ff7d73}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0,#20342a 0,transparent 34rem),radial-gradient(circle at 2% 38%,#23213d 0,transparent 34rem),var(--bg);color:var(--ink);font:15px/1.68 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}
+    main{width:min(1180px,calc(100% - 32px));margin:48px auto 90px}.eyebrow{color:var(--acid);font:700 12px/1.4 ui-monospace,SFMono-Regular,monospace;letter-spacing:.14em}h1{max-width:970px;margin:14px 0 18px;font-size:clamp(38px,6vw,68px);line-height:1.03;letter-spacing:-.045em}h2{margin:54px 0 16px;font-size:27px;letter-spacing:-.02em}h3{margin:0 0 8px;font-size:18px}.lede{max-width:980px;color:#c3cbc6;font-size:20px}.callout{margin:28px 0;padding:24px 26px;border:1px solid #526733;border-radius:18px;background:linear-gradient(135deg,#1b281c,#121915);font-size:18px}.callout strong{color:var(--acid)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:21px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(155deg,var(--panel2),var(--panel))}.card p{margin:6px 0;color:var(--muted)}.metric{color:var(--teal);font:750 29px/1.2 ui-monospace,SFMono-Regular,monospace}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#29351d;color:var(--acid);font:700 11px/1.4 ui-monospace,SFMono-Regular,monospace}
+    table{width:100%;border-collapse:separate;border-spacing:0;background:#0f1411;border:1px solid var(--line);border-radius:16px;overflow:hidden}th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}th{color:var(--acid);background:#171e19;font-size:12px;letter-spacing:.07em}code{color:#bceab9;font-size:.92em}.good{color:var(--teal)}.warn{color:var(--amber)}.bad{color:var(--red)}
+    .flow{display:flex;align-items:center;gap:9px;overflow:auto;padding:8px 0}.flow span{min-width:150px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#121814;text-align:center}.flow i{color:var(--acid);font-style:normal}.rule{padding:18px 20px;border-left:3px solid var(--red);background:#1b1312}.score{display:grid;grid-template-columns:80px 70px 1fr;gap:13px;padding:15px 0;border-bottom:1px solid var(--line)}.score:last-child{border:0}.grade{color:var(--acid);font:800 22px/1.3 ui-monospace,SFMono-Regular,monospace}.small{color:var(--muted);font-size:13px}ul{padding-left:22px}li+li{margin-top:8px}.footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+    @media(max-width:820px){.grid{grid-template-columns:1fr}.score{grid-template-columns:64px 54px 1fr}table{display:block;overflow:auto}h1{font-size:42px}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">DELIVERY REPORT · 2026-08-24 · P0 AUDIO + P1 CANVAS</div>
+  <h1>线上 H3Storyboard 继续做底座，<br>这次把声音底线和产品画布真正落了地。</h1>
+  <p class="lede">实施基于线上最新提交 <code>5b8c33b</code>，独立分支 <code>codex/p0-p1-h3-canvas</code>。没有把旧项目硬合并进来；迁移的是 xyz/OiiOii 的成熟画布展示与对象旁操作思路，保留 H3Storyboard 的不可变任务、资产血缘、Plan/Actual 分离和可恢复 worker。</p>
+  <div class="callout"><strong>最终判断：</strong>方向已经统一——H3Storyboard 是唯一产品主线；xyz-video-creator 是交互参考，不是运行时。首批交付已达到四路独立复审门槛，协议对齐 A、测试 B+、真实 bug B、架构 B-。</div>
+
+  <h2>这次到底交付了什么</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">P0 · AUDIO INVARIANT</span><div class="metric">H3 或静音</div><h3>声音选择变成持久协议</h3><p>Protocol 1.4 / schema v16 新增 <code>audio_mode = h3_native | silent</code>。worker 只服从 Job，不再接受运行时开关覆盖。</p></div>
+    <div class="card"><span class="tag">P1 · REACT FLOW</span><div class="metric">7 类节点</div><h3>从卡片墙升级为可追溯画布</h3><p>Script、Scene、Asset、Character、Shot、H3 Job、Take/QC 同屏；含连线、MiniMap、Controls、状态与右侧 Inspector。</p></div>
+    <div class="card"><span class="tag">DATA TRUTH</span><div class="metric">1 套真相</div><h3>React Flow 只是 projection</h3><p>业务节点和关系来自 ProjectSnapshot；只把 Shot/Character 坐标写入既有 <code>canvas_nodes</code>，没有另造画布业务数据库。</p></div>
+    <div class="card"><span class="tag">REAL E2E</span><div class="metric">4 / 4</div><h3>真浏览器、真 API、真 SQLite</h3><p>覆盖选中 Inspector、拖拽 PATCH、刷新回显、真实 404 回滚，以及 100 Shot 的 MiniMap 挂载。</p></div>
+  </div>
+
+  <h2>声音硬规则</h2>
+  <div class="rule"><strong>最终视频只能保留原始 H3 输出中已有的声音，或保持静音。</strong><br>禁止 TTS、配音、声音克隆、音乐、环境声、雨声、room tone、Foley、SFX 和任何合成噪声叠加。H3 原声不可用时，唯一替代是静音。</div>
+  <table><thead><tr><th>层级</th><th>落地方式</th><th>验证</th></tr></thead><tbody>
+    <tr><td>Agent 约束</td><td><code>AGENTS.md</code> 写入永久硬规则</td><td>后续 agent 不得引入 TTS/后混</td></tr>
+    <tr><td>Protocol</td><td>新 Shot 与所有 H3 Job 拒绝 external audio binding</td><td>稳定错误 <code>H3_EXTERNAL_AUDIO_FORBIDDEN</code></td></tr>
+    <tr><td>SQLite</td><td>v16 增加非空、带 CHECK 的 <code>audio_mode</code>；历史任务回填 <code>h3_native</code></td><td>v15→v16 migration + restart 测试</td></tr>
+    <tr><td>Worker</td><td><code>generate_audio</code> 从全局配置删除，由 <code>job.audio_mode</code> 决定</td><td>i2v / fl2v / r2v 静音图均无输出音轨</td></tr>
+    <tr><td>Studio</td><td>删除新音频资产入口与 H3 音频参考槽；历史绑定只显示“已隔离”</td><td>Job Inspector 明确显示“H3 原声 / 静音”</td></tr>
+  </tbody></table>
+
+  <h2>画布的产品模型</h2>
+  <div class="flow"><span>Script / Scene</span><i>→</i><span>Reference / Character</span><i>→</i><span>ShotPlan</span><i>→</i><span>H3 Job</span><i>→</i><span>Output Asset</span><i>→</i><span>ShotActual / QC</span></div>
+  <table><thead><tr><th>从 xyz 学什么</th><th>在 H3 如何实现</th><th>明确不搬什么</th></tr></thead><tbody>
+    <tr><td>左侧素材、中央工作流、右侧详情</td><td>Asset palette + React Flow + Inspector/Character rail</td><td>4712 行 HTML / 5778 行 Alpine 单体状态机</td></tr>
+    <tr><td>媒体卡、状态遮罩、对象旁主动作</td><td>Shot 卡保留生成入口；Asset/Job/Take 卡展示媒体和生命周期</td><td>结果 URL 覆盖 Storyboard 当前字段</td></tr>
+    <tr><td>缩放、平移、适应、全局导航</td><td>React Flow Background / Controls / MiniMap / fitView / viewport culling</td><td>不可恢复 SSE task 和全局 generating 单槽</td></tr>
+    <tr><td>流程的可视化关系</td><td>关系从 semantic references、Job、Asset、Actual、continuity 派生</td><td>任意视觉连线伪造业务关系</td></tr>
+    <tr><td>强媒体反馈</td><td>候选 Take 可预览，但 <code>completed</code> 与 <code>approved</code> 分开</td><td>TTS、BGM、音效、后混与“最新=最终”</td></tr>
+  </tbody></table>
+
+  <h2>关键工程处理</h2>
+  <ul>
+    <li><strong>完整血缘：</strong><code>ShotPlan → H3Job → output Asset → ShotActual/QC</code>；连续性边直接指向具体 source Take 和 reference frame Asset。</li>
+    <li><strong>Plan/Actual 不混：</strong>Shot 节点固定为 planned，绝不继承 Take 的 pending/approved/rejected；Take 自己承载 QC。</li>
+    <li><strong>拖拽可靠性：</strong>每次拖动有 session token；同一节点 PATCH 串行；旧请求完成不会清掉新拖动；失败立即恢复原坐标并显示稳定错误。</li>
+    <li><strong>布局可靠性：</strong>Job/Output/Take 使用独立泳道，Script/Character/Shot 默认位置经全前景碰撞测试；派生节点只读。</li>
+    <li><strong>规模控制：</strong>canvas 初始化与 preflight 并发上限为 6；图谱用 Map 索引，消除按 Shot/Job 反复全表 filter 的 O(N²)。</li>
+    <li><strong>孤儿数据：</strong>只给真实渲染的 source/target 建 edge，缺失 Asset/Character/Job/Take 不会留下悬空连线。</li>
+  </ul>
+
+  <h2>质量门</h2>
+  <table><thead><tr><th>门禁</th><th>结果</th><th>覆盖重点</th></tr></thead><tbody>
+    <tr><td><code>pnpm check</code></td><td class="good">通过</td><td>TypeScript workspace contract</td></tr>
+    <tr><td><code>pnpm build</code></td><td class="good">通过</td><td>Studio production bundle</td></tr>
+    <tr><td>Vitest</td><td class="good">118 passed / 1 skipped</td><td>Protocol、migration、真 HTTP+SQLite、worker、图谱、并发队列</td></tr>
+    <tr><td>Playwright</td><td class="good">4 passed</td><td>真 Chrome、Inspector、拖拽保存、刷新、失败回滚、100 Shot</td></tr>
+    <tr><td>文件限制</td><td class="good">通过</td><td><code>InfiniteCanvas.tsx</code> 62 行；graph 249 行；lineage 162 行</td></tr>
+  </tbody></table>
+
+  <h2>Self-Review</h2>
+  <section class="card">
+    <div class="score"><strong>A</strong><span class="grade">B-</span><div><strong>架构与可维护性</strong><br><span class="small">首轮文件超限、拖拽回弹、O(N²) 已修。保留项：100 Shot 仍是 O(N) HTTP 数量，尚无 batch API。</span></div></div>
+    <div class="score"><strong>B</strong><span class="grade">B</span><div><strong>真实 bug 与边界</strong><br><span class="small">遮挡、快速连续拖拽、失败假成功、旧轮覆盖、悬空边全部修复。保留项：多标签首载可能竞争创建 canvas node；fetch 尚无统一超时。</span></div></div>
+    <div class="score"><strong>C</strong><span class="grade">B+</span><div><strong>测试质量</strong><br><span class="small">原先只有纯函数测试，现有真浏览器穿透、100 Shot、三模式静音与 restart。保留项：浏览器 fixture 尚未真实点击完整 Asset/Character/Job/Take 媒体链。</span></div></div>
+    <div class="score"><strong>D</strong><span class="grade">A</span><div><strong>Spec / 协议对齐</strong><br><span class="small">首轮输出 Asset、精确 continuity、Plan/Actual、音频槽四项全部修复；复审未发现新偏离，MVP 100%。</span></div></div>
+  </section>
+  <p><strong>严重项 verdict：</strong>四路首轮全部严重问题均已修复并给出回归测试；没有严重项延期。架构、并发和浏览器媒体 fixture 的中低项未伪装成“已完成”，列入下一阶段。</p>
+
+  <h2>原始任务逐条 verdict</h2>
+  <table><thead><tr><th>任务</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+    <tr><td>以线上 H3Storyboard 为基础</td><td class="good">完成</td><td>基线 <code>5b8c33b</code>，独立实现分支，旧本地未合并</td></tr>
+    <tr><td>永远不要 TTS；只允许 H3 声音</td><td class="good">完成</td><td>Agent + Protocol + SQLite + Worker + Studio 五层约束</td></tr>
+    <tr><td>迁入 xyz-video-creator 的画布展示方式</td><td class="good">完成 P1</td><td>四区布局、React Flow、媒体节点、血缘线、MiniMap、Inspector</td></tr>
+    <tr><td>人物/素材/任务/成片关系清楚</td><td class="good">完成</td><td>Script/Scene/Asset/Character/Shot/Job/Take 七类节点与精确 edge</td></tr>
+    <tr><td>真实验证</td><td class="good">完成</td><td>Vitest + Playwright；不是 mock-only 或源码字符串断言</td></tr>
+  </tbody></table>
+
+  <h2>没有悄悄做掉的东西</h2>
+  <ul>
+    <li>删除了旧手写 InfiniteCanvas 的 viewport/pointer 实现，替换为 React Flow；没有删除现有业务 API 或历史数据。</li>
+    <li>删除了 Studio 新建 AUDIO 素材入口、H3 音频参考槽和 worker 全局 <code>generate_audio</code> 配置；历史 audio schema 保留只读兼容。</li>
+    <li>没有迁入 xyz 的 TTS、BGM、SFX、后混、URL 覆盖 Plan、不可恢复任务和假节点状态。</li>
+    <li>没有做 batch canvas upsert / batch preflight、完整媒体浏览器 fixture、跨标签幂等首载；这些是已知下一步，不是遗漏。</li>
+  </ul>
+
+  <h2>下一阶段建议</h2>
+  <ol>
+    <li><strong>P1.1：</strong>批量 preflight + 幂等 canvas upsert，优先解决 4090 远端延迟、多标签竞争和 O(Shot) 请求数。</li>
+    <li><strong>P1.2：</strong>带真实 Character/Asset/Job/Take/视频文件的浏览器 fixture；增加远端节点 pan/zoom 与媒体 lightbox 测试。</li>
+    <li><strong>P1.3：</strong>继续迁 xyz 的直接操作密度：Take switcher、媒体放大、per-job progress、修复输入；不改变 H3-only audio 与 Plan/Actual。</li>
+  </ol>
+
+  <div class="footer">研究索引：<code>.hive/research/2026-08-24-h3-audio-react-flow-canvas.md</code>。本报告自包含；源码分支位于线上 H3Storyboard 的独立 worktree，主分支未被改写。</div>
+</main></body></html>

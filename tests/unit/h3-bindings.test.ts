@@ -77,13 +77,13 @@ describe('H3 binding contracts', () => {
     );
   });
 
-  it('allows audio to accompany first-frame modes', () => {
+  it('rejects external audio because final output is H3-native or silent', () => {
     expect(
       validateH3Bindings('i2v', [
         binding(1, 'first_frame', 'image'),
         binding(2, 'audio', 'audio'),
-      ]),
-    ).toEqual([]);
+      ]).map(({ code }) => code),
+    ).toContain('H3_EXTERNAL_AUDIO_FORBIDDEN');
   });
 
   it('rejects role-kind mismatches and duplicate boundary roles', () => {
@@ -142,6 +142,18 @@ describe('H3 binding contracts', () => {
 });
 
 describe('continuity protocol', () => {
+  it('rejects external audio when a new shot plan is authored', () => {
+    const result = CreateShotPlanInputSchema.safeParse({
+      title: 'silent plan', scene_id: 'SC-1', duration_seconds: 6,
+      shot_size: 'medium', camera_movement: 'locked',
+      action: 'A person crosses the frame.',
+      reference_bindings: [binding(1, 'audio', 'audio')],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.map(({ message }) => message))
+      .toContainEqual(expect.stringContaining('H3_EXTERNAL_AUDIO_FORBIDDEN'));
+  });
+
   it('requires every continuity dependency asset in the upload bindings', () => {
     const result = CreateShotPlanInputSchema.safeParse({
       title: 'continued shot',

@@ -296,7 +296,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(15);
+    ).toBe(16);
     migratedVersion.close();
   });
 
@@ -327,6 +327,43 @@ describe('ProjectStore', () => {
     expect(reopened.getProjectSnapshot(project.id).shot_plans[0]
       ?.semantic_references).toEqual([{ purpose: 'first_frame',
         target: { type: 'asset', asset_id: image.id } }]);
+  });
+
+  it('backfills H3-native audio policy when migrating from v15', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'h3-store-v16-'));
+    directories.push(directory);
+    const databasePath = join(directory, 'project.db');
+    const first = new ProjectStore(databasePath);
+    const project = createProject(first);
+    const shot = createShot(first, project.id);
+    const job = first.createH3Job(shot.id, {
+      mode: 't2v',
+      provider: 'local_comfyui',
+      model: 'H3-local',
+      prompt: 'Legacy H3 job before audio policy was durable.',
+      duration_seconds: 6,
+      seed: 44,
+      steps: 24,
+      idempotency_key: 'legacy-audio-policy',
+      input_bindings: [],
+    });
+    first.close();
+
+    const raw = new Database(databasePath);
+    raw.exec(`
+      ALTER TABLE h3_jobs DROP COLUMN audio_mode;
+      DELETE FROM schema_version WHERE version = 16;
+    `);
+    raw.close();
+
+    const reopened = new ProjectStore(databasePath);
+    stores.push(reopened);
+    expect(reopened.getH3Job(job.id).audio_mode).toBe('h3_native');
+    const migrated = new Database(databasePath, { readonly: true });
+    expect((migrated.prepare(
+      'SELECT MAX(version) AS version FROM schema_version',
+    ).get() as { version: number }).version).toBe(16);
+    migrated.close();
   });
 
   it('keeps every generated attempt and reviews a take only once', () => {

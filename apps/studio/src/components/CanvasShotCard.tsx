@@ -1,4 +1,4 @@
-import type { Asset, CanvasNode, GenerationPreflight, H3Job, ShotActual,
+import type { Asset, GenerationPreflight, H3Job, ShotActual,
   ShotPlan } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
 import { GenerationControl } from './GenerationControl.js';
@@ -6,8 +6,7 @@ import { GenerationControl } from './GenerationControl.js';
 interface CanvasShotCardProps {
   shot: ShotPlan;
   actuals: ShotActual[];
-  assets: Asset[];
-  node: CanvasNode;
+  previewAsset: Asset | null;
   selected: boolean;
   compileReady: boolean;
   busy: boolean;
@@ -20,8 +19,7 @@ interface CanvasShotCardProps {
 export function CanvasShotCard({
   shot,
   actuals,
-  assets,
-  node,
+  previewAsset,
   selected,
   compileReady,
   busy,
@@ -36,45 +34,30 @@ export function CanvasShotCard({
       !latest || actual.attempt_number > latest.attempt_number ? actual : latest,
     null,
   );
-  const actualAsset = assets.find(({ id }) => id === latestActual?.output_asset_id);
-  const firstFrame = shot.semantic_references.find(({ purpose, target }) =>
-    purpose === 'first_frame' && target.type === 'asset');
-  const firstFrameAssetId = firstFrame?.target.type === 'asset'
-    ? firstFrame.target.asset_id : null;
-  const firstFrameAsset = firstFrameAssetId
-    ? assets.find((asset) => asset.id === firstFrameAssetId &&
-      asset.kind === 'image' && asset.status !== 'archived') : undefined;
-  const preview = actualAsset ?? firstFrameAsset;
-
   return (
     <article
       aria-label={`计划分镜 ${shot.ordinal}: ${shot.title}`}
       className="canvas-shot-card"
       data-selected={selected}
-      data-canvas-node={node.id}
       data-shot-card={shot.id}
-      style={{
-        height: node.height,
-        transform: `translate(${node.x}px, ${node.y}px)`,
-        width: node.width,
-        zIndex: node.z_index,
-      }}
     >
       <header>
         <span>SHOT {String(shot.ordinal).padStart(2, '0')}</span>
         <i data-compile-ready={compileReady}>{compileReady ? '可编译' : '缺输入'}</i>
       </header>
       <div className="canvas-card-frame" aria-hidden="true">
-        {preview?.kind === 'video' ? <video muted playsInline preload="metadata"
-          src={assetFileUrl(preview.id)} /> : preview?.kind === 'image'
-          ? <img alt="" loading="lazy" src={assetFileUrl(preview.id)} /> : null}
+        {previewAsset?.kind === 'video' ? <video muted playsInline preload="metadata"
+          src={assetFileUrl(previewAsset.id)} /> : previewAsset?.kind === 'image'
+          ? <img alt="" loading="lazy" src={assetFileUrl(previewAsset.id)} /> : null}
         <b>{shot.shot_size}</b>
         <span>{shot.duration_seconds}s</span>
       </div>
       <h3>{shot.title}</h3>
       <p>{shot.action}</p>
-      <GenerationControl compact busy={busy} job={job} preflight={preflight}
-        onGenerate={onGenerate} onSetup={onSetup} />
+      <div className="nodrag nopan">
+        <GenerationControl compact busy={busy} job={job} preflight={preflight}
+          onGenerate={onGenerate} onSetup={onSetup} />
+      </div>
       <footer>
         <span>{shot.camera_movement}</span>
         <span data-verdict={latestActual?.qc_verdict ?? 'none'}>

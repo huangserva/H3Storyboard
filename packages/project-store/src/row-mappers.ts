@@ -149,6 +149,7 @@ export function mapH3Job(row: unknown): H3Job {
     gate_override_reason: record.gate_override_reason ?? null,
     cancel_reason: record.cancel_reason ?? null,
     provider_client_id: record.provider_client_id ?? null,
+    audio_mode: record.audio_mode ?? 'h3_native',
   });
 }
 

@@ -39,7 +39,7 @@ describe('compiled API runtime', () => {
     const response = await fetch(`${origin}/api/health`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      data: { status: 'ok', protocol_version: '1.3' },
+      data: { status: 'ok', protocol_version: '1.4' },
     });
 
     child.kill('SIGTERM');

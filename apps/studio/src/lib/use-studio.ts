@@ -186,6 +186,7 @@ export function useStudio() {
         duration_seconds: shot.duration_seconds,
         seed,
         steps: 4,
+        audio_mode: 'h3_native',
         idempotency_key: `studio-${crypto.randomUUID()}`,
         input_bindings: preflight.input_bindings,
         ...(gateOverrideReason ? { gate_override_reason: gateOverrideReason } : {}),

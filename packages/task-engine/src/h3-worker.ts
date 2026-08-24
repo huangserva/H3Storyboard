@@ -39,7 +39,6 @@ export class H3LeaseWorker {
       fps: options.fps ?? 24,
       turbo: options.turbo ?? true,
       loras: options.loras ?? [],
-      generate_audio: options.generate_audio ?? true,
       free_before_submit: options.free_before_submit ?? true,
       r2v_loader: options.r2v_loader ?? { kind: 'stock' },
     };
@@ -199,7 +198,7 @@ export class H3LeaseWorker {
       fps: this.#options.fps, seed: job.seed, loras: this.#options.loras,
       steps: job.steps, turbo: this.#options.turbo,
       filename_prefix: `h3storyboard/${job.id}`,
-      generate_audio: this.#options.generate_audio,
+      generate_audio: job.audio_mode === 'h3_native',
     };
     const graph = job.mode === 'i2v'
       ? buildH3I2VGraph({ ...common, start_name: names[0]! })

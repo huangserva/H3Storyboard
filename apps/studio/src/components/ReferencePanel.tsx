@@ -17,11 +17,12 @@ const slots: Array<{
   { role: 'first_frame', label: '首帧', hint: '画面起点', glyph: '首' },
   { role: 'last_frame', label: '尾帧', hint: '画面终点', glyph: '尾' },
   { role: 'motion', label: '动作视频', hint: '动态参考', glyph: '动' },
-  { role: 'audio', label: '音频', hint: '声音参考', glyph: '声' },
 ];
 
 export function ReferencePanel({ shot }: ReferencePanelProps) {
   const bindings = shot?.reference_bindings ?? [];
+  const visibleBindings = bindings.filter(({ role }) => role !== 'audio');
+  const hasLegacyAudio = visibleBindings.length !== bindings.length;
 
   return (
     <aside className="reference-panel" aria-label="H3 参考资产">
@@ -30,13 +31,17 @@ export function ReferencePanel({ shot }: ReferencePanelProps) {
           <span className="eyebrow">H3 INPUTS</span>
           <h2>参考槽</h2>
         </div>
-        <span className="binding-count">{bindings.length}/12</span>
+        <span className="binding-count">{visibleBindings.length}/12</span>
       </header>
       <p className="reference-intro">提示词与上传文件使用同一绑定清单，未上传的参考不会写入任务。</p>
+      {hasLegacyAudio ? <p className="reference-intro" role="alert">
+        历史音频绑定已隔离，不会进入 H3 任务。
+      </p> : null}
 
       <div className="reference-slots">
         {slots.map((slot) => {
-          const count = bindings.filter((binding) => binding.role === slot.role).length;
+          const count = visibleBindings.filter(
+            (binding) => binding.role === slot.role).length;
           return (
             <div className="reference-slot" data-bound={count > 0} key={slot.role}>
               <span className="slot-glyph">{slot.glyph}</span>

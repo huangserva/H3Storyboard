@@ -19,10 +19,12 @@
     "dev:studio": "pnpm check && pnpm --filter @h3storyboard/studio dev:serve",
     "check": "tsc -b --pretty false",
     "build": "tsc -b --pretty false && pnpm --filter @h3storyboard/studio build",
-    "test": "tsc -b --pretty false && vitest run",
+    "test": "tsc -b --pretty false && vitest run && playwright test",
+    "test:e2e": "tsc -b --pretty false && playwright test",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.0",
     "better-sqlite3": "^13.0.3",

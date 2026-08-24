@@ -22,6 +22,9 @@ export type H3Mode = z.infer<typeof H3ModeSchema>;
 export const H3ProviderSchema = z.enum(['local_comfyui', 'minimax_api']);
 export type H3ProviderName = z.infer<typeof H3ProviderSchema>;
 
+export const H3AudioModeSchema = z.enum(['h3_native', 'silent']);
+export type H3AudioMode = z.infer<typeof H3AudioModeSchema>;
+
 export const H3JobStatusSchema = z.enum([
   'draft',
   'submitting',
@@ -41,6 +44,7 @@ const jobFields = {
   duration_seconds: z.number().min(4).max(15),
   seed: z.number().int().nonnegative().nullable().default(null),
   steps: z.number().int().min(1).max(100),
+  audio_mode: H3AudioModeSchema.default('h3_native'),
   idempotency_key: NonEmptyTextSchema.min(8).max(200),
   input_bindings: z.array(AssetBindingSchema),
   gate_override_reason: NonEmptyTextSchema.max(1_000).nullable().optional(),
@@ -66,7 +70,7 @@ export const CreateH3JobInputSchema = z
       });
     }
   });
-export type CreateH3JobInput = z.infer<typeof CreateH3JobInputSchema>;
+export type CreateH3JobInput = z.input<typeof CreateH3JobInputSchema>;
 
 export const H3JobSchema = z.object({
   id: IdSchema,
@@ -79,6 +83,7 @@ export const H3JobSchema = z.object({
   duration_seconds: z.number().min(4).max(15),
   seed: z.number().int().nonnegative().nullable(),
   steps: z.number().int().min(1).max(100),
+  audio_mode: H3AudioModeSchema,
   idempotency_key: NonEmptyTextSchema,
   input_bindings: z.array(AssetBindingSchema),
   status: H3JobStatusSchema,
@@ -188,6 +193,12 @@ export function validateH3Bindings(
     issues.push({
       code: 'H3_MODE_BINDING_MISMATCH',
       message: `Reference bindings do not satisfy ${mode}`,
+    });
+  }
+  if (counts.audio > 0) {
+    issues.push({
+      code: 'H3_EXTERNAL_AUDIO_FORBIDDEN',
+      message: 'H3 jobs may use only H3-native audio or silence',
     });
   }
   return issues;

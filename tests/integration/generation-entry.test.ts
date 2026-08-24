@@ -91,6 +91,58 @@ describe('Studio generation entrypoint', () => {
     expect((await snapshot(api.origin, project)).h3_jobs).toEqual([]);
   });
 
+  it('rejects external audio bindings without persisting a job', async () => {
+    const api = await startApi();
+    const project = await createProject(api.origin, 'H3 native audio project');
+    const shot = await createShot(api.origin, project);
+    await createMode(api.origin, 'native-audio-production', ['i2v']);
+    const image = await createApprovedAsset(api.origin, project, 'image');
+    const audio = await createApprovedAsset(api.origin, project, 'audio');
+    await post(`${api.origin}/api/projects/${project}/manifests`, {});
+    await patch(`${api.origin}/api/shots/${shot}`, { semantic_references: [{
+      purpose: 'first_frame', target: { type: 'asset', asset_id: image },
+    }] });
+    await post(`${api.origin}/api/projects/${project}/briefs`,
+      brief('native-audio-production'));
+    await put(`${api.origin}/api/projects/${project}/generation_lock`, {
+      engaged: true, reason: 'External audio rejection test',
+    });
+    const preflight = ((await (await fetch(
+      `${api.origin}/api/projects/${project}/shots/${shot}/jobs/preflight`)
+    ).json()) as { data: { ready: boolean; input_bindings: unknown[] } }).data;
+    expect(preflight.ready).toBe(true);
+
+    const response = await post(
+      `${api.origin}/api/projects/${project}/shots/${shot}/jobs`,
+      jobInput('i2v', [...preflight.input_bindings, {
+        asset_id: audio, asset_kind: 'audio', role: 'audio', ordinal: 1,
+      }]));
+
+    await expectError(response, 422, 'H3_BINDINGS_INVALID');
+    expect((await snapshot(api.origin, project)).h3_jobs).toEqual([]);
+  });
+
+  it('rejects external audio while authoring a new shot plan', async () => {
+    const api = await startApi();
+    const project = await createProject(api.origin, 'Audio-free shot plan');
+    const response = await post(`${api.origin}/api/projects/${project}/shots`, {
+      title: 'No external mix', scene_id: 'scene-01', duration_seconds: 5,
+      shot_size: 'medium', camera_movement: 'locked',
+      action: 'A courier crosses the frame.', dialogue: '', sound: '',
+      prompt: 'A cinematic courier crosses a rain-soaked frame.',
+      continuity_mode: 'independent', continuity_dependencies: [],
+      costume_state: {}, reference_bindings: [{ asset_id: crypto.randomUUID(),
+        asset_kind: 'audio', role: 'audio', ordinal: 0 }],
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: {
+      code: string; details: Array<{ message: string }> } };
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details.map(({ message }) => message)).toContainEqual(
+      expect.stringContaining('H3_EXTERNAL_AUDIO_FORBIDDEN'));
+    expect((await snapshot(api.origin, project)).shot_plans).toEqual([]);
+  });
+
   it('creates an immutable scoped job while leaving plan and actual records separate', async () => {
     const api = await startApi();
     const project = await createProject(api.origin, 'Ready project');
@@ -126,15 +178,53 @@ describe('Studio generation entrypoint', () => {
     expect(persisted.shot_actuals).toEqual([]);
     expect(persisted.shot_plans).toHaveLength(1);
   });
+
+  it('persists silent audio mode through the HTTP boundary and a SQLite restart', async () => {
+    const api = await startApi();
+    const project = await createProject(api.origin, 'Silent restart project');
+    const shot = await createShot(api.origin, project);
+    await createMode(api.origin, 'silent-image-production', ['i2v']);
+    const asset = await createManifestAsset(api.origin, project);
+    await patch(`${api.origin}/api/shots/${shot}`, { semantic_references: [{
+      purpose: 'first_frame', target: { type: 'asset', asset_id: asset },
+    }] });
+    await post(`${api.origin}/api/projects/${project}/briefs`,
+      brief('silent-image-production'));
+    await put(`${api.origin}/api/projects/${project}/generation_lock`, {
+      engaged: true, reason: 'Silent persistence integration test',
+    });
+    const preflight = ((await (await fetch(
+      `${api.origin}/api/projects/${project}/shots/${shot}/jobs/preflight`)
+    ).json()) as { data: { input_bindings: unknown[] } }).data;
+
+    const created = await post(
+      `${api.origin}/api/projects/${project}/shots/${shot}/jobs`,
+      { ...jobInput('i2v', preflight.input_bindings), audio_mode: 'silent' });
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({ data: { audio_mode: 'silent' } });
+
+    await api.server.close();
+    servers.delete(api.server);
+    const restarted = createApiServer({ database_path: api.databasePath, port: 0 });
+    servers.add(restarted);
+    const { origin } = await restarted.start();
+    const persisted = await snapshot(origin, project) as { h3_jobs: Array<{
+      shot_plan_id: string; audio_mode: string }> };
+    expect(persisted.h3_jobs).toContainEqual(expect.objectContaining({
+      shot_plan_id: shot,
+      audio_mode: 'silent',
+    }));
+  });
 });
 
 async function startApi() {
   const directory = await mkdtemp(join(tmpdir(), 'h3-generation-entry-'));
   directories.add(directory);
-  const server = createApiServer({ database_path: join(directory, 'project.db'), port: 0 });
+  const databasePath = join(directory, 'project.db');
+  const server = createApiServer({ database_path: databasePath, port: 0 });
   servers.add(server);
   const { origin } = await server.start();
-  return { origin };
+  return { origin, server, databasePath };
 }
 
 async function createProject(origin: string, title: string): Promise<string> {
@@ -169,14 +259,21 @@ async function createMode(origin: string, key: string,
 }
 
 async function createManifestAsset(origin: string, project: string): Promise<string> {
+  const assetId = await createApprovedAsset(origin, project, 'image');
+  await post(`${origin}/api/projects/${project}/manifests`, {});
+  return assetId;
+}
+
+async function createApprovedAsset(origin: string, project: string,
+  kind: 'image' | 'audio'): Promise<string> {
   const created = await post(`${origin}/api/projects/${project}/assets`, {
-    kind: 'image', name: 'Context', uri: `context/${project}.png`, content_hash: null,
+    kind, name: `${kind} context`, uri: `context/${project}.${kind}`,
+    content_hash: null,
   });
   const asset = ((await created.json()) as { data: { id: string } }).data;
   await patch(`${origin}/api/projects/${project}/assets`, {
     asset_id: asset.id, status: 'approved',
   });
-  await post(`${origin}/api/projects/${project}/manifests`, {});
   return asset.id;
 }
 

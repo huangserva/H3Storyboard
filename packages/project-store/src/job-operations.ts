@@ -73,12 +73,12 @@ export function createH3Job(
     db.prepare(
       `INSERT INTO h3_jobs
        (id, project_id, shot_plan_id, mode, provider, model, prompt,
-        duration_seconds, seed, steps, input_bindings_json, idempotency_key,
+        duration_seconds, seed, steps, audio_mode, input_bindings_json, idempotency_key,
         attempt, status, provider_job_id, output_asset_id, error_code,
         error_message, created_at, updated_at, completed_at, lease_expires_at,
         heartbeat_at, lock_snapshot_json, compiled_bindings_json,
         gate_override_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', NULL, NULL,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', NULL, NULL,
                NULL, NULL, ?, ?, NULL, NULL, NULL, ?, ?, ?)`,
     ).run(
       id,
@@ -91,6 +91,7 @@ export function createH3Job(
       input.duration_seconds,
       input.seed,
       input.steps,
+      input.audio_mode,
       JSON.stringify(input.input_bindings),
       input.idempotency_key,
       now,
@@ -117,6 +118,7 @@ function jobInputFingerprint(input: CreateH3JobInput | H3Job): string {
     duration_seconds: input.duration_seconds,
     seed: input.seed,
     steps: input.steps,
+    audio_mode: input.audio_mode ?? 'h3_native',
     input_bindings: input.input_bindings,
     gate_override_reason: input.gate_override_reason ?? null,
   });

@@ -38,13 +38,31 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     const output = snapshot.assets.find(({ id }) => id === job.output_asset_id)!;
     const actual = snapshot.shot_actuals.find(({ job_id }) => job_id === job.id)!;
     expect(job.status).toBe('completed');
+    expect(job.audio_mode).toBe('h3_native');
     expect(job.provider_job_id).toBe('prompt-1');
+    const graph = (stub.prompts[0] as { prompt: Record<string, {
+      class_type: string; inputs: Record<string, unknown> }> }).prompt;
+    expect(graph['6']?.inputs.audio).toEqual(['5', 1]);
     expect(output).toMatchObject({ kind: 'video', status: 'candidate',
       content_hash: `sha256:${createHash('sha256').update(outputBytes).digest('hex')}`,
       producer_job_id: job.id });
     expect(readFileSync(join(fixture.directory, output.relative_path))).toEqual(outputBytes);
     expect(actual).toMatchObject({ output_asset_id: output.id,
       qc_verdict: 'pending' });
+  });
+
+  it('persists silent mode and omits H3 audio from the submitted graph', async () => {
+    const fixture = seedWorkerJob('silent');
+    const stub = await startComfyStub('success');
+
+    const result = await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce();
+
+    expect(result).toMatchObject({ outcome: 'completed', job_id: fixture.jobId });
+    expect(fixture.store.getH3Job(fixture.jobId).audio_mode).toBe('silent');
+    const graph = (stub.prompts[0] as { prompt: Record<string, {
+      class_type: string; inputs: Record<string, unknown> }> }).prompt;
+    expect(graph['6']?.inputs).not.toHaveProperty('audio');
   });
 
   it('recovers an expired lease by polling the persisted task without resubmitting', async () => {
@@ -179,6 +197,18 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     expect(graph['5']?.inputs['ref_images.ref_image_1']).toEqual(['9', 0]);
   });
 
+  it('submits an r2v silent job without an audio decoder or output track', async () => {
+    const fixture = seedR2VWorkerJob('silent');
+    const stub = await startComfyStub('success');
+
+    expect((await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce()).outcome).toBe('completed');
+    const graph = (stub.prompts[0] as { prompt: Record<string, {
+      class_type: string; inputs: Record<string, unknown> }> }).prompt;
+    expect(graph['37']).toBeUndefined();
+    expect(graph['6']?.inputs).not.toHaveProperty('audio');
+  });
+
   it('uploads first and last frames and submits the fl2v Director graph', async () => {
     const fixture = seedFL2VWorkerJob();
     const stub = await startComfyStub('success');
@@ -198,6 +228,17 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     expect(timeline.timelineMode).toBe('fl2v');
     expect(timeline.shots[0].startImage.imageFile).toBe('worker/upload-1.png');
     expect(timeline.shots[0].endImage.imageFile).toBe('worker/upload-2.png');
+  });
+
+  it('submits an fl2v silent job without an output audio track', async () => {
+    const fixture = seedFL2VWorkerJob('silent');
+    const stub = await startComfyStub('success');
+
+    expect((await createWorker(fixture.store, fixture.directory,
+      stub.endpoint).runOnce()).outcome).toBe('completed');
+    const graph = (stub.prompts[0] as { prompt: Record<string, {
+      class_type: string; inputs: Record<string, unknown> }> }).prompt;
+    expect(graph['6']?.inputs).not.toHaveProperty('audio');
   });
 
   it('uses attempt and lease ownership in output paths', async () => {
@@ -318,7 +359,7 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
   });
 });
 
-function seedWorkerJob() {
+function seedWorkerJob(audioMode: 'h3_native' | 'silent' = 'h3_native') {
   const directory = mkdtempSync(join(tmpdir(), 'h3-worker-'));
   directories.push(directory);
   const databasePath = join(directory, 'storyboard.db');
@@ -355,14 +396,15 @@ function seedWorkerJob() {
   const job = store.createH3Job(shot.id, { mode: 'i2v',
     provider: 'local_comfyui', model: 'H3-local',
     prompt: 'A cinematic locked shot in soft rain.', duration_seconds: 5,
-    seed: 20260811, steps: 20, idempotency_key: `worker-${project.id}`,
+    seed: 20260811, steps: 20, audio_mode: audioMode,
+    idempotency_key: `worker-${project.id}`,
     input_bindings: [{ asset_id: image.id, asset_kind: 'image',
       role: 'first_frame', ordinal: 0 }] });
   return { directory, databasePath, store, projectId: project.id,
     jobId: job.id };
 }
 
-function seedR2VWorkerJob() {
+function seedR2VWorkerJob(audioMode: 'h3_native' | 'silent' = 'h3_native') {
   const directory = mkdtempSync(join(tmpdir(), 'h3-r2v-worker-'));
   directories.push(directory);
   const databasePath = join(directory, 'storyboard.db');
@@ -404,7 +446,7 @@ function seedR2VWorkerJob() {
   const job = store.createH3Job(shot.id, { mode: 'r2v',
     provider: 'local_comfyui', model: 'H3-hybrid', prompt:
       '<Picture 1> is the rainy alley. <Picture 2> is the courier identity.',
-    duration_seconds: 5, seed: 20260812, steps: 4,
+    duration_seconds: 5, seed: 20260812, steps: 4, audio_mode: audioMode,
     idempotency_key: `r2v-worker-${project.id}`, input_bindings: [
       { asset_id: assets[0]!.id, asset_kind: 'image', role: 'first_frame', ordinal: 0 },
       { asset_id: assets[1]!.id, asset_kind: 'image', role: 'style', ordinal: 1 },
@@ -413,7 +455,7 @@ function seedR2VWorkerJob() {
     jobId: job.id };
 }
 
-function seedFL2VWorkerJob() {
+function seedFL2VWorkerJob(audioMode: 'h3_native' | 'silent' = 'h3_native') {
   const directory = mkdtempSync(join(tmpdir(), 'h3-fl2v-worker-'));
   directories.push(directory);
   const databasePath = join(directory, 'storyboard.db');
@@ -455,7 +497,8 @@ function seedFL2VWorkerJob() {
   const job = store.createH3Job(shot.id, { mode: 'fl2v',
     provider: 'local_comfyui', model: 'H3-fl2va', prompt:
       'The courier walks from rain into warm window light.', duration_seconds: 5,
-    seed: 20260812, steps: 4, idempotency_key: `fl2v-worker-${project.id}`,
+    seed: 20260812, steps: 4, audio_mode: audioMode,
+    idempotency_key: `fl2v-worker-${project.id}`,
     input_bindings: [
       { asset_id: assets[0]!.id, asset_kind: 'image', role: 'first_frame', ordinal: 0 },
       { asset_id: assets[1]!.id, asset_kind: 'image', role: 'last_frame', ordinal: 1 },
@@ -470,7 +513,7 @@ function createWorker(store: ProjectStore, dataDirectory: string, endpoint: stri
     client: new ComfyUIClient({ endpoint, poll_interval_ms: 0,
       poll_max_attempts: 1 }), data_directory: dataDirectory,
     lease_duration_ms: 3_000_000, width: 480, height: 864, fps: 24,
-    turbo: false, loras: [], generate_audio: true, r2v_loader: r2vLoader });
+    turbo: false, loras: [], r2v_loader: r2vLoader });
 }
 
 async function startComfyStub(mode: 'success' | 'empty-download' | 'claim-client' |

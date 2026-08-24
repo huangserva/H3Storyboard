@@ -48,7 +48,6 @@ export interface H3LeaseWorkerOptions {
   fps?: number;
   turbo?: boolean;
   loras?: readonly H3Lora[];
-  generate_audio?: boolean;
   free_before_submit?: boolean;
   r2v_loader?: H3R2VLoader;
   on_error?: (error: unknown) => void;

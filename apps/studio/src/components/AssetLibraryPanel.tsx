@@ -29,7 +29,6 @@ export function AssetLibraryPanel({ projectId }: { projectId: string }) {
         <form className="asset-form" onSubmit={submit}>
           <select value={kind} onChange={(event) => setKind(event.target.value as AssetKind)}>
             <option value="image">IMAGE</option><option value="video">VIDEO</option>
-            <option value="audio">AUDIO</option>
           </select>
           <input aria-label="资产 URI" required maxLength={2000} value={uri}
             onChange={(event) => setUri(event.target.value)} placeholder="references/scene.png" />

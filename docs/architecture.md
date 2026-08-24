@@ -28,7 +28,7 @@ protocol (single JSON contract)
 2. A `shot_actual` always points to the exact H3 job and output asset that produced it.
 3. An actual result is not accepted until `qc_verdict = approved`.
 4. H3 input bindings are typed assets, not prompt-only annotations.
-5. Every job stores its prompt, mode, model, seed, steps, input bindings, and lifecycle events.
+5. Every job stores its prompt, mode, model, seed, steps, audio mode, input bindings, and lifecycle events.
 6. Local ComfyUI and cloud MiniMax are providers behind the same validated contract, not separate product flows.
 7. Provider callbacks carry the current lease token so a late callback cannot mutate a later attempt.
 8. Cross-shot frame continuity references a versioned frame asset derived from an approved take's exact video output.
@@ -42,6 +42,7 @@ protocol (single JSON contract)
 16. A worker persists a unique provider client id before submission. Recovery first claims a matching ComfyUI queue/history task and only resubmits after repeated proof that neither client intent nor prompt id exists remotely.
 17. Worker completion exposes the candidate asset, completed job, and pending take in one immediate SQLite transaction. Files are staged under attempt-and-lease-qualified paths, so a late worker can compensate only its own output.
 18. Provider graph builders share one Director/LoRA/sampler/output skeleton. Capability discovery is the union of node classes emitted by representative i2v, fl2v, stock r2v, and hybrid r2v graphs.
+19. Final video audio is either the original audio present in the H3 output or silence. External audio assets and post-generation audio layers never enter the render path.
 
 ## Production-policy boundary
 
@@ -51,7 +52,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.3 module ownership
+## Protocol 1.4 module ownership
 
 ```text
 packages/protocol
@@ -70,12 +71,18 @@ packages/task-engine
 apps/api
   small domain route dispatchers + optional H3_WORKER=1 runtime assembly
 apps/studio
-  director UI consuming only Protocol 1.3 API shapes
+  director UI consuming only Protocol 1.4 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
 
-Migrations v7–v15 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null.
+## Storyboard canvas projection
+
+The Studio uses React Flow as a read/write projection over protocol truth. Script, scene, reference asset, character, `ShotPlan`, H3 job, generated output asset, and `ShotActual`/QC nodes are derived from each `ProjectSnapshot`; they never create a second business-state store. Generation lineage is rendered as `ShotPlan -> H3Job -> output Asset -> ShotActual`, while continuity points back to the exact source take and boundary-frame asset. Only authored shot and character coordinates use the existing `canvas_nodes` persistence contract. Dragging one of those anchor nodes PATCHes SQLite through a per-node serial queue; failed writes roll back immediately, while derived nodes remain read-only and are deterministically rebuilt after polling or restart. Initial layout and preflight reads use bounded concurrency so a 100-shot canvas does not create an unbounded request burst.
+
+The four-zone desktop layout keeps project navigation, the asset palette, the media graph, and node inspection separate. The graph exposes Script → Scene → Shot → H3 Job → Take/QC, semantic asset/character references, continuity edges, media previews, controls, and a minimap. Provider `completed` and creative `approved` remain visually and structurally distinct.
+
+Migrations v7–v16 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`.
 
 ## Initial deployment
 
