@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard · P1.1 批量画布首载与 Preflight</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090c0b;--panel:#111713;--ink:#f2eee4;--muted:#9aa49f;--line:#2b3731;--acid:#c9f36b;--teal:#55d7be;--amber:#dfb86f;--violet:#a6adff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0,#20372c 0,transparent 34rem),radial-gradient(circle at 0 45%,#24223c 0,transparent 34rem),var(--bg);color:var(--ink);font:15px/1.68 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1160px,calc(100% - 32px));margin:48px auto 88px}.eyebrow{color:var(--acid);font:700 12px ui-monospace,monospace;letter-spacing:.14em}h1{max-width:980px;margin:14px 0 18px;font-size:clamp(38px,6vw,66px);line-height:1.04;letter-spacing:-.045em}h2{margin:48px 0 15px;font-size:27px}.lede{max-width:960px;color:#c6cec9;font-size:20px}.callout{margin:26px 0;padding:23px 25px;border:1px solid #536b35;border-radius:18px;background:linear-gradient(135deg,#1b291d,#121915);font-size:18px}.callout strong,.good{color:var(--teal)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.card{padding:21px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(150deg,#18201b,var(--panel))}.metric{color:var(--acid);font:800 31px ui-monospace,monospace}.card p{margin:6px 0;color:var(--muted)}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#29361d;color:var(--acid);font:700 11px ui-monospace,monospace}table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0f1411}th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}th{color:var(--acid);background:#171e19;font-size:12px;letter-spacing:.06em}code{color:#bceab9}.flow{display:flex;align-items:center;gap:9px;overflow:auto;padding:8px 0}.flow span{min-width:170px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#121814;text-align:center}.flow i{color:var(--acid);font-style:normal}.score{display:grid;grid-template-columns:70px 58px 1fr;gap:13px;padding:14px 0;border-bottom:1px solid var(--line)}.score:last-child{border:0}.grade{color:var(--acid);font:800 22px ui-monospace,monospace}.small{color:var(--muted);font-size:13px}ul{padding-left:22px}li+li{margin-top:7px}.warn{color:var(--amber)}.footer{margin-top:46px;padding-top:19px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}@media(max-width:800px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}.score{grid-template-columns:58px 48px 1fr}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">DELIVERY REPORT · 2026-08-24 · M2 / P1.1</div>
+  <h1>100 个分镜首载，<br>从 O(Shot) 请求收敛到两条。</h1>
+  <p class="lede">P1.1 没有改画布视觉，也没有触碰 4090 生成链。它把 React Flow 首载的两个结构性问题一次处理掉：canvas 坐标批量幂等写入，以及全项目 generation preflight 一致性读取。</p>
+  <div class="callout"><strong>结果：</strong>每个项目首载固定为 1 次 canvas batch PUT + 1 次 batch preflight GET；两标签、两 API 进程共用 SQLite 也不会重复建节点或出现半写入。Protocol 升至 1.5，旧 CRUD 与单镜接口继续兼容。</div>
+
+  <h2>交付指标</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">REQUEST BUDGET</span><div class="metric">2 requests</div><p>100 Shot 与 1 Shot 的画布 bootstrap 请求预算相同。</p></div>
+    <div class="card"><span class="tag">CONCURRENCY</span><div class="metric">20 writers</div><p>两个真 HTTP server 并发写同一 SQLite，最终只有一行、一套 ID。</p></div>
+    <div class="card"><span class="tag">ATOMICITY</span><div class="metric">0 partial</div><p>真实 SQLite trigger 在第二条 INSERT 中断，第一条也随事务回滚。</p></div>
+    <div class="card"><span class="tag">QUALITY GATE</span><div class="metric">129 passed</div><p>Vitest 124 + Playwright 5；另有 1 个外部 ComfyUI probe 按设计跳过。</p></div>
+  </div>
+
+  <h2>运行链路</h2>
+  <div class="flow"><span>Project snapshot</span><i>→</i><span>1× canvas batch PUT</span><i>+</i><span>1× preflight batch GET</span><i>→</i><span>React Flow projection</span></div>
+  <table><thead><tr><th>能力</th><th>服务端语义</th><th>Studio 语义</th></tr></thead><tbody>
+    <tr><td>Canvas batch upsert</td><td>先验证全部 ref；单个 immediate transaction；唯一键冲突不新建；完整结果经输出 schema 验证</td><td>Shot/Character 批量放置；默认保留用户位置；旧坐标只迁入未触碰节点</td></tr>
+    <tr><td>Batch preflight</td><td>snapshot/lock/brief/bindings 在同一读事务；复用 manifest/asset/character context；按 ordinal 输出</td><td>单项目一次 GET；5 秒刷新不重叠；统一填充 ready/blocked 状态</td></tr>
+    <tr><td>StrictMode / project switch</td><td>API 无特殊测试 fallback</td><td>共享 in-flight registry 合并 setup-cleanup-replay；真正离开项目时 abort 旧请求</td></tr>
+    <tr><td>兼容性</td><td>POST/PATCH/GET canvas 与 per-shot preflight 均保留</td><td>既有 Plan/Actual、Job、Take/QC 和 Inspector 行为不变</td></tr>
+  </tbody></table>
+
+  <h2>并发与迁移边界</h2>
+  <ul>
+    <li><strong>默认幂等：</strong>已有节点不会因为另一标签首载而被移动、改宽度或改 z-index。</li>
+    <li><strong>旧坐标迁移：</strong><code>update_position_if_untouched</code> 只在 <code>created_at === updated_at</code> 时改 x/y；任何用户修改都会阻止之后的旧值覆盖。</li>
+    <li><strong>原子失败：</strong>请求中一个 ref 无效或事务中途写失败，整批都不落库。</li>
+    <li><strong>一致性读取：</strong>batch preflight 不会把旧 snapshot 与新 manifest/lock 拼成混合状态。</li>
+    <li><strong>稳定失败：</strong>输出 Zod 失败是 <code>500 RESPONSE_CONTRACT_INVALID</code>，不是误报成客户端 400。</li>
+  </ul>
+
+  <h2>质量门</h2>
+  <table><thead><tr><th>门禁</th><th>结果</th><th>证据</th></tr></thead><tbody>
+    <tr><td><code>pnpm check</code></td><td class="good">通过</td><td>Protocol 1.5、API、Store、Studio workspace 类型契约</td></tr>
+    <tr><td><code>pnpm build</code></td><td class="good">通过</td><td>Studio production bundle；存在 534 KB chunk warning，不影响构建</td></tr>
+    <tr><td>Vitest</td><td class="good">124 passed / 1 skipped</td><td>真 HTTP + SQLite、多进程并发、中途回滚、schema、共享请求</td></tr>
+    <tr><td>Playwright</td><td class="good">5 passed</td><td>拖拽/刷新/404 回滚、项目切换 abort、双标签 100 Shot</td></tr>
+    <tr><td>文件限制</td><td class="good">通过</td><td><code>ProjectStore</code> 298 行；Studio hooks 134/74 行；API route 4/3 endpoints</td></tr>
+  </tbody></table>
+
+  <h2>Self-Review</h2>
+  <section class="card">
+    <div class="score"><strong>A</strong><span class="grade">B-</span><div><strong>架构与可维护性</strong><br><span class="small">ProjectStore 307 行、共享 context 与跨事务混合快照均已修；拆出 CanvasStore 后为 298 行。</span></div></div>
+    <div class="score"><strong>B</strong><span class="grade">B-</span><div><strong>真实 bug 与边界</strong><br><span class="small">N+1、多标签唯一键冲突、部分写、stale response 全部关闭。保留：已加载标签之间无实时布局广播。</span></div></div>
+    <div class="score"><strong>C</strong><span class="grade">B+</span><div><strong>测试质量</strong><br><span class="small">首轮伪 rollback、abort 空白、100 Shot 弱断言全部改为真穿透。保留：旧坐标成功迁移与角色放置尚无浏览器用例。</span></div></div>
+    <div class="score"><strong>D</strong><span class="grade">A</span><div><strong>Spec / 协议对齐</strong><br><span class="small">兼容 API、输出 schema、读事务、错误分类、batch item 唯一性经最终复核，未发现剩余问题。</span></div></div>
+  </section>
+  <p><strong>严重项 verdict：</strong>没有严重项延期。文件超限、伪回滚、stale 请求、重复查询、混合快照和兼容 API 风险均已修复并验证；综合评分 B，四维均达到 B- 以上。</p>
+
+  <h2>原始任务逐条 verdict</h2>
+  <table><thead><tr><th>任务</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+    <tr><td>继续线上 H3Storyboard 主线</td><td class="good">完成</td><td>在 P1 commit <code>a621432</code> 上增量实现，未合并旧仓库历史</td></tr>
+    <tr><td>批量 canvas 初始化</td><td class="good">完成</td><td>幂等、原子、跨进程并发、兼容 CRUD</td></tr>
+    <tr><td>批量 generation preflight</td><td class="good">完成</td><td>一次一致性读、共享 context、稳定 ordinal</td></tr>
+    <tr><td>100 Shot 固定请求预算</td><td class="good">完成</td><td>双标签 E2E：每标签 1 PUT + 1 GET，零 per-shot preflight</td></tr>
+    <tr><td>文档、测试、四路 review</td><td class="good">完成</td><td>Protocol/Architecture/baseline/plan 与本报告同步；全量门禁通过</td></tr>
+  </tbody></table>
+
+  <h2>明确保留到下一步</h2>
+  <ul>
+    <li>标签页之间的后续拖拽/角色布局不实时同步；刷新会回到 SQLite 最新状态。</li>
+    <li>成功旧坐标迁移、character placement 与 representative gate override 仍缺专门浏览器/批量用例。</li>
+    <li>全量 project snapshot 仍按 2 秒轮询，production bundle 仍有 534 KB chunk warning。</li>
+    <li>下一步 P1.2：真实媒体 fixture 与 Asset/Character/Job/Take/lightbox/QC 浏览器穿透；之后才做 P1.3 卡内操作密度。</li>
+  </ul>
+  <div class="footer">研究索引：<code>.hive/research/2026-08-24-p11-batch-canvas-preflight.md</code>。本轮没有访问 4090、没有提交 H3 任务，也没有增加任何声音路径。</div>
+</main></body></html>

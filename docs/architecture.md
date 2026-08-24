@@ -52,7 +52,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.4 module ownership
+## Protocol 1.5 module ownership
 
 ```text
 packages/protocol
@@ -71,14 +71,14 @@ packages/task-engine
 apps/api
   small domain route dispatchers + optional H3_WORKER=1 runtime assembly
 apps/studio
-  director UI consuming only Protocol 1.4 API shapes
+  director UI consuming only Protocol 1.5 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
 
 ## Storyboard canvas projection
 
-The Studio uses React Flow as a read/write projection over protocol truth. Script, scene, reference asset, character, `ShotPlan`, H3 job, generated output asset, and `ShotActual`/QC nodes are derived from each `ProjectSnapshot`; they never create a second business-state store. Generation lineage is rendered as `ShotPlan -> H3Job -> output Asset -> ShotActual`, while continuity points back to the exact source take and boundary-frame asset. Only authored shot and character coordinates use the existing `canvas_nodes` persistence contract. Dragging one of those anchor nodes PATCHes SQLite through a per-node serial queue; failed writes roll back immediately, while derived nodes remain read-only and are deterministically rebuilt after polling or restart. Initial layout and preflight reads use bounded concurrency so a 100-shot canvas does not create an unbounded request burst.
+The Studio uses React Flow as a read/write projection over protocol truth. Script, scene, reference asset, character, `ShotPlan`, H3 job, generated output asset, and `ShotActual`/QC nodes are derived from each `ProjectSnapshot`; they never create a second business-state store. Generation lineage is rendered as `ShotPlan -> H3Job -> output Asset -> ShotActual`, while continuity points back to the exact source take and boundary-frame asset. Only authored shot and character coordinates use the existing `canvas_nodes` persistence contract. Dragging one of those anchor nodes PATCHes SQLite through a per-node serial queue; failed writes roll back immediately, while derived nodes remain read-only and are deterministically rebuilt after polling or restart. Initial layout is one idempotent batch PUT that preserves existing coordinates, and all per-shot generation preflights are returned by one project-level GET per polling interval. This keeps a 100-shot canvas at a fixed two-request bootstrap budget and makes concurrent tabs converge on the same SQLite rows.
 
 The four-zone desktop layout keeps project navigation, the asset palette, the media graph, and node inspection separate. The graph exposes Script → Scene → Shot → H3 Job → Take/QC, semantic asset/character references, continuity edges, media previews, controls, and a minimap. Provider `completed` and creative `approved` remain visually and structurally distinct.
 

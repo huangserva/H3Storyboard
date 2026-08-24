@@ -1,7 +1,9 @@
 import type {
   Asset,
-  CurrentAssetsManifestSnapshot,
+  BatchUpsertCanvasNodesInput,
+  BatchUpsertCanvasNodesResult,
   CanvasNode,
+  CurrentAssetsManifestSnapshot,
   CreateCanvasNodeInput,
   CreateAssetInput,
   CreateH3JobInput,
@@ -28,11 +30,7 @@ import {
   listAssets,
   updateAsset,
 } from './asset-operations.js';
-import {
-  createCanvasNode,
-  listCanvasNodes,
-  updateCanvasNode,
-} from './canvas-operations.js';
+import { CanvasStore } from './canvas-store.js';
 import { CharacterStore } from './character-store.js';
 import {
   claimH3Job,
@@ -86,6 +84,7 @@ export class ProjectStore {
   readonly production: ProductionStore;
   readonly takes: TakeStore;
   readonly characters: CharacterStore;
+  readonly canvas: CanvasStore;
   #closed = false;
   constructor(databasePath: string) {
     if (databasePath !== ':memory:') {
@@ -96,6 +95,7 @@ export class ProjectStore {
     this.production = new ProductionStore(this.#database);
     this.takes = new TakeStore(this.#database);
     this.characters = new CharacterStore(this.#database);
+    this.canvas = new CanvasStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
     this.#database.pragma('journal_mode = WAL');
@@ -147,21 +147,22 @@ export class ProjectStore {
   }
 
   listCanvasNodes(projectId: string): CanvasNode[] {
-    return listCanvasNodes(this.#database, projectId);
+    return this.canvas.list(projectId);
   }
 
-  createCanvasNode(
-    projectId: string,
-    input: CreateCanvasNodeInput,
-  ): CanvasNode {
-    return createCanvasNode(this.#database, projectId, input);
+  batchUpsertCanvasNodes(projectId: string,
+    input: BatchUpsertCanvasNodesInput): BatchUpsertCanvasNodesResult {
+    return this.canvas.batchUpsert(projectId, input);
   }
 
-  updateCanvasNode(
-    projectId: string,
-    input: UpdateCanvasNodeInput,
-  ): CanvasNode {
-    return updateCanvasNode(this.#database, projectId, input);
+  createCanvasNode(projectId: string,
+    input: CreateCanvasNodeInput): CanvasNode {
+    return this.canvas.create(projectId, input);
+  }
+
+  updateCanvasNode(projectId: string,
+    input: UpdateCanvasNodeInput): CanvasNode {
+    return this.canvas.update(projectId, input);
   }
 
   createShotPlan(projectId: string, input: CreateShotPlanInput): ShotPlan {

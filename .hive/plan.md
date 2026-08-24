@@ -3,7 +3,7 @@ title: H3Storyboard
 started: 2026-08-11
 current_phase: M2
 status: active
-last_review: 2026-08-13
+last_review: 2026-08-24
 ---
 
 ## 目标
@@ -38,6 +38,8 @@ last_review: 2026-08-13
 - [x] actual 结果捕获 + QC verdict 契约
 
 ### M2 · 无限画布 Studio · in_progress
+- [x] P1：React Flow 产品画布与 `H3 原声 | 静音` 五层硬约束（commit `a621432`）
+- [x] P1.1：canvas batch upsert + project batch preflight；100 Shot 首载固定为 1 次画布写入 + 1 次 preflight 读取
 - [x] 无限画布：分镜卡片自由布局、平移缩放、SQLite v6 `canvas_nodes` 持久化（含旧 localStorage 一次迁移）
 - [x] 多分镜按 scene 聚簇并显示动态分组框（原型方案，待 user 体验反馈）
 - [x] 角色库面板与画布联动（character node 共用 SQLite 布局/z-index）
@@ -66,7 +68,7 @@ last_review: 2026-08-13
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M2 — 无限画布 Studio 继续迭代。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+M2 — P1/P1.1 已完成并通过质量门；下一步是 P1.2 真实媒体浏览器 fixture 与 P1.3 更高密度卡内操作。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。
@@ -145,3 +147,10 @@ M2 — 无限画布 Studio 继续迭代。M1A/M1B 已完成工程实现、真实
 - 三类 graph 共用 Director/LoRA/sampler/output 骨架；能力发现从 graph 节点 union 派生并由守护测试防漂移。Protocol 升 1.3。
 - `pnpm check && pnpm build && pnpm test` 全绿（11 files；92 passed，1 opt-in probe skipped）。post-fix 真机 i2v job `c5685701` 单次提交，70.476 秒完成；480×864、5.167 秒 H.264 + AAC，真 hash、candidate asset、pending actual 与双 provider id 齐全，锁已释放。
 - M1B 六项全部完成，四路 review 整改闭环，里程碑状态更新为 `done`。配对证据见 `research/2026-08-12-m1b-review-remediation.md` 与 `reports/2026-08-12-m1b-review-remediation.html`。
+
+## 2026-08-24 M2 P1.1 批量首载与 preflight 交付状态
+- Protocol 升至 1.5：新增幂等 canvas batch upsert 与 project batch preflight；保留单节点 CRUD 和单镜 preflight 兼容接口。
+- 画布初始化在一个 SQLite immediate transaction 内预校验、写入并返回完整布局；多进程/多标签并发由唯一键裁决，旧布局默认不覆盖。
+- preflight 在一个一致性读事务内复用 project/brief/lock/manifest/asset/character context，按 Shot ordinal 返回；Studio 首载与 StrictMode replay 共用请求，项目切换会终止旧请求。
+- `pnpm check && pnpm build && pnpm test` 全绿：Vitest 124 passed / 1 skipped，Playwright 5 passed。四路最终评分 A=B-、B=B-、C=B+、D=A，无严重项遗留。
+- 证据双产出：`research/2026-08-24-p11-batch-canvas-preflight.md` + `reports/2026-08-24-p11-batch-canvas-preflight.html`。

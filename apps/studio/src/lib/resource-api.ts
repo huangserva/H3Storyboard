@@ -1,4 +1,6 @@
-import type { Asset, CanvasNode, Character, CreateAssetInput,
+import { BatchUpsertCanvasNodesResultSchema } from '@h3storyboard/protocol';
+import type { Asset, BatchUpsertCanvasNodesInput,
+  BatchUpsertCanvasNodesResult, CanvasNode, Character, CreateAssetInput,
   CreateCanvasNodeInput, CreateCharacterInput, CurrentAssetsManifestSnapshot,
   UpdateAssetInput, UpdateCanvasNodeInput, UpdateCharacterInput,
 } from '@h3storyboard/protocol';
@@ -6,6 +8,16 @@ import { request } from './api.js';
 
 export async function listCanvasNodes(projectId: string): Promise<CanvasNode[]> {
   return request<CanvasNode[]>(`/api/projects/${projectId}/canvas_nodes`);
+}
+export async function batchUpsertCanvasNodes(projectId: string,
+  input: BatchUpsertCanvasNodesInput,
+  signal?: AbortSignal): Promise<BatchUpsertCanvasNodesResult> {
+  const result = await request<unknown>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas_nodes`, {
+      method: 'PUT', body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    });
+  return BatchUpsertCanvasNodesResultSchema.parse(result);
 }
 export async function createCanvasNode(projectId: string,
   input: CreateCanvasNodeInput): Promise<CanvasNode> {

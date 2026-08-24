@@ -21,6 +21,33 @@ export type CreateCanvasNodeInput = z.infer<
   typeof CreateCanvasNodeInputSchema
 >;
 
+export const UpsertCanvasNodeInputSchema = CreateCanvasNodeInputSchema.extend({
+  update_position_if_untouched: z.boolean().optional().default(false),
+});
+export type UpsertCanvasNodeInput = z.input<
+  typeof UpsertCanvasNodeInputSchema
+>;
+
+export const BatchUpsertCanvasNodesInputSchema = z.object({
+  nodes: z.array(UpsertCanvasNodeInputSchema),
+}).superRefine(({ nodes }, context) => {
+  const references = new Set<string>();
+  nodes.forEach((node, index) => {
+    const reference = `${node.node_type}:${node.ref_id}`;
+    if (references.has(reference)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['nodes', index, 'ref_id'],
+        message: 'CANVAS_BATCH_DUPLICATE_REF',
+      });
+    }
+    references.add(reference);
+  });
+});
+export type BatchUpsertCanvasNodesInput = z.input<
+  typeof BatchUpsertCanvasNodesInputSchema
+>;
+
 export const UpdateCanvasNodeInputSchema = z
   .object({
     node_id: IdSchema,
@@ -49,3 +76,12 @@ export const CanvasNodeSchema = z.object({
   updated_at: TimestampSchema,
 });
 export type CanvasNode = z.infer<typeof CanvasNodeSchema>;
+
+export const BatchUpsertCanvasNodesResultSchema = z.object({
+  canvas_nodes: z.array(CanvasNodeSchema),
+  created_count: z.number().int().nonnegative(),
+  updated_count: z.number().int().nonnegative(),
+});
+export type BatchUpsertCanvasNodesResult = z.infer<
+  typeof BatchUpsertCanvasNodesResultSchema
+>;

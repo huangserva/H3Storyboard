@@ -1,4 +1,4 @@
-import { ZodError } from 'zod';
+import { ZodError, type ZodType } from 'zod';
 import { StoreError } from '@h3storyboard/project-store';
 
 export interface ErrorBody {
@@ -19,6 +19,22 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+export function parseResponseContract<T>(
+  schema: ZodType<T>,
+  value: unknown,
+): T {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new ApiError(
+      500,
+      'RESPONSE_CONTRACT_INVALID',
+      'Server response did not match the API contract',
+      result.error.issues,
+    );
+  }
+  return result.data;
 }
 
 const storeStatusByCode: Readonly<Record<string, number>> = {

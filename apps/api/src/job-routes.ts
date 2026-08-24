@@ -1,24 +1,44 @@
-import { CreateH3JobInputSchema, type GenerationPreflight,
-  type ProjectSnapshot } from '@h3storyboard/protocol';
-import { StoreError, type ProjectStore } from '@h3storyboard/project-store';
+import { CreateH3JobInputSchema, GenerationPreflightBatchSchema,
+  type GenerationPreflight,
+  type GenerationPreflightBatch, type ProjectSnapshot } from '@h3storyboard/protocol';
+import { StoreError, type BindingCompilationOutcome,
+  type ProjectStore } from '@h3storyboard/project-store';
 import type { IncomingMessage } from 'node:http';
-import { ApiError } from './api-error.js';
+import { ApiError, parseResponseContract } from './api-error.js';
 import { readJson } from './http.js';
 
 interface JobRouteResult { status: number; body: unknown }
 
 const JOBS = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs$/;
 const PREFLIGHT = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs\/preflight$/;
+const BATCH_PREFLIGHT = /^\/api\/projects\/([^/]+)\/jobs\/preflights$/;
 
 export async function dispatchJobRoute(request: IncomingMessage,
   store: ProjectStore, method: string,
   pathname: string): Promise<JobRouteResult | null> {
+  const batchPreflight = BATCH_PREFLIGHT.exec(pathname);
+  if (batchPreflight && method === 'GET') {
+    const projectId = decode(batchPreflight[1] ?? '', 'project_id');
+    const read = store.production.readPreflightBatch(projectId);
+    const context = preflightContext(read.snapshot,
+      read.lock_engaged, read.has_brief);
+    const compilations = new Map(read.compilations.map(
+        (outcome) => [outcome.shot_plan_id, outcome]));
+    const body: GenerationPreflightBatch = { project_id: projectId,
+      items: read.snapshot.shot_plans.map(({ id }) => ({ shot_plan_id: id,
+        preflight: generationPreflight(store, id, context,
+          compilations.get(id)) })) };
+    return { status: 200,
+      body: parseResponseContract(GenerationPreflightBatchSchema, body) };
+  }
   const preflight = PREFLIGHT.exec(pathname);
   if (preflight && method === 'GET') {
     const { projectId, shotId, snapshot } = scopedShot(
       store, preflight[1] ?? '', preflight[2] ?? '');
     return { status: 200, body: generationPreflight(
-      store, projectId, shotId, snapshot) };
+      store, shotId, preflightContext(snapshot,
+        store.production.getLock(projectId).engaged,
+        store.production.listBriefs(projectId).length > 0)) };
   }
   const jobs = JOBS.exec(pathname);
   if (!jobs || method !== 'POST') return null;
@@ -26,8 +46,11 @@ export async function dispatchJobRoute(request: IncomingMessage,
   const parsed = CreateH3JobInputSchema.safeParse(await readJson(request));
   if (!parsed.success) throw new ApiError(422, 'H3_BINDINGS_INVALID',
     'H3 job input does not satisfy the provider contract', parsed.error.issues);
-  const readiness = generationPreflight(store, decode(jobs[1] ?? '', 'project_id'),
-    shotId, store.getProjectSnapshot(decode(jobs[1] ?? '', 'project_id')));
+  const projectId = decode(jobs[1] ?? '', 'project_id');
+  const snapshot = store.getProjectSnapshot(projectId);
+  const readiness = generationPreflight(store, shotId,
+    preflightContext(snapshot, store.production.getLock(projectId).engaged,
+      store.production.listBriefs(projectId).length > 0));
   if (readiness.ready && parsed.data.provider === 'local_comfyui' &&
     !isWorkerMode(parsed.data.mode)) throw new ApiError(409,
       'H3_MODE_UNAVAILABLE',
@@ -57,31 +80,55 @@ function scopedShot(store: ProjectStore, rawProjectId: string,
   return { projectId, shotId, snapshot };
 }
 
-function generationPreflight(store: ProjectStore, projectId: string,
-  shotId: string, snapshot: ProjectSnapshot): GenerationPreflight {
-  const lock = store.production.getLock(projectId);
-  const briefs = store.production.listBriefs(projectId);
-  if (!lock.engaged) return blocked('LOCK_REQUIRED',
-    briefs.length === 0
+interface PreflightContext {
+  readonly lock_engaged: boolean;
+  readonly has_brief: boolean;
+  readonly jobs_by_shot: ReadonlySet<string>;
+  readonly approved_representatives_by_shot: ReadonlySet<string>;
+  readonly assets_by_id: ReadonlyMap<string, ProjectSnapshot['assets'][number]>;
+}
+
+function preflightContext(snapshot: ProjectSnapshot, lockEngaged: boolean,
+  hasBrief: boolean): PreflightContext {
+  return {
+    lock_engaged: lockEngaged,
+    has_brief: hasBrief,
+    jobs_by_shot: new Set(snapshot.h3_jobs.map(({ shot_plan_id }) => shot_plan_id)),
+    approved_representatives_by_shot: new Set(snapshot.shot_actuals
+      .filter(({ is_representative, representative_status }) =>
+        is_representative && representative_status === 'approved')
+      .map(({ shot_plan_id }) => shot_plan_id)),
+    assets_by_id: new Map(snapshot.assets.map((asset) => [asset.id, asset])),
+  };
+}
+
+function generationPreflight(store: ProjectStore, shotId: string,
+  context: PreflightContext,
+  compilation?: BindingCompilationOutcome): GenerationPreflight {
+  if (!context.lock_engaged) return blocked('LOCK_REQUIRED',
+    !context.has_brief
       ? '请先建立 Production Brief 并锁定生成上下文'
       : '请先锁定 Production Brief 与当前资产清单');
   try {
-    const compiled = store.production.compileBindings(shotId);
+    if (compilation?.error) throw compilation.error;
+    const compiled = compilation?.compiled ??
+      store.production.compileBindings(shotId);
     if (!isWorkerMode(compiled.generation_mode)) return blocked(
       'H3_MODE_UNAVAILABLE',
       `本机常驻 worker 尚不支持 ${compiled.generation_mode}，请调整 Production Mode`);
-    const jobs = snapshot.h3_jobs.filter(({ shot_plan_id }) => shot_plan_id === shotId);
-    const approvedRepresentative = snapshot.shot_actuals.some((actual) =>
-      actual.shot_plan_id === shotId && actual.is_representative &&
-      actual.representative_status === 'approved');
     return { ready: true, blocking_error: null,
       mode: compiled.generation_mode, input_bindings: compiled.bindings.map(
         ({ asset_id, purpose }, ordinal) => {
-          const asset = snapshot.assets.find(({ id }) => id === asset_id)!;
+          const asset = context.assets_by_id.get(asset_id);
+          if (!asset) throw new StoreError('ASSET_NOT_FOUND',
+            'Compiled binding asset does not exist in the project snapshot', {
+              shot_plan_id: shotId, asset_id,
+            });
           return { asset_id, asset_kind: asset.kind,
             role: purposeRole[purpose], ordinal };
         }),
-      gate_override_required: jobs.length > 0 && !approvedRepresentative };
+      gate_override_required: context.jobs_by_shot.has(shotId) &&
+        !context.approved_representatives_by_shot.has(shotId) };
   } catch (error) {
     if (error instanceof StoreError) return blocked(error.code,
       preflightMessage(error.code, error.message));

@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard · P1.1 交接</title><style>body{max-width:920px;margin:44px auto;padding:0 20px;background:#0d1117;color:#e6edf3;font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}h1,h2{color:#c9f36b}code{color:#8ee6d2}section{padding:18px 22px;margin:16px 0;border:1px solid #30363d;border-radius:13px;background:#111820}li+li{margin-top:7px}a{color:#8fb6ff}</style></head>
+<body><h1>H3Storyboard · P1.1 session 交接</h1><p>日期：2026-08-24 · 分支：<code>codex/p0-p1-h3-canvas</code> · 基线：<code>a621432</code></p>
+<section><h2>本次完成</h2><ul><li>Protocol 1.5 canvas batch upsert 与 project batch preflight。</li><li>100 Shot 每标签固定 1 次 canvas PUT + 1 次 preflight GET。</li><li>SQLite 原子写、一致性读、跨进程/多标签幂等、StrictMode 复用和项目切换 abort。</li><li>完整报告：<a href="reports/2026-08-24-p11-batch-canvas-preflight.html">P1.1 delivery report</a>。</li></ul></section>
+<section><h2>当前状态</h2><ul><li><code>pnpm check</code>、<code>pnpm build</code>、<code>pnpm test</code> 全绿。</li><li>Vitest 124 passed / 1 skipped；Playwright 5 passed。</li><li>四路复核：A B-、B B-、C B+、D A；没有严重项或 M+1 blocker。</li><li>H3-only audio 与 Plan/Actual 均未改变；本轮未访问 4090。</li></ul></section>
+<section><h2>下一次接手</h2><ol><li>P1.2 建真实媒体 fixture，覆盖 Character/Asset/Job/Take/lightbox/QC 浏览器链。</li><li>补旧 localStorage 成功迁移、character placement、representative gate override 用例。</li><li>评估 project snapshot 增量化与 Studio chunk 拆包；再进入 P1.3 卡内直接操作。</li></ol></section>
+</body></html>

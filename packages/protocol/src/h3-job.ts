@@ -118,6 +118,34 @@ export const GenerationPreflightSchema = z.object({
 });
 export type GenerationPreflight = z.infer<typeof GenerationPreflightSchema>;
 
+export const GenerationPreflightBatchItemSchema = z.object({
+  shot_plan_id: IdSchema,
+  preflight: GenerationPreflightSchema,
+});
+export type GenerationPreflightBatchItem = z.infer<
+  typeof GenerationPreflightBatchItemSchema
+>;
+
+export const GenerationPreflightBatchSchema = z.object({
+  project_id: IdSchema,
+  items: z.array(GenerationPreflightBatchItemSchema),
+}).superRefine((value, context) => {
+  const shotPlanIds = new Set<string>();
+  value.items.forEach((item, index) => {
+    if (shotPlanIds.has(item.shot_plan_id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'shot_plan_id must be unique within a preflight batch',
+        path: ['items', index, 'shot_plan_id'],
+      });
+    }
+    shotPlanIds.add(item.shot_plan_id);
+  });
+});
+export type GenerationPreflightBatch = z.infer<
+  typeof GenerationPreflightBatchSchema
+>;
+
 export interface BindingIssue {
   code: string;
   message: string;

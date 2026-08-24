@@ -1,6 +1,6 @@
-# Protocol 1.4
+# Protocol 1.5
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.4 makes the final-audio policy durable: a job chooses original H3 output audio or silence, and no external audio binding may enter generation.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.5 keeps the Protocol 1.4 H3-only final-audio policy and adds project-level batch contracts for idempotent canvas bootstrap and generation preflight reads.
 
 ## Project lineage
 
@@ -159,6 +159,25 @@ The first job for a shot is ungated. Every later job requires an approved repres
 
 Routes: `POST /api/actuals/:actual_id/representative`; `POST /api/actuals/:actual_id/representative/review`.
 
+## Canvas bootstrap and generation preflight batches
+
+`PUT /api/projects/:project_id/canvas_nodes` accepts unique
+`(node_type, ref_id)` entries within the API's 1 MB JSON body limit. The store validates every project-owned reference
+before writing, then performs the batch in one immediate SQLite transaction.
+Missing nodes are inserted; existing nodes are preserved by default, making two
+tabs safe to load concurrently. `update_position_if_untouched = true` may update
+only the x/y of an otherwise untouched row (the Studio uses this for one-time
+localStorage migration). It never changes size or z-index and cannot overwrite
+a previously modified row. The response returns the complete project canvas
+plus `created_count` and `updated_count`. A validation or
+reference failure rolls back the whole batch.
+
+`GET /api/projects/:project_id/jobs/preflights` returns `{project_id, items}` in
+shot ordinal order. Each item contains `shot_plan_id` and the existing
+`GenerationPreflight` shape. A shot-level production `StoreError` remains that
+shot's stable `blocking_error`; an unexpected server failure still fails the
+whole request. The single-shot preflight route remains compatible.
+
 ## Local HTTP API
 
 Success envelope:
@@ -190,6 +209,7 @@ Error envelope:
 | `GET/PATCH` | `/api/projects/:project_id/assets` | list or update asset lifecycle metadata |
 | `GET` | `/api/assets/:asset_id/file` | stream the on-disk asset; supports a single byte `Range` with `206` |
 | `GET/POST` | `/api/projects/:project_id/canvas_nodes` | list or create persisted canvas nodes |
+| `PUT` | `/api/projects/:project_id/canvas_nodes` | atomically ensure nodes and return the complete canvas |
 | `PATCH` | `/api/projects/:project_id/canvas_nodes` | update canvas position, size, or z-index |
 | `GET/POST/PATCH` | `/api/projects/:project_id/characters` | character CRUD/archival |
 | `GET/POST/PATCH` | `/api/projects/:project_id/characters/:character_id/references` | reference lineage |
@@ -201,6 +221,8 @@ Error envelope:
 | `PATCH` | `/api/shots/:shot_plan_id` | update semantic references and shot states |
 | `POST` | `/api/shots/:shot_plan_id/compile_bindings` | dry-run deterministic compilation |
 | `POST` | `/api/shots/:shot_plan_id/jobs` | idempotently create a validated draft job |
+| `GET` | `/api/projects/:project_id/shots/:shot_plan_id/jobs/preflight` | read one shot generation preflight |
+| `GET` | `/api/projects/:project_id/jobs/preflights` | read all project shot preflights in one ordered response |
 | `POST` | `/api/shots/:shot_plan_id/actuals` | append a pending generated take |
 | `POST` | `/api/actuals/:actual_id/review` | approve or reject a pending take once |
 | `POST` | `/api/actuals/:actual_id/representative` | select or withdraw representative |

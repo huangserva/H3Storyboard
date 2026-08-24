@@ -2,16 +2,36 @@
 
 > 主要的运行时数据流，让 orch 一眼看清"消息从哪来、经过谁、到哪去"。
 
-## Flow 1: User 在 web UI 派单
+## Flow 1: 画布首载与布局持久化
 
 ```
-（待 AI 起草数据流图，类似 feishu-bridge-plan-2026-05-21.html 的架构图风格）
+ProjectSnapshot.shot_plans
+  -> Studio 计算缺省坐标 / 读取一次性 legacy localStorage
+  -> PUT /api/projects/:id/canvas_nodes（单请求，受 1 MB JSON body 限制）
+  -> ProjectStore immediate transaction
+       先验证全部引用 -> INSERT ON CONFLICT DO NOTHING
+       -> 仅未被拖动的 legacy 行可迁移 x/y
+  -> 返回完整 canvas_nodes（含 character）
+  -> React Flow 派生完整业务图
 ```
 
-## Flow 2: Worker team report 回 orch
+拖拽只 PATCH 当前 anchor node；每节点串行队列避免旧响应覆盖新位置，失败立即回滚 UI。
 
-（待 AI 起草）
+## Flow 2: 生成就绪检查
 
-## Flow 3: 飞书 inbound → orch
+```
+Studio 每 5 秒一次 GET /api/projects/:id/jobs/preflights
+  -> API 一次读取 snapshot / lock / briefs 并预索引 jobs、代表 Take、assets
+  -> 按 shot ordinal 编译各镜 binding
+  -> 每镜返回 ready 或稳定 blocking_error
+  -> Studio 原子替换 shot_id -> preflight Map
+```
 
-（待 AI 起草，可以参考 .hive/reports/feishu-bridge-plan-2026-05-21.html 的图）
+项目切换或 hook 重建会 abort 旧请求；同一轮询周期不允许请求重叠。
+
+## Flow 3: H3 Job 到 Take
+
+Studio create job -> SQLite immutable draft -> lease worker claim -> ComfyUI
+submit/poll/download -> 同一 immediate transaction 创建 candidate video Asset、
+completed H3Job、pending ShotActual -> Studio snapshot 刷新 -> 显式 QC / 代表 Take。
+最终音频只能是 H3 原始输出音轨或静音。

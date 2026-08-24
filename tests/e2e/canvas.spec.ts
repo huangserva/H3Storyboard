@@ -69,6 +69,87 @@ test.describe.serial('React Flow storyboard canvas', () => {
       await expect.poll(() => nodeWorldPosition(shot)).toEqual(start);
     });
 
+  test('aborts stale batch loads when switching projects',
+    async ({ page, request }) => {
+      const otherTitle = `Canvas switch ${crypto.randomUUID().slice(0, 8)}`;
+      const projectResponse = await request.post(`${API_ORIGIN}/api/projects`, {
+        data: { title: otherTitle, script_title: '切换项目',
+          script_content: '真实项目切换必须取消旧画布与生成检查请求。' },
+      });
+      const otherProject = (await projectResponse.json()) as {
+        data: { id: string };
+      };
+      const shotResponse = await request.post(
+        `${API_ORIGIN}/api/projects/${otherProject.data.id}/shots`, {
+          data: shotInput(1),
+        });
+      const otherShot = (await shotResponse.json()) as { data: { id: string } };
+      const canvasStarted = deferred();
+      const preflightStarted = deferred();
+      const releaseCanvas = deferred();
+      const releasePreflight = deferred();
+      let heldCanvas = false;
+      let heldPreflight = false;
+      const failedUrls: string[] = [];
+      page.on('requestfailed', (failed) => failedUrls.push(failed.url()));
+      await page.route('**/api/projects/*/canvas_nodes', async (route) => {
+        const outgoing = route.request();
+        if (!heldCanvas && outgoing.method() === 'PUT' &&
+          outgoing.url().includes(`/projects/${projectId}/`)) {
+          heldCanvas = true;
+          canvasStarted.resolve();
+          await releaseCanvas.promise;
+          try { await route.continue(); } catch { /* request was aborted */ }
+          return;
+        }
+        await route.continue();
+      });
+      await page.route('**/api/projects/*/jobs/preflights', async (route) => {
+        const outgoing = route.request();
+        if (!heldPreflight && outgoing.url().includes(`/projects/${projectId}/`)) {
+          heldPreflight = true;
+          preflightStarted.resolve();
+          await releasePreflight.promise;
+          try { await route.continue(); } catch { /* request was aborted */ }
+          return;
+        }
+        await route.continue();
+      });
+
+      try {
+        await page.goto('/');
+        const legacyKey = `h3storyboard.canvas.v1.${projectId}`;
+        const legacyValue = JSON.stringify({ [shotId]: { x: 701, y: 403 } });
+        await page.evaluate(({ key, value }) => localStorage.setItem(key, value),
+          { key: legacyKey, value: legacyValue });
+        await page.getByRole('button', { name: new RegExp(projectTitle) }).click();
+        await Promise.all([canvasStarted.promise, preflightStarted.promise]);
+        const nextCanvas = page.waitForResponse((response) =>
+          response.request().method() === 'PUT' && response.url().includes(
+            `/projects/${otherProject.data.id}/canvas_nodes`));
+        const nextPreflight = page.waitForResponse((response) =>
+          response.request().method() === 'GET' && response.url().includes(
+            `/projects/${otherProject.data.id}/jobs/preflights`));
+        await page.getByRole('button', { name: new RegExp(otherTitle) }).click();
+        expect((await Promise.all([nextCanvas, nextPreflight])).every(
+          (response) => response.status() === 200)).toBe(true);
+        releaseCanvas.resolve();
+        releasePreflight.resolve();
+        await expect(page.locator(
+          `.react-flow__node[data-id="shot:${otherShot.data.id}"]`)).toBeVisible();
+        await expect.poll(() => page.evaluate((key) => localStorage.getItem(key),
+          legacyKey)).toBe(legacyValue);
+        await expect.poll(() => failedUrls.some((url) =>
+          url.includes(`/projects/${projectId}/canvas_nodes`))).toBe(true);
+        await expect.poll(() => failedUrls.some((url) =>
+          url.includes(`/projects/${projectId}/jobs/preflights`))).toBe(true);
+      } finally {
+        releaseCanvas.resolve();
+        releasePreflight.resolve();
+        await page.unrouteAll({ behavior: 'wait' });
+      }
+    });
+
   test('mounts a real 100-shot project with the complete minimap graph',
     async ({ page, request }) => {
       test.setTimeout(60_000);
@@ -86,13 +167,59 @@ test.describe.serial('React Flow storyboard canvas', () => {
           })));
       }
 
-      await page.goto('/');
-      await page.getByRole('button', { name: new RegExp(largeTitle) }).click();
-      await expect(page.locator('.react-flow')).toBeVisible();
-      await expect.poll(() => page.locator(
-        '.react-flow__minimap-node').count(), { timeout: 30_000 })
-        .toBeGreaterThanOrEqual(100);
-      await expect(page.getByText('素材 → 分镜 → H3 JOB → TAKE / QC')).toBeVisible();
+      const secondPage = await page.context().newPage();
+      try {
+        const firstCalls = recordRequests(page);
+        const secondCalls = recordRequests(secondPage);
+        await Promise.all([page.goto('/'), secondPage.goto('/')]);
+        const canvasUrl = `/api/projects/${project.data.id}/canvas_nodes`;
+        const preflightUrl = `/api/projects/${project.data.id}/jobs/preflights`;
+        const initialResponses = [page, secondPage].flatMap((target) => [
+          target.waitForResponse((response) =>
+            response.request().method() === 'PUT' &&
+            response.url().endsWith(canvasUrl)),
+          target.waitForResponse((response) =>
+            response.request().method() === 'GET' &&
+            response.url().endsWith(preflightUrl)),
+        ]);
+        await Promise.all([page, secondPage].map((target) =>
+          target.getByRole('button', { name: new RegExp(largeTitle) }).click()));
+        const responses = await Promise.all(initialResponses);
+        expect(responses.every((response) => response.status() === 200)).toBe(true);
+        for (const response of responses.filter((candidate) =>
+          candidate.url().endsWith(preflightUrl))) {
+          const body = (await response.json()) as { data: {
+            items: Array<{ shot_plan_id: string }> } };
+          expect(body.data.items).toHaveLength(100);
+          expect(new Set(body.data.items.map(
+            ({ shot_plan_id }) => shot_plan_id)).size).toBe(100);
+        }
+
+        for (const calls of [firstCalls, secondCalls]) {
+          expect(calls.filter(({ method, url }) =>
+            method === 'PUT' && url.endsWith(canvasUrl))).toHaveLength(1);
+          expect(calls.filter(({ method, url }) =>
+            method === 'POST' && url.endsWith(canvasUrl))).toHaveLength(0);
+          expect(calls.filter(({ method, url }) =>
+            method === 'GET' && url.endsWith(preflightUrl))).toHaveLength(1);
+          expect(calls.filter(({ url }) =>
+            /\/shots\/[^/]+\/jobs\/preflight$/.test(url))).toHaveLength(0);
+        }
+
+        for (const target of [page, secondPage]) {
+          await expect(target.locator('.react-flow')).toBeVisible();
+          await expect.poll(() => target.locator(
+            '.react-flow__minimap-node').count(), { timeout: 30_000 })
+            .toBeGreaterThanOrEqual(100);
+          await expect(target.locator('.generation-control small').first())
+            .toContainText('请先');
+        }
+        expect(canvasRows(project.data.id)).toEqual({ count: 100, refs: 100 });
+        await expect(page.getByText(
+          '素材 → 分镜 → H3 JOB → TAKE / QC')).toBeVisible();
+      } finally {
+        await secondPage.close();
+      }
     });
 });
 
@@ -180,4 +307,32 @@ function deleteCanvasNodeFromSqlite(): void {
   } finally {
     database.close();
   }
+}
+
+function recordRequests(page: Page): Array<{ method: string; url: string }> {
+  const calls: Array<{ method: string; url: string }> = [];
+  page.on('request', (request) => calls.push({
+    method: request.method(), url: request.url(),
+  }));
+  return calls;
+}
+
+function canvasRows(targetProjectId: string): { count: number; refs: number } {
+  const databasePath = process.env.H3_E2E_DB;
+  if (!databasePath) throw new Error('H3_E2E_DB is not configured');
+  const database = new Database(databasePath, { readonly: true });
+  try {
+    return database.prepare(
+      `SELECT COUNT(*) AS count, COUNT(DISTINCT ref_id) AS refs
+       FROM canvas_nodes WHERE project_id = ? AND node_type = 'shot_plan'`,
+    ).get(targetProjectId) as { count: number; refs: number };
+  } finally {
+    database.close();
+  }
+}
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
 }

@@ -4,6 +4,7 @@ import {
   UpdateProjectGenerationLockInputSchema,
   type CreateProductionBriefInput,
   type ProductionBrief,
+  type ProjectSnapshot,
   type ProjectGenerationLock,
   type UpdateProjectGenerationLockInput,
 } from '@h3storyboard/protocol';
@@ -13,8 +14,17 @@ import { StoreError } from './errors.js';
 import { requireGenerationUnlocked, requireProject } from './generation-locks.js';
 import { parseInput } from './input.js';
 import { mapGenerationLock, mapProductionBrief } from './row-mappers.js';
-import { compileShotBindings } from './binding-operations.js';
+import { compileProjectShotBindings, compileShotBindings,
+  type BindingCompilationOutcome } from './binding-operations.js';
 import type { CompiledBindingsResult } from '@h3storyboard/protocol';
+import { getProjectSnapshot } from './project-operations.js';
+
+export interface GenerationPreflightBatchRead {
+  readonly snapshot: ProjectSnapshot;
+  readonly lock_engaged: boolean;
+  readonly has_brief: boolean;
+  readonly compilations: readonly BindingCompilationOutcome[];
+}
 
 export class ProductionStore {
   constructor(private readonly database: Database.Database) {}
@@ -22,6 +32,18 @@ export class ProductionStore {
   compileBindings(shotPlanId: string): CompiledBindingsResult {
     return this.database.transaction(() =>
       compileShotBindings(this.database, shotPlanId))();
+  }
+
+  readPreflightBatch(projectId: string): GenerationPreflightBatchRead {
+    return this.database.transaction(() => {
+      const snapshot = getProjectSnapshot(this.database, projectId);
+      const lock = this.getLock(projectId);
+      const briefs = this.listBriefs(projectId);
+      return { snapshot, lock_engaged: lock.engaged,
+        has_brief: briefs.length > 0,
+        compilations: compileProjectShotBindings(this.database, projectId,
+          snapshot.shot_plans.map(({ id }) => id)) };
+    })();
   }
 
   listBriefs(projectId: string): ProductionBrief[] {

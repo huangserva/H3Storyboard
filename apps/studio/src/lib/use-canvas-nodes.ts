@@ -6,40 +6,24 @@ import type {
 } from '@h3storyboard/protocol';
 import { createInitialPositions, parseStoredPositions } from './canvas-layout.js';
 import * as api from './api.js';
-import { mapWithConcurrency } from './bounded-map.js';
 import { KeyedSerialQueue } from './keyed-serial-queue.js';
+import { SharedRequestRegistry } from './shared-request-registry.js';
 
 const CARD_WIDTH = 260;
 const CARD_HEIGHT = 196;
-const pendingLoads = new Map<string, Promise<CanvasNode[]>>();
+const canvasLoads = new SharedRequestRegistry<CanvasNode[]>();
 
-async function loadNodes(snapshot: ProjectSnapshot): Promise<CanvasNode[]> {
+async function loadNodes(snapshot: ProjectSnapshot,
+  signal: AbortSignal): Promise<CanvasNode[]> {
   const projectId = snapshot.project.id;
   const storageKey = `h3storyboard.canvas.v1.${projectId}`;
   const serialized = localStorage.getItem(storageKey);
   const stored = parseStoredPositions(serialized);
   const defaults = createInitialPositions(snapshot.shot_plans);
-  const existing = await api.listCanvasNodes(projectId);
-  const byRefId = new Map(existing.map((node) => [node.ref_id, node]));
-  const characterNodes = existing.filter(
-    ({ node_type }) => node_type === 'character',
-  );
-  const shotNodes = await mapWithConcurrency(snapshot.shot_plans, 6,
-    async (shot): Promise<CanvasNode | null> => {
-    const persisted = byRefId.get(shot.id);
+  const nodes = snapshot.shot_plans.flatMap((shot) => {
     const legacy = stored[shot.id];
-    if (persisted) {
-      return legacy
-        ? api.updateCanvasNode(projectId, {
-            node_id: persisted.id,
-            x: legacy.x,
-            y: legacy.y,
-          })
-        : persisted;
-    }
     const position = legacy ?? defaults[shot.id];
-    if (!position) return null;
-    return api.createCanvasNode(projectId, {
+    return position ? [{
         node_type: 'shot_plan',
         ref_id: shot.id,
         x: position.x,
@@ -47,11 +31,12 @@ async function loadNodes(snapshot: ProjectSnapshot): Promise<CanvasNode[]> {
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
         z_index: shot.ordinal,
-      });
+        update_position_if_untouched: legacy !== undefined,
+      } as const] : [];
   });
+  const result = await api.batchUpsertCanvasNodes(projectId, { nodes }, signal);
   if (serialized !== null) localStorage.removeItem(storageKey);
-  return [...characterNodes, ...shotNodes.filter(
-    (node): node is CanvasNode => node !== null)];
+  return result.canvas_nodes;
 }
 function describeError(error: unknown): string {
   if (error instanceof api.ApiError) return `${error.message} · ${error.code}`;
@@ -76,23 +61,23 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
     requestId.current = currentRequest;
     setLoading(true);
     setError(null);
-    let pending = pendingLoads.get(loadKey);
-    if (!pending) {
-      pending = loadNodes(snapshotRef.current).finally(() => pendingLoads.delete(loadKey));
-      pendingLoads.set(loadKey, pending);
-    }
-    void pending.then(
+    let active = true;
+    const lease = canvasLoads.acquire(loadKey, (signal) =>
+      loadNodes(snapshotRef.current, signal));
+    void lease.promise.then(
       (loaded) => {
-        if (requestId.current !== currentRequest) return;
+        if (!active || requestId.current !== currentRequest) return;
         setNodes(loaded);
         setLoading(false);
       },
       (loadError: unknown) => {
-        if (requestId.current !== currentRequest) return;
+        if (!active || isAbortError(loadError) ||
+          requestId.current !== currentRequest) return;
         setError(describeError(loadError));
         setLoading(false);
       },
     );
+    return () => { active = false; lease.release(); };
   }, [loadKey]);
 
   const updateLocalNode = (
@@ -125,16 +110,16 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
       const characterCount = nodes.filter(
         ({ node_type }) => node_type === 'character',
       ).length;
-      const created = await api.createCanvasNode(snapshot.project.id, {
-        node_type: 'character',
-        ref_id: characterId,
-        x: 640,
-        y: 100 + characterCount * 244,
-        width: 240,
-        height: 220,
-        z_index: Math.max(0, ...nodes.map(({ z_index }) => z_index)) + 1,
+      const result = await api.batchUpsertCanvasNodes(snapshot.project.id, {
+        nodes: [{ node_type: 'character', ref_id: characterId, x: 640,
+          y: 100 + characterCount * 244, width: 240, height: 220,
+          z_index: Math.max(0, ...nodes.map(({ z_index }) => z_index)) + 1 }],
       });
-      setNodes((current) => [...current, created]);
+      const placed = result.canvas_nodes.find(({ node_type, ref_id }) =>
+        node_type === 'character' && ref_id === characterId);
+      if (!placed) throw new Error('Character canvas node was not returned');
+      setNodes((current) => current.some(({ id }) => id === placed.id)
+        ? current : [...current, placed]);
       setError(null);
     } catch (placeError) {
       setError(describeError(placeError));
@@ -142,4 +127,8 @@ export function useCanvasNodes(snapshot: ProjectSnapshot) {
   };
 
   return { nodes, loading, error, updateLocalNode, persistNode, placeCharacter };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }

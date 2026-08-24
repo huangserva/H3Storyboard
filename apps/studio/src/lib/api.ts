@@ -1,3 +1,4 @@
+import { GenerationPreflightBatchSchema } from '@h3storyboard/protocol';
 import type {
   CreateProjectInput,
   CreateShotPlanInput,
@@ -15,6 +16,7 @@ import type {
   ShotActual,
   H3Job,
   GenerationPreflight,
+  GenerationPreflightBatch,
   CreateH3JobInput,
 } from '@h3storyboard/protocol';
 
@@ -137,6 +139,14 @@ export async function getGenerationPreflight(projectId: string,
   shotId: string): Promise<GenerationPreflight> {
   return request<GenerationPreflight>(`/api/projects/${projectId}/shots/${shotId}` +
     '/jobs/preflight');
+}
+
+export async function getGenerationPreflights(projectId: string,
+  signal?: AbortSignal): Promise<GenerationPreflightBatch> {
+  const result = await request<unknown>(
+    `/api/projects/${encodeURIComponent(projectId)}/jobs/preflights`,
+    signal ? { signal } : undefined);
+  return GenerationPreflightBatchSchema.parse(result);
 }
 
 export async function createH3Job(projectId: string, shotId: string,

@@ -56,7 +56,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const health = await fetch(`${first.origin}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({
-      data: { status: 'ok', protocol_version: '1.4' },
+      data: { status: 'ok', protocol_version: '1.5' },
     });
 
     const projectResponse = await postJson(`${first.origin}/api/projects`, {
