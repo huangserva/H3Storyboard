@@ -1,6 +1,10 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { ProjectStore } from '../../packages/project-store/src/index.js';
 
-const API_ORIGIN = 'http://127.0.0.1:4187';
+const API_ORIGIN = process.env.H3_E2E_API_ORIGIN ?? 'http://127.0.0.1:4187';
 const title = `Production Board ${crypto.randomUUID().slice(0, 8)}`;
 let projectId = '';
 let characterId = '';
@@ -73,6 +77,13 @@ test.describe.serial('P1.3 production board', () => {
       await card.getByRole('button', { name: '批准' }).click();
       expect((await approveResponse).status()).toBe(200);
       await expect(card.getByRole('img', { name: '苏婉宁 approved 母图' })).toBeVisible();
+      await expect(page.getByRole('status')).toContainText('manifest_stale = false');
+      const firstFreeze = page.waitForResponse((response) =>
+        response.url().endsWith(`/api/projects/${projectId}/manifests`) &&
+        response.request().method() === 'POST');
+      await page.getByRole('button', { name: '冻结 CURRENT-ASSETS' }).click();
+      expect((await firstFreeze).status()).toBe(201);
+      await expect(page.getByRole('status')).toBeHidden();
 
       const angleUploadResponse = page.waitForResponse((response) =>
         response.url().includes('/reference_uploads') &&
@@ -97,6 +108,7 @@ test.describe.serial('P1.3 production board', () => {
       }).click();
       expect((await angleApproveResponse).status()).toBe(200);
       await expect(card).toContainText('DERIVED · approved');
+      await expect(page.getByRole('status')).toContainText('manifest_stale = true');
 
       const repeatedApproval = await request.post(
         `${API_ORIGIN}/api/projects/${projectId}/characters/${characterId}` +
@@ -154,14 +166,157 @@ test.describe.serial('P1.3 production board', () => {
       });
       await openProject(page);
       const projectCalls = calls.filter((path) => path.includes(projectId));
-      expect(projectCalls).toHaveLength(3);
+      expect(projectCalls).toHaveLength(4);
       expect(new Set(projectCalls)).toEqual(new Set([
         `/api/projects/${projectId}`,
         `/api/projects/${projectId}/character_catalog`,
+        `/api/projects/${projectId}/character_image_jobs`,
         `/api/projects/${projectId}/jobs/preflights`,
       ]));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <=
         document.documentElement.clientWidth)).toBe(true);
+    });
+
+  test('creates, cancels, retries, and restores a real local image job',
+    async ({ page }) => {
+      await openProject(page);
+      const card = page.getByRole('article', { name: '角色卡 苏婉宁' });
+      await card.getByRole('button', { name: '生成派生图' }).click();
+      const dialog = page.getByRole('dialog', { name: '苏婉宁 角色图生成' });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText('LORA 无（不会默认加载）');
+      await dialog.getByLabel('生成方式').selectOption('variant_i2i');
+      await expect(dialog.getByLabel('Denoise')).toHaveValue('0.52');
+
+      const createResponse = page.waitForResponse((response) =>
+        response.url().endsWith(`/characters/${characterId}/image_jobs`) &&
+        response.request().method() === 'POST');
+      await dialog.getByRole('button', { name: '提交角色图任务' }).click();
+      const createdHttp = await createResponse;
+      expect(createdHttp.status()).toBe(201);
+      const createBody = createdHttp.request().postDataJSON() as Record<string, unknown>;
+      expect(createBody).toMatchObject({ operation: 'variant_i2i', denoise: 0.52,
+        lora_profile: null, lora_name: null, lora_strength: null });
+      expect(createBody).not.toHaveProperty('engine');
+      expect(createBody).not.toHaveProperty('provider');
+      expect(createBody.source_reference_ids).toHaveLength(1);
+      const created = (await createdHttp.json()) as { data: { id: string } };
+      await expect(card.locator('.character-image-job').first()).toContainText('draft');
+
+      const cancelResponse = page.waitForResponse((response) =>
+        response.url().endsWith(`/character_image_jobs/${created.data.id}/cancel`));
+      await card.getByRole('button', {
+        name: `取消角色图任务 ${created.data.id}`,
+      }).click();
+      expect((await cancelResponse).status()).toBe(200);
+      await expect(card.locator('.character-image-job').first()).toContainText('canceled');
+
+      const retryResponse = page.waitForResponse((response) =>
+        response.url().endsWith(`/character_image_jobs/${created.data.id}/retry`));
+      await card.getByRole('button', {
+        name: `重试角色图任务 ${created.data.id}`,
+      }).click();
+      const retriedHttp = await retryResponse;
+      expect(retriedHttp.status()).toBe(201);
+      const retried = (await retriedHttp.json()) as { data: { id: string } };
+      await expect(card.locator('.character-image-job').first()).toContainText('draft');
+
+      const retryCancel = page.waitForResponse((response) =>
+        response.url().endsWith(`/character_image_jobs/${retried.data.id}/cancel`));
+      await card.getByRole('button', {
+        name: `取消角色图任务 ${retried.data.id}`,
+      }).click();
+      expect((await retryCancel).status()).toBe(200);
+      await page.reload();
+      await selectProject(page);
+      await expect(page.getByRole('article', { name: '角色卡 苏婉宁' })
+        .locator('.character-image-job').first()).toContainText('canceled');
+    });
+
+  test('restores a completed worker result as a candidate before manual approval',
+    async ({ page }) => {
+      const databasePath = process.env.H3_E2E_DB;
+      if (!databasePath) throw new Error('H3_E2E_DB is required');
+      const dataDirectory = dirname(databasePath);
+      const outputName = 'suwanning-generated-e2e.png';
+      const outputPath = `assets/characters/${projectId}/generated/${outputName}`;
+      mkdirSync(dirname(join(dataDirectory, outputPath)), { recursive: true });
+      writeFileSync(join(dataDirectory, outputPath), PNG_1X1);
+      const store = new ProjectStore(databasePath);
+      let outputAssetId = '';
+      try {
+        const draft = store.characterImageJobs.create(projectId, characterId, {
+          operation: 'master_t2i', provider: 'local_comfyui', engine: 'krea2',
+          prompt: 'E2E worker-generated neutral master portrait.',
+          seed: 2026082499, width: 480, height: 864, steps: 8, cfg: 1,
+          sampler: 'euler_ancestral', scheduler: 'sgm_uniform', denoise: null,
+          lora_profile: null, lora_name: null, lora_strength: null,
+          source_reference_ids: [], idempotency_key:
+            'production-board-completed-image-e2e',
+        });
+        const claimed = store.characterImageJobs.claim(draft.id, 120_000);
+        store.characterImageJobs.markSubmitIntent(
+          draft.id, claimed.lease_token!, 'e2e-comfy-client',
+        );
+        store.characterImageJobs.markQueued(
+          draft.id, claimed.lease_token!, 'e2e-comfy-prompt',
+        );
+        store.characterImageJobs.markRunning(draft.id, claimed.lease_token!);
+        const result = store.characterImageJobs.finalizeOutput(
+          draft.id,
+          claimed.lease_token!,
+          { name: outputName, relative_path: outputPath,
+            content_hash: `sha256:${createHash('sha256').update(PNG_1X1)
+              .digest('hex')}` },
+        );
+        outputAssetId = result.asset.id;
+        expect(result.asset.status).toBe('candidate');
+        store.freezeCurrentAssetsManifest(projectId);
+      } finally {
+        store.close();
+      }
+
+      await openProject(page);
+      await page.reload();
+      await selectProject(page);
+      const card = page.getByRole('article', { name: '角色卡 苏婉宁' });
+      const completed = card.locator('.character-image-job').filter({
+        hasText: 'SEED 2026082499',
+      });
+      await expect(completed).toHaveCount(1);
+      await expect(completed).toContainText('completed');
+      await expect(completed).toContainText('候选已生成 · 等待人工批准');
+      const candidate = card.locator('.production-reference-thumb').filter({
+        has: page.locator(`img[src*="${outputAssetId}"]`),
+      });
+      await expect(candidate).toContainText('MASTER · candidate');
+      await expect(candidate.locator('img')).toBeVisible();
+      await expect.poll(() => candidate.locator('img').evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      )).toBe(true);
+      await expect(page.getByRole('status')).toBeHidden();
+
+      const approval = page.waitForResponse((response) =>
+        response.url().includes('/references/') &&
+        response.url().endsWith('/approve') &&
+        response.request().method() === 'POST');
+      await card.getByRole('button', {
+        name: `批准 苏婉宁 ${outputName}`,
+      }).click();
+      expect((await approval).status()).toBe(200);
+      await expect(candidate).toContainText('MASTER · approved');
+      await expect(page.getByRole('status')).toContainText('manifest_stale = true');
+
+      await page.reload();
+      await selectProject(page);
+      const restoredCard = page.getByRole('article', { name: '角色卡 苏婉宁' });
+      await expect(restoredCard.locator('.character-image-job').filter({
+        hasText: 'SEED 2026082499',
+      })).toContainText('completed');
+      await expect(restoredCard.getByRole('button', {
+        name: `归档 苏婉宁 ${outputName}`,
+      })).toBeVisible();
+      expect(outputAssetId).not.toBe('');
     });
 
   test('keeps the board keyboard-reachable without mobile page overflow',
@@ -176,7 +331,7 @@ test.describe.serial('P1.3 production board', () => {
       expect(await tabUntil(page, (label) => label.includes('上传母图')))
         .toContain('上传母图');
       const archiveLabel = await tabUntil(page, (label) =>
-        label.startsWith('归档 苏婉宁'));
+        label.includes('归档 苏婉宁 suwanning-master.png'));
       expect(archiveLabel).toContain('suwanning-master.png');
       const archiveResponse = page.waitForResponse((response) =>
         response.request().method() === 'PATCH' &&

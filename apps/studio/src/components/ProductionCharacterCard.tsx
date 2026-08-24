@@ -1,20 +1,27 @@
-import type { Asset, Character, CharacterReference } from '@h3storyboard/protocol';
+import type { Asset, Character, CharacterImageJob,
+  CharacterReference } from '@h3storyboard/protocol';
 import { assetFileUrl } from '../lib/api.js';
+import { CharacterImageJobList } from './CharacterImageJobList.js';
 
 interface ProductionCharacterCardProps {
   character: Character;
   references: CharacterReference[];
   assetById: Map<string, Asset>;
+  imageJobs: CharacterImageJob[];
   busy: boolean;
   onUpload: (file: File, derivedFrom: string | null) => void;
   onApprove: (referenceId: string, makePrimary: boolean) => void;
   onArchive: (assetId: string) => void;
   onOpenMedia: (assetId: string) => void;
+  onOpenGenerator: () => void;
+  onRetryImageJob: (jobId: string) => void;
+  onCancelImageJob: (jobId: string) => void;
 }
 
 export function ProductionCharacterCard({ character, references, assetById,
-  busy, onUpload, onApprove, onArchive,
-  onOpenMedia }: ProductionCharacterCardProps) {
+  imageJobs, busy, onUpload, onApprove, onArchive, onOpenMedia,
+  onOpenGenerator, onRetryImageJob, onCancelImageJob }:
+  ProductionCharacterCardProps) {
   const ordered = [...references].sort((left, right) =>
     left.sort_order - right.sort_order || left.created_at.localeCompare(right.created_at));
   const imageReferences = ordered.flatMap((reference) => {
@@ -63,7 +70,12 @@ export function ProductionCharacterCard({ character, references, assetById,
         {imageReferences.length === 0 ? <span className="production-empty-note">
           上传候选图后，人工批准才会进入 H3 reference binding。</span> : null}
       </div>
+      <CharacterImageJobList jobs={imageJobs} busy={busy}
+        onRetry={onRetryImageJob} onCancel={onCancelImageJob} />
       <footer>
+        <button className="button compact button-accent" disabled={busy}
+          onClick={onOpenGenerator} type="button">
+          {primary ? '生成派生图' : '生成母图'}</button>
         <label className="button compact production-upload-action">
           上传母图<input accept="image/png,image/jpeg,image/webp" disabled={busy}
             type="file" onChange={(event) => {

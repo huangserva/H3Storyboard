@@ -46,7 +46,7 @@ describe('compiled API runtime', () => {
     const response = await fetch(`${origin}/api/health`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      data: { status: 'ok', protocol_version: '1.6' },
+      data: { status: 'ok', protocol_version: '1.7' },
     });
 
     child.kill('SIGTERM');
@@ -97,6 +97,116 @@ describe('compiled API runtime', () => {
     expect(await waitForExit(child)).toBe(0);
     children.delete(child);
   });
+
+  it('runs the compiled character-image worker through HTTP and SQLite',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'h3-image-runtime-start-'));
+      directories.add(directory);
+      const databasePath = join(directory, 'runtime.db');
+      const comfy = await startImageComfy();
+      const child = spawn(process.execPath, ['apps/api/dist/main.js'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, H3_STORYBOARD_DB: databasePath,
+          H3_STORYBOARD_PORT: '0', H3_VIDEO_WORKER: '0',
+          H3_IMAGE_WORKER: '1', H3_IMAGE_COMFY_ENDPOINT: comfy.origin,
+          H3_COMFY_ENDPOINT: comfy.origin, H3_GPU_MIN_FREE_GIB: '0.001',
+          H3_IMAGE_WORKER_IDLE_MS: '10', H3_IMAGE_WORKER_POLL_MS: '1',
+          H3_IMAGE_WORKER_POLL_ATTEMPTS: '100',
+          H3_GPU_SETTLE_MS: '0', H3_MANAGED_COMFY_ENDPOINTS: '' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      children.add(child);
+      const origin = await waitForOrigin(child);
+      const project = await postData(origin, '/api/projects', {
+        title: 'Runtime image project', script_title: 'Runtime image script',
+        script_content: 'A real main-process image worker integration test.',
+      });
+      const character = await postData(origin,
+        `/api/projects/${project.id}/characters`, {
+          name: 'Runtime actor', canonical_appearance:
+            'An adult actor with stable face, hair, and wardrobe.',
+        });
+      const job = await postData(origin,
+        `/api/projects/${project.id}/characters/${character.id}/image_jobs`, {
+          operation: 'master_t2i', prompt: 'Neutral cinematic master portrait.',
+          seed: 2026082402, width: 480, height: 864, steps: 8, cfg: 1,
+          sampler: 'euler_ancestral', scheduler: 'sgm_uniform', denoise: null,
+          lora_profile: null, lora_name: null, lora_strength: null,
+          source_reference_ids: [],
+          idempotency_key: `runtime-image-${crypto.randomUUID()}`,
+        });
+
+      const completed = await waitForImageJob(origin, project.id, job.id);
+      expect(completed).toMatchObject({ status: 'completed',
+        provider_job_id: 'runtime-image-prompt' });
+      const snapshot = await fetch(`${origin}/api/projects/${project.id}`)
+        .then((response) => response.json() as Promise<{ data: {
+          assets: Array<{ id: string; kind: string; status: string;
+            producer_image_job_id: string | null }>; } }>);
+      expect(snapshot.data.assets).toContainEqual(expect.objectContaining({
+        id: completed.output_asset_id, kind: 'image', status: 'candidate',
+        producer_image_job_id: job.id,
+      }));
+      expect(comfy.submissions()).toBe(1);
+      expect(comfy.classTypes()).toEqual(expect.arrayContaining([
+        'UNETLoader', 'KSampler', 'SaveImage',
+      ]));
+
+      child.kill('SIGTERM');
+      expect(await waitForExit(child)).toBe(0);
+      children.delete(child);
+    });
+
+  it('cancels the active provider prompt through the compiled API runtime',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'h3-image-cancel-start-'));
+      directories.add(directory);
+      const comfy = await startImageComfy({ complete: false });
+      const child = spawn(process.execPath, ['apps/api/dist/main.js'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, H3_STORYBOARD_DB: join(directory, 'runtime.db'),
+          H3_STORYBOARD_PORT: '0', H3_VIDEO_WORKER: '0',
+          H3_IMAGE_WORKER: '1', H3_IMAGE_COMFY_ENDPOINT: comfy.origin,
+          H3_COMFY_ENDPOINT: comfy.origin, H3_GPU_MIN_FREE_GIB: '0.001',
+          H3_IMAGE_WORKER_IDLE_MS: '10', H3_IMAGE_WORKER_POLL_MS: '5',
+          H3_IMAGE_WORKER_POLL_ATTEMPTS: '1000', H3_GPU_SETTLE_MS: '0',
+          H3_MANAGED_COMFY_ENDPOINTS: '' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      children.add(child);
+      const origin = await waitForOrigin(child);
+      const project = await postData(origin, '/api/projects', {
+        title: 'Cancel image project', script_title: 'Cancel image script',
+        script_content: 'Cancel a live provider task from the compiled runtime.',
+      });
+      const character = await postData(origin,
+        `/api/projects/${project.id}/characters`, {
+          name: 'Cancel actor', canonical_appearance: 'Stable adult actor.',
+        });
+      const job = await postData(origin,
+        `/api/projects/${project.id}/characters/${character.id}/image_jobs`, {
+          operation: 'master_t2i', prompt: 'Cancelable master portrait.',
+          seed: 2026082403, width: 480, height: 864, steps: 8, cfg: 1,
+          sampler: 'euler_ancestral', scheduler: 'sgm_uniform', denoise: null,
+          lora_profile: null, lora_name: null, lora_strength: null,
+          source_reference_ids: [],
+          idempotency_key: `runtime-cancel-${crypto.randomUUID()}`,
+        });
+      await waitForImageJobStatus(origin, project.id, job.id, 'running');
+
+      const canceled = await postData(origin,
+        `/api/projects/${project.id}/character_image_jobs/${job.id}/cancel`, {
+          reason: 'Director canceled the active provider render.',
+        });
+      expect(canceled).toMatchObject({ status: 'canceled',
+        cancel_reason: 'Director canceled the active provider render.' });
+      expect(comfy.interrupts()).toBe(1);
+      await waitForImageJobStatus(origin, project.id, job.id, 'canceled');
+
+      child.kill('SIGTERM');
+      expect(await waitForExit(child)).toBe(0);
+      children.delete(child);
+    });
 });
 
 async function startSentinel(): Promise<{ origin: string; requests: () => number }> {
@@ -114,6 +224,113 @@ async function startSentinel(): Promise<{ origin: string; requests: () => number
   return { origin: `http://127.0.0.1:${address.port}`,
     requests: () => requestCount };
 }
+
+async function startImageComfy(options: { complete?: boolean } = {}): Promise<{
+  origin: string; submissions: () => number; classTypes: () => string[];
+  interrupts: () => number }> {
+  let submissions = 0;
+  let interrupts = 0;
+  let active = false;
+  let submittedClassTypes: string[] = [];
+  const requiredNodes = ['UNETLoader', 'CLIPLoader', 'VAELoader',
+    'CLIPTextEncode', 'ConditioningZeroOut', 'EmptyLatentImage', 'KSampler',
+    'VAEDecode', 'SaveImage'];
+  const server = createServer((request, response) => {
+    const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+    if (url.pathname === '/queue') return json(response, {
+      queue_running: active ? [[0, 'runtime-image-prompt', {}, {}]] : [],
+      queue_pending: [],
+    });
+    if (url.pathname === '/system_stats') return json(response, { devices: [{
+      name: 'NVIDIA RTX 4090', type: 'cuda',
+      vram_total: 48 * 1024 ** 3, vram_free: 32 * 1024 ** 3,
+    }] });
+    if (url.pathname === '/object_info') return json(response,
+      Object.fromEntries(requiredNodes.map((node) => [node, {}])));
+    if (url.pathname === '/prompt' && request.method === 'POST') {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => { body += chunk; });
+      request.on('end', () => {
+        const parsed = JSON.parse(body) as { prompt: Record<string, {
+          class_type?: string }> };
+        submittedClassTypes = Object.values(parsed.prompt)
+          .flatMap(({ class_type }) => class_type ? [class_type] : []);
+        submissions += 1;
+        active = true;
+        json(response, { prompt_id: 'runtime-image-prompt', node_errors: {} });
+      });
+      return;
+    }
+    if (url.pathname === '/history/runtime-image-prompt') return json(response,
+      options.complete === false ? {} : {
+        'runtime-image-prompt': { status: { completed: true }, outputs: {
+          save: { images: [{ filename: 'runtime.png', type: 'output' }] },
+        } },
+      });
+    if (url.pathname === '/interrupt' && request.method === 'POST') {
+      interrupts += 1;
+      active = false;
+      return json(response, {});
+    }
+    if (url.pathname === '/view') {
+      response.writeHead(200, { 'content-type': 'image/png' });
+      response.end(PNG_1X1);
+      return;
+    }
+    response.writeHead(404).end();
+  });
+  httpServers.add(server);
+  await new Promise<void>((resolveListen) =>
+    server.listen(0, '127.0.0.1', resolveListen));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Comfy unavailable');
+  return { origin: `http://127.0.0.1:${address.port}`,
+    submissions: () => submissions, classTypes: () => submittedClassTypes,
+    interrupts: () => interrupts };
+}
+
+function json(response: import('node:http').ServerResponse, body: unknown): void {
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify(body));
+}
+
+async function postData(origin: string, pathname: string,
+  body: unknown): Promise<Record<string, any>> {
+  const response = await fetch(`${origin}${pathname}`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const payload = await response.json() as { data?: Record<string, any>;
+    error?: unknown };
+  if (!response.ok || !payload.data) throw new Error(
+    `POST ${pathname} failed (${response.status}): ${JSON.stringify(payload)}`);
+  return payload.data;
+}
+
+async function waitForImageJob(origin: string, projectId: string,
+  jobId: string): Promise<Record<string, any>> {
+  return waitForImageJobStatus(origin, projectId, jobId, 'completed');
+}
+
+async function waitForImageJobStatus(origin: string, projectId: string,
+  jobId: string, expectedStatus: string): Promise<Record<string, any>> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const payload = await fetch(
+      `${origin}/api/projects/${projectId}/character_image_jobs`)
+      .then((response) => response.json() as Promise<{ data: Array<
+        Record<string, any>> }>);
+    const job = payload.data.find(({ id }) => id === jobId);
+    if (job?.status === expectedStatus) return job;
+    if (job && ['failed', 'canceled', 'completed'].includes(String(job.status))) {
+      throw new Error(`Image job ended as ${job.status}: ${JSON.stringify(job)}`);
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+  }
+  throw new Error(`Image job ${jobId} did not reach ${expectedStatus}`);
+}
+
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUB' +
+  'AScY42YAAAAASUVORK5CYII=', 'base64');
 
 function waitForOrigin(child: ChildProcess): Promise<string> {
   return new Promise((resolveOrigin, reject) => {

@@ -37,6 +37,8 @@ export const H3JobStatusSchema = z.enum([
 ]);
 export type H3JobStatus = z.infer<typeof H3JobStatusSchema>;
 
+export const H3_MAX_AUTO_ATTEMPTS = 8;
+
 const jobFields = {
   provider: H3ProviderSchema,
   model: NonEmptyTextSchema.max(200),

@@ -243,6 +243,54 @@ describe('durable H3 job leases', () => {
       'H3_JOB_OUTPUT_MISMATCH',
     );
   });
+
+  it('backs off timed-out jobs without starving fresh drafts and caps retries',
+    () => {
+      const { databasePath, store } = fileStore();
+      const { shotId } = seedShot(store);
+      const older = createDraft(store, shotId, 'timed-out-backoff');
+      const olderClaim = store.claimH3Job(older.id);
+      store.deferH3Job(older.id, olderClaim.lease_token!,
+        'H3_COMFY_QUEUE_BUSY', 'Shared GPU is busy');
+      const fresh = createDraft(store, shotId, 'fresh-draft-wins');
+
+      const freshClaim = store.claimNextH3Job();
+      expect(freshClaim?.id).toBe(fresh.id);
+      store.cancelH3Job(fresh.id);
+      expect(store.claimNextH3Job()).toBeNull();
+
+      const raw = new Database(databasePath);
+      raw.prepare('UPDATE h3_jobs SET updated_at = ? WHERE id = ?')
+        .run('2000-01-01T00:00:00.000Z', older.id);
+      raw.close();
+      const recovered = store.claimNextH3Job();
+      expect(recovered).toMatchObject({ id: older.id, attempt: 2 });
+      store.deferH3Job(older.id, recovered!.lease_token!,
+        'H3_COMFY_QUEUE_BUSY', 'Shared GPU is still busy');
+
+      const capped = new Database(databasePath);
+      capped.prepare(`UPDATE h3_jobs SET attempt = 8, updated_at = ?
+        WHERE id = ?`).run('2000-01-01T00:00:00.000Z', older.id);
+      capped.close();
+      expect(store.claimNextH3Job()).toBeNull();
+    });
+
+  it('immediately recovers one expired lease then backs off a busy retry', () => {
+    const store = track(new ProjectStore(':memory:'));
+    const { shotId } = seedShot(store);
+    const draft = createDraft(store, shotId, 'expired-then-peer-busy');
+    const first = store.claimH3Job(draft.id);
+    store.markH3SubmitIntent(draft.id, first.lease_token!, 'expired-client');
+    store.deferH3Job(draft.id, first.lease_token!,
+      'LEASE_EXPIRED', 'Worker lease expired');
+
+    const recovery = store.claimNextH3Job();
+    expect(recovery).toMatchObject({ id: draft.id, attempt: 2 });
+    store.deferH3Job(draft.id, recovery!.lease_token!,
+      'H3_COMFY_QUEUE_BUSY', 'Peer queue became busy during recovery');
+
+    expect(store.claimNextH3Job()).toBeNull();
+  });
 });
 
 function fileStore(): { databasePath: string; store: ProjectStore } {

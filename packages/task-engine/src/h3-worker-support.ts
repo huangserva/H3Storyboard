@@ -5,6 +5,7 @@ import { RelativeAssetPathSchema, type H3Job,
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
+import type { SharedGpuCoordinator } from './gpu-coordinator.js';
 
 export interface WorkerCompletionInput {
   name: string;
@@ -15,6 +16,7 @@ export interface WorkerCompletionInput {
 
 export interface H3WorkerStore {
   recoverExpiredH3Jobs(now?: Date): number;
+  claimH3Job(jobId: string, leaseDurationMs?: number): H3Job;
   claimNextH3Job(leaseDurationMs?: number): H3Job | null;
   getProjectSnapshot(projectId: string): ProjectSnapshot;
   getH3Job(jobId: string): H3Job;
@@ -49,6 +51,7 @@ export interface H3LeaseWorkerOptions {
   turbo?: boolean;
   loras?: readonly H3Lora[];
   free_before_submit?: boolean;
+  gpu_coordinator?: SharedGpuCoordinator;
   r2v_loader?: H3R2VLoader;
   on_error?: (error: unknown) => void;
 }
@@ -72,6 +75,40 @@ export type H3WorkerErrorCode =
   | 'H3_WORKER_PATH_INVALID'
   | 'H3_WORKER_FAILED'
   | 'H3_WORKER_CONFIG_INVALID';
+
+export function startLeaseHeartbeat(
+  leaseDurationMs: number,
+  heartbeat: () => void,
+  onError?: (error: unknown) => void,
+): () => void {
+  let stopped = false;
+  let timer: NodeJS.Timeout;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+  };
+  timer = setInterval(() => {
+    try { heartbeat(); }
+    catch (error) {
+      stop();
+      onError?.(error);
+    }
+  }, Math.max(1, Math.floor(leaseDurationMs / 3)));
+  timer.unref();
+  return stop;
+}
+
+export function startCancellationDeadline(
+  leaseDurationMs: number,
+  controller: AbortController,
+): () => void {
+  const timer = setTimeout(() => controller.abort(new H3WorkerError(
+    'H3_WORKER_FAILED', 'Provider cancellation exceeded its safety deadline')),
+  Math.min(30_000, Math.max(1, Math.floor(leaseDurationMs / 2))));
+  timer.unref();
+  return () => clearTimeout(timer);
+}
 
 export class H3WorkerError extends Error {
   constructor(readonly code: H3WorkerErrorCode, message: string,

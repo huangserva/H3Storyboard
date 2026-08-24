@@ -5,6 +5,23 @@ import {
   type ComfyHistoryEntry,
   type ComfyOutputItem,
 } from './comfyui-types.js';
+import { discoverGraphCapabilities } from './comfyui-capabilities.js';
+import {
+  delay,
+  findTaskByClientId,
+  firstImageOutput,
+  firstOutput,
+  httpError,
+  isRecord,
+  optionalStringField,
+  parseJson,
+  queueContainsPrompt,
+  queueHasEntries,
+  queueListContains,
+  queuePromptIds,
+  requestSignal,
+  stringField,
+} from './comfyui-client-helpers.js';
 
 export interface ComfyUIClientOptions {
   endpoint: string;
@@ -19,6 +36,12 @@ export interface PollHistoryOptions {
   on_attempt?: (attempt: number) => void | Promise<void>;
   missing_max_attempts?: number;
   max_attempts?: number;
+}
+
+export interface ComfyGpuMemory {
+  device_name: string;
+  total_bytes: number;
+  free_bytes: number;
 }
 
 export class ComfyUIClient {
@@ -40,23 +63,87 @@ export class ComfyUIClient {
     return this.#pollIntervalMs * this.#pollMaxAttempts;
   }
   get poll_interval_ms(): number { return this.#pollIntervalMs; }
+  get endpoint(): string { return this.#endpoint; }
 
   createClientId(): string { return this.#clientIdFactory(); }
 
-  async assertQueueIdle(): Promise<void> {
-    const response = await this.#fetch(`${this.#endpoint}/queue`);
+  async assertGraphCapabilities(graph: ComfyGraph,
+    signal?: AbortSignal): Promise<void> {
+    const evidence = await discoverGraphCapabilities(
+      this.#endpoint, graph, this.#fetch, signal);
+    if (!evidence.ready) throw new H3ComfyError(
+      'H3_COMFY_CAPABILITY_MISMATCH',
+      'ComfyUI does not provide every node required by the selected graph', {
+        missing_nodes: Object.entries(evidence.nodes).flatMap(
+          ([node, status]) => status === 'missing' ? [node] : []),
+      });
+  }
+
+  async assertQueueIdle(signal?: AbortSignal): Promise<void> {
+    const response = await this.#fetch(`${this.#endpoint}/queue`,
+      requestSignal(signal));
     const body = await parseJson(response, 'inspect queue');
     if (queueHasEntries(body)) throw new H3ComfyError(
       'H3_COMFY_QUEUE_BUSY',
       'ComfyUI queue is occupied; H3Storyboard will wait without freeing or submitting');
   }
 
-  async uploadImage(image: Blob, filename: string): Promise<string> {
+  async assertQueueCompatible(promptId: string,
+    signal?: AbortSignal): Promise<void> {
+    const response = await this.#fetch(`${this.#endpoint}/queue`,
+      requestSignal(signal));
+    const body = await parseJson(response, 'inspect queue');
+    const promptIds = queuePromptIds(body);
+    if (promptIds.some((queuedPromptId) => queuedPromptId !== promptId)) {
+      throw new H3ComfyError('H3_COMFY_QUEUE_BUSY',
+        'ComfyUI queue contains a task not owned by the recovering job', {
+          prompt_id: promptId, queued_prompt_ids: promptIds,
+        });
+    }
+  }
+
+  async assertFreeVram(minimumFreeBytes: number,
+    signal?: AbortSignal): Promise<ComfyGpuMemory> {
+    if (!Number.isSafeInteger(minimumFreeBytes) || minimumFreeBytes < 0) {
+      throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
+        'Minimum free VRAM must be a non-negative safe integer');
+    }
+    const body = await parseJson(await this.#fetch(
+      `${this.#endpoint}/system_stats`, requestSignal(signal)),
+    'inspect system stats');
+    const devices = body.devices;
+    if (!Array.isArray(devices)) throw new H3ComfyError(
+      'H3_COMFY_PROTOCOL_ERROR', 'ComfyUI system stats omitted devices');
+    const candidates = devices.flatMap((device) => {
+      if (!isRecord(device) || device.type !== 'cuda' ||
+        typeof device.name !== 'string' ||
+        typeof device.vram_total !== 'number' ||
+        typeof device.vram_free !== 'number' ||
+        !Number.isFinite(device.vram_total) || !Number.isFinite(device.vram_free)) {
+        return [];
+      }
+      return [{ device_name: device.name, total_bytes: device.vram_total,
+        free_bytes: device.vram_free }];
+    }).sort((left, right) => right.free_bytes - left.free_bytes);
+    const memory = candidates[0];
+    if (!memory) throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
+      'ComfyUI system stats contained no valid CUDA device');
+    if (memory.free_bytes < minimumFreeBytes) throw new H3ComfyError(
+      'H3_COMFY_GPU_INSUFFICIENT',
+      'ComfyUI GPU does not have enough free VRAM for this job', {
+        minimum_free_bytes: minimumFreeBytes, free_bytes: memory.free_bytes,
+        device_name: memory.device_name,
+      });
+    return memory;
+  }
+
+  async uploadImage(image: Blob, filename: string,
+    signal?: AbortSignal): Promise<string> {
     const form = new FormData();
     form.append('image', image, filename);
     form.append('overwrite', 'true');
     const response = await this.#fetch(`${this.#endpoint}/upload/image`, {
-      method: 'POST', body: form,
+      method: 'POST', body: form, ...(signal ? { signal } : {}),
     });
     const body = await parseJson(response, 'upload image');
     const name = stringField(body, 'name', 'upload image');
@@ -64,10 +151,12 @@ export class ComfyUIClient {
     return subfolder ? `${subfolder}/${name}` : name;
   }
 
-  async submitPrompt(graph: ComfyGraph, clientId = this.createClientId()): Promise<string> {
+  async submitPrompt(graph: ComfyGraph, clientId = this.createClientId(),
+    signal?: AbortSignal): Promise<string> {
     const response = await this.#fetch(`${this.#endpoint}/prompt`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ prompt: graph, client_id: clientId }),
+      ...(signal ? { signal } : {}),
     });
     const body = await parseJson(response, 'submit prompt');
     if (isRecord(body.node_errors) && Object.keys(body.node_errors).length > 0) {
@@ -116,14 +205,10 @@ export class ComfyUIClient {
       });
   }
 
-  async findTaskByClientId(clientId: string): Promise<string | null> {
-    const queue = await this.#fetch(`${this.#endpoint}/queue`);
-    const queueBody = queue.ok ? await queue.json() as unknown : null;
-    const queued = findPromptInQueue(queueBody, clientId);
-    if (queued) return queued;
-    const history = await this.#fetch(`${this.#endpoint}/history`);
-    const historyBody = history.ok ? await history.json() as unknown : null;
-    return findPromptInHistory(historyBody, clientId);
+  async findTaskByClientId(clientId: string,
+    signal?: AbortSignal, confirmationAttempts = 1): Promise<string | null> {
+    return findTaskByClientId(this.#endpoint, clientId, this.#fetch,
+      this.#pollIntervalMs, signal, confirmationAttempts);
   }
 
   async taskExists(promptId: string, signal?: AbortSignal,
@@ -145,35 +230,33 @@ export class ComfyUIClient {
     return false;
   }
 
-  async cancelTask(promptId: string): Promise<void> {
-    const state = await this.#fetch(`${this.#endpoint}/queue`);
+  async cancelTask(promptId: string, signal?: AbortSignal): Promise<void> {
+    const state = await this.#fetch(`${this.#endpoint}/queue`,
+      requestSignal(signal));
     if (!state.ok) throw await httpError(state, 'inspect queue');
     const body = await state.json() as unknown;
+    queuePromptIds(body);
     if (queueListContains(body, 'queue_pending', promptId)) {
       const deleted = await this.#fetch(`${this.#endpoint}/queue`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ delete: [promptId] }),
+        ...(signal ? { signal } : {}),
       });
       if (!deleted.ok) throw await httpError(deleted, 'delete queued prompt');
     }
     if (queueListContains(body, 'queue_running', promptId)) {
       const interrupt = await this.#fetch(`${this.#endpoint}/interrupt`,
-        { method: 'POST' });
+        { method: 'POST', ...(signal ? { signal } : {}) });
       if (!interrupt.ok) throw await httpError(interrupt, 'interrupt prompt');
     }
   }
 
   firstOutput(history: ComfyHistoryEntry): ComfyOutputItem {
-    for (const output of Object.values(history.outputs ?? {})) {
-      for (const key of ['gifs', 'videos', 'images']) {
-        const items = output[key];
-        if (Array.isArray(items) && items.length > 0 && isOutputItem(items[0])) {
-          return items[0];
-        }
-      }
-    }
-    throw new H3ComfyError('H3_COMFY_OUTPUT_MISSING',
-      'ComfyUI outputs contain no downloadable media');
+    return firstOutput(history);
+  }
+
+  firstImageOutput(history: ComfyHistoryEntry): ComfyOutputItem {
+    return firstImageOutput(history);
   }
 
   viewUrl(item: ComfyOutputItem): string {
@@ -182,8 +265,9 @@ export class ComfyUIClient {
     return `${this.#endpoint}/view?${query.toString()}`;
   }
 
-  async downloadOutput(item: ComfyOutputItem): Promise<Uint8Array> {
-    const response = await this.#fetch(this.viewUrl(item));
+  async downloadOutput(item: ComfyOutputItem,
+    signal?: AbortSignal): Promise<Uint8Array> {
+    const response = await this.#fetch(this.viewUrl(item), requestSignal(signal));
     if (!response.ok) throw await httpError(response, 'download output');
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength === 0) throw new H3ComfyError(
@@ -193,115 +277,12 @@ export class ComfyUIClient {
     return bytes;
   }
 
-  async free(): Promise<void> {
+  async free(signal?: AbortSignal): Promise<void> {
     const response = await this.#fetch(`${this.#endpoint}/free`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ unload_models: true, free_memory: true }),
+      ...(signal ? { signal } : {}),
     });
     if (!response.ok) throw await httpError(response, 'free memory');
   }
-}
-
-async function parseJson(response: Response, operation: string): Promise<Record<string, unknown>> {
-  if (!response.ok) throw await httpError(response, operation);
-  try {
-    const body = await response.json() as unknown;
-    if (!isRecord(body)) throw new Error('JSON root is not an object');
-    return body;
-  } catch (error) {
-    throw new H3ComfyError('H3_COMFY_PROTOCOL_ERROR',
-      `ComfyUI ${operation} returned invalid JSON`, {}, { cause: error });
-  }
-}
-
-async function httpError(response: Response, operation: string) {
-  const text = (await response.text()).slice(0, 800);
-  return new H3ComfyError('H3_COMFY_HTTP_ERROR',
-    `ComfyUI ${operation} failed with HTTP ${response.status}`, {
-      status: response.status, response: text,
-    });
-}
-
-function stringField(body: Record<string, unknown>, field: string, operation: string) {
-  const value = body[field];
-  if (typeof value !== 'string' || value.length === 0) throw new H3ComfyError(
-    'H3_COMFY_PROTOCOL_ERROR', `ComfyUI ${operation} omitted ${field}`);
-  return value;
-}
-
-function optionalStringField(body: Record<string, unknown>, field: string,
-  operation: string) {
-  const value = body[field];
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string') throw new H3ComfyError(
-    'H3_COMFY_PROTOCOL_ERROR', `ComfyUI ${operation} returned invalid ${field}`);
-  return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isOutputItem(value: unknown): value is ComfyOutputItem {
-  return isRecord(value) && typeof value.filename === 'string';
-}
-
-function requestSignal(signal?: AbortSignal): RequestInit | undefined {
-  return signal ? { signal } : undefined;
-}
-
-function delay(milliseconds: number, signal?: AbortSignal) {
-  if (signal?.aborted) throw new H3ComfyError('H3_COMFY_ABORTED',
-    'ComfyUI polling was aborted');
-  if (milliseconds <= 0) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, milliseconds);
-    signal?.addEventListener('abort', () => {
-      clearTimeout(timer);
-      reject(new H3ComfyError('H3_COMFY_ABORTED',
-        'ComfyUI polling was aborted'));
-    }, { once: true });
-  });
-}
-
-function queueContainsPrompt(value: unknown, promptId: string): boolean {
-  if (!isRecord(value)) return false;
-  return ['queue_running', 'queue_pending'].some((key) =>
-    Array.isArray(value[key]) && (value[key] as unknown[]).some((item) =>
-      Array.isArray(item) && item[1] === promptId));
-}
-
-function queueListContains(value: unknown, key: string, promptId: string): boolean {
-  return isRecord(value) && Array.isArray(value[key]) &&
-    (value[key] as unknown[]).some((item) => Array.isArray(item) && item[1] === promptId);
-}
-
-function queueHasEntries(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  return ['queue_running', 'queue_pending'].some((key) =>
-    Array.isArray(value[key]) && value[key].length > 0);
-}
-
-function findPromptInQueue(value: unknown, clientId: string): string | null {
-  if (!isRecord(value)) return null;
-  for (const key of ['queue_running', 'queue_pending']) {
-    const entries = value[key];
-    if (!Array.isArray(entries)) continue;
-    for (const item of entries) if (Array.isArray(item) &&
-      isRecord(item[3]) && item[3].client_id === clientId &&
-      typeof item[1] === 'string') return item[1];
-  }
-  return null;
-}
-
-function findPromptInHistory(value: unknown, clientId: string): string | null {
-  if (!isRecord(value)) return null;
-  for (const [promptId, entry] of Object.entries(value)) {
-    if (!isRecord(entry)) continue;
-    const prompt = entry.prompt;
-    if (Array.isArray(prompt) && isRecord(prompt[3]) &&
-      prompt[3].client_id === clientId) return promptId;
-    if (entry.client_id === clientId) return promptId;
-  }
-  return null;
 }

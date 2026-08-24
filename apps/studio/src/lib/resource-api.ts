@@ -2,9 +2,11 @@ import { BatchUpsertCanvasNodesResultSchema } from '@h3storyboard/protocol';
 import type { ApproveCharacterReferenceResult, Asset, BatchUpsertCanvasNodesInput,
   BatchUpsertCanvasNodesResult, CanvasNode, Character, CharacterReference,
   CharacterCatalog,
+  CharacterImageJob,
   CharacterReferenceUploadResult,
   CreateAssetInput,
-  CreateCanvasNodeInput, CreateCharacterInput, CurrentAssetsManifestSnapshot,
+  CreateCanvasNodeInput, CreateCharacterImageJobInput, CreateCharacterInput,
+  CurrentAssetsManifestSnapshot, RetryCharacterImageJobInput,
   UpdateAssetInput, UpdateCanvasNodeInput, UpdateCharacterInput,
 } from '@h3storyboard/protocol';
 import { ApiError, request } from './api.js';
@@ -88,6 +90,35 @@ export async function approveCharacterReference(projectId: string,
 export async function archiveCharacterReferenceAsset(projectId: string,
   assetId: string): Promise<Asset> {
   return updateAsset(projectId, { asset_id: assetId, status: 'archived' });
+}
+export async function listCharacterImageJobs(projectId: string,
+  signal?: AbortSignal): Promise<CharacterImageJob[]> {
+  return request<CharacterImageJob[]>(`/api/projects/${encodeURIComponent(projectId)}` +
+    '/character_image_jobs', signal ? { signal } : undefined);
+}
+export async function createCharacterImageJob(projectId: string,
+  characterId: string,
+  input: CreateCharacterImageJobInput): Promise<CharacterImageJob> {
+  const { engine: _serverSelectedEngine, provider: _serverSelectedProvider,
+    ...requestInput } = input;
+  return request<CharacterImageJob>(`/api/projects/${encodeURIComponent(projectId)}` +
+    `/characters/${encodeURIComponent(characterId)}/image_jobs`, {
+      method: 'POST', body: JSON.stringify(requestInput),
+    });
+}
+export async function retryCharacterImageJob(projectId: string, jobId: string,
+  input: RetryCharacterImageJobInput): Promise<CharacterImageJob> {
+  return request<CharacterImageJob>(`/api/projects/${encodeURIComponent(projectId)}` +
+    `/character_image_jobs/${encodeURIComponent(jobId)}/retry`, {
+      method: 'POST', body: JSON.stringify(input),
+    });
+}
+export async function cancelCharacterImageJob(projectId: string,
+  jobId: string, reason: string): Promise<CharacterImageJob> {
+  return request<CharacterImageJob>(`/api/projects/${encodeURIComponent(projectId)}` +
+    `/character_image_jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    });
 }
 export async function listAssets(projectId: string): Promise<Asset[]> {
   return request<Asset[]>(`/api/projects/${projectId}/assets`);

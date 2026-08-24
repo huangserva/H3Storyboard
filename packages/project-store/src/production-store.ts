@@ -120,6 +120,19 @@ export class ProductionStore {
         'LOCK_NOT_ENGAGED', 'Project generation lock is not engaged', {
           project_id: projectId,
         });
+      if (input.engaged) {
+        const activeImageJob = this.database.prepare(
+          `SELECT id, status FROM character_image_jobs
+           WHERE project_id = ? AND status IN ('submitting', 'queued', 'running')
+           ORDER BY created_at, id LIMIT 1`,
+        ).get(projectId) as { id: string; status: string } | undefined;
+        if (activeImageJob) throw new StoreError(
+          'LOCK_IMAGE_JOBS_ACTIVE',
+          'Project generation lock cannot engage while character image work is active',
+          { project_id: projectId, job_id: activeImageJob.id,
+            status: activeImageJob.status },
+        );
+      }
       const now = new Date().toISOString();
       this.database.prepare(
         `INSERT INTO project_generation_locks
@@ -135,6 +148,6 @@ export class ProductionStore {
       return mapGenerationLock(this.database.prepare(
         'SELECT * FROM project_generation_locks WHERE project_id = ?',
       ).get(projectId));
-    })();
+    }).immediate();
   }
 }

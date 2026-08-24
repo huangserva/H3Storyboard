@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { seedCanvasDemo, type CanvasDemoResult } from
   '../../scripts/canvas-demo-fixture.js';
 
-const API_ORIGIN = 'http://127.0.0.1:4187';
+const API_ORIGIN = process.env.H3_E2E_API_ORIGIN ?? 'http://127.0.0.1:4187';
 const DEMO_TITLE = '上海雨夜 · 画布体验项目';
 let fixture: CanvasDemoResult;
 

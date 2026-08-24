@@ -60,13 +60,15 @@ pnpm dev
 - API: `http://127.0.0.1:4187`
 - Data: `~/.h3storyboard/h3storyboard.db` by default, or set `H3_STORYBOARD_DB`.
 
-The API starts `H3LeaseWorker` by default and connects to
-`http://127.0.0.1:8190`. Override the endpoint with `H3_COMFY_ENDPOINT`; set
-`H3_WORKER=0` only when a separately managed worker owns this database. Before a
-new submission the worker verifies that ComfyUI's running and pending queues are
-both empty. If another application occupies the queue it records a recoverable
-wait state and does not call `/free`, upload inputs, or submit a prompt. Once the
-queue is free, it calls `/free` before loading the H3 model and submitting.
+The API starts both the H3 video worker and character-image worker by default.
+Video uses `H3_COMFY_ENDPOINT` (default `http://127.0.0.1:8190`); Krea/Qwen image
+jobs use `H3_IMAGE_COMFY_ENDPOINT` (default `http://127.0.0.1:8188`). Disable one
+with `H3_VIDEO_WORKER=0` or `H3_IMAGE_WORKER=0`, or both with `H3_WORKER=0` when
+a separately managed process owns the database. Both workers share one durable
+GPU lease and verify every configured queue before submission. A busy queue is
+recorded as recoverable work without uploading or submitting. `/free` is called
+only for endpoints explicitly listed in the comma-separated
+`H3_MANAGED_COMFY_ENDPOINTS`; unmanaged ComfyUI processes are never released.
 
 Production startup uses the same behavior:
 
@@ -74,6 +76,8 @@ Production startup uses the same behavior:
 pnpm build
 H3_STORYBOARD_DB=/path/to/project.db \
 H3_COMFY_ENDPOINT=http://127.0.0.1:8190 \
+H3_IMAGE_COMFY_ENDPOINT=http://127.0.0.1:8188 \
+H3_MANAGED_COMFY_ENDPOINTS=http://127.0.0.1:8188,http://127.0.0.1:8190 \
 pnpm --filter @h3storyboard/api start
 ```
 

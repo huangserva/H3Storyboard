@@ -152,9 +152,13 @@ export function updateCharacterReference(db: Database.Database, projectId: strin
     const uploadManaged = Boolean(db.prepare(
       'SELECT 1 FROM character_reference_uploads WHERE reference_id = ?',
     ).get(existing.id));
-    if (uploadManaged && changesUploadedReferenceContent(existing, input)) {
+    const imageJobManaged = Boolean(db.prepare(
+      'SELECT 1 FROM character_image_jobs WHERE output_reference_id = ?',
+    ).get(existing.id));
+    if ((uploadManaged || imageJobManaged) &&
+      changesUploadedReferenceContent(existing, input)) {
       throw new StoreError('CHARACTER_REFERENCE_IMMUTABLE',
-        'Uploaded reference content and lineage are immutable', {
+        'Persisted reference content and lineage are immutable', {
           reference_id: existing.id,
         });
     }

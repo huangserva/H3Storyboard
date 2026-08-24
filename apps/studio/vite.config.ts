@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     proxy: {
-      '/api': 'http://127.0.0.1:4187',
+      '/api': process.env.H3_STORYBOARD_API_ORIGIN ?? 'http://127.0.0.1:4187',
     },
   },
 });

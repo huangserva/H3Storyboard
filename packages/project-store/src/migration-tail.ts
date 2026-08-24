@@ -5,6 +5,8 @@ import { addJobAudioMode } from './migration-v16.js';
 import { addCharacterReferenceUploads } from './migration-v17.js';
 import { createCharacterAssetDerivations } from './migration-v18.js';
 import { enforceCharacterPrimaryReferences } from './migration-v19.js';
+import { createCharacterImageJobsAndGpuLeases } from './migration-v20.js';
+import { enforceSingleCharacterImageRetry } from './migration-v21.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -14,6 +16,8 @@ const tailMigrations: Array<readonly [number,
   [17, addCharacterReferenceUploads],
   [18, createCharacterAssetDerivations],
   [19, enforceCharacterPrimaryReferences],
+  [20, createCharacterImageJobsAndGpuLeases],
+  [21, enforceSingleCharacterImageRetry],
 ];
 
 export function applyTailMigrations(

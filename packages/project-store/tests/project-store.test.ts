@@ -296,7 +296,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(19);
+    ).toBe(21);
     migratedVersion.close();
   });
 
@@ -362,7 +362,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(19);
+    ).get() as { version: number }).version).toBe(21);
     migrated.close();
   });
 
@@ -413,7 +413,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(19);
+    ).get() as { version: number }).version).toBe(21);
     migrated.close();
   });
 

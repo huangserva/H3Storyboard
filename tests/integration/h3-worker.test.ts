@@ -111,7 +111,8 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     fixture.store.close(); stores.splice(stores.indexOf(fixture.store), 1);
     const raw = new Database(fixture.databasePath);
     raw.prepare(`UPDATE h3_jobs SET status='timed_out', lease_token=NULL,
-      lease_expires_at=NULL WHERE id=?`).run(fixture.jobId); raw.close();
+      lease_expires_at=NULL, error_code='LEASE_EXPIRED' WHERE id=?`)
+      .run(fixture.jobId); raw.close();
     const reopened = track(new ProjectStore(fixture.databasePath));
     const stub = await startComfyStub('claim-client');
 

@@ -1,5 +1,7 @@
 import { CharacterReferenceUploadResultSchema, IdSchema } from
   '@h3storyboard/protocol';
+import { CharacterImageValidationError, decodeCharacterImage } from
+  '@h3storyboard/h3-provider';
 import type { ProjectStore } from '@h3storyboard/project-store';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, realpath, rename, unlink, writeFile } from 'node:fs/promises';
@@ -32,7 +34,15 @@ export async function serveCharacterUploadRoute(
   const idempotencyKey = requiredHeader(request, 'x-idempotency-key', 200);
   const derivedFrom = optionalIdHeader(request, 'x-derived-from-reference-id');
   const bytes = await readImageBody(request);
-  if (detectImageMime(bytes) !== contentType) throw new ApiError(
+  let decoded;
+  try {
+    decoded = await decodeCharacterImage(bytes);
+  } catch (error) {
+    if (error instanceof CharacterImageValidationError) throw new ApiError(
+      422, error.code, error.message);
+    throw error;
+  }
+  if (decoded.mime_type !== contentType) throw new ApiError(
     422, 'CHARACTER_IMAGE_INVALID',
     'Uploaded bytes do not match the declared image type');
   const contentHash = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -94,96 +104,6 @@ async function readImageBody(request: IncomingMessage): Promise<Buffer> {
   if (size === 0) throw new ApiError(400, 'CHARACTER_IMAGE_REQUIRED',
     'Character image body is required');
   return Buffer.concat(chunks);
-}
-
-function detectImageMime(bytes: Buffer): string | null {
-  if (validatePng(bytes)) return 'image/png';
-  if (validateJpeg(bytes)) return 'image/jpeg';
-  if (validateWebp(bytes)) return 'image/webp';
-  return null;
-}
-
-function validatePng(bytes: Buffer): boolean {
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  if (bytes.length < 45 || !bytes.subarray(0, 8).equals(signature)) return false;
-  let offset = 8;
-  let sawHeader = false;
-  let sawData = false;
-  while (offset + 12 <= bytes.length) {
-    const length = bytes.readUInt32BE(offset);
-    const typeStart = offset + 4;
-    const dataStart = offset + 8;
-    const dataEnd = dataStart + length;
-    if (dataEnd + 4 > bytes.length) return false;
-    const type = bytes.subarray(typeStart, dataStart).toString('ascii');
-    if (crc32(bytes.subarray(typeStart, dataEnd)) !==
-      bytes.readUInt32BE(dataEnd)) return false;
-    if (!sawHeader) {
-      if (type !== 'IHDR' || length !== 13 ||
-        bytes.readUInt32BE(dataStart) === 0 ||
-        bytes.readUInt32BE(dataStart + 4) === 0) return false;
-      sawHeader = true;
-    } else if (type === 'IHDR') return false;
-    if (type === 'IDAT') sawData = true;
-    offset = dataEnd + 4;
-    if (type === 'IEND') {
-      return length === 0 && sawData && offset === bytes.length;
-    }
-  }
-  return false;
-}
-
-function crc32(bytes: Buffer): number {
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function validateJpeg(bytes: Buffer): boolean {
-  if (bytes.length < 32 || bytes[0] !== 0xff || bytes[1] !== 0xd8 ||
-    bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) {
-    return false;
-  }
-  const frameMarkers = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
-    0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
-  let sawFrame = false;
-  let offset = 2;
-  while (offset < bytes.length - 2) {
-    if (bytes[offset] !== 0xff) return false;
-    while (bytes[offset] === 0xff) offset += 1;
-    const marker = bytes[offset++]!;
-    if (marker === 0xda) return sawFrame && offset + 2 <= bytes.length - 2;
-    if (marker === 0xd8 || marker === 0x01 ||
-      (marker >= 0xd0 && marker <= 0xd7)) continue;
-    if (offset + 2 > bytes.length - 2) return false;
-    const length = bytes.readUInt16BE(offset);
-    if (length < 2 || offset + length > bytes.length - 2) return false;
-    if (frameMarkers.has(marker)) sawFrame = true;
-    offset += length;
-  }
-  return false;
-}
-
-function validateWebp(bytes: Buffer): boolean {
-  if (bytes.length < 20 || bytes.subarray(0, 4).toString('ascii') !== 'RIFF' ||
-    bytes.readUInt32LE(4) + 8 !== bytes.length ||
-    bytes.subarray(8, 12).toString('ascii') !== 'WEBP') return false;
-  let offset = 12;
-  let sawImageChunk = false;
-  while (offset + 8 <= bytes.length) {
-    const type = bytes.subarray(offset, offset + 4).toString('ascii');
-    const length = bytes.readUInt32LE(offset + 4);
-    const end = offset + 8 + length;
-    if (end > bytes.length) return false;
-    if (['VP8 ', 'VP8L', 'VP8X', 'ANMF'].includes(type)) sawImageChunk = true;
-    offset = end + (length % 2);
-  }
-  return sawImageChunk && offset === bytes.length;
 }
 
 async function secureOutputPath(rootPath: string, relativePath: string) {

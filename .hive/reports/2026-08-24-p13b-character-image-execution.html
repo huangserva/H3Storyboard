@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H3Storyboard P1.3B · 角色图真实执行闭环</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080b10;--panel:#111721;--panel2:#17202d;--ink:#f5f2e9;--muted:#a7b0be;--line:#2e3948;--green:#b8ef71;--cyan:#67e6dc;--amber:#f1bc67;--red:#ff8d93;--violet:#aab4ff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 86% 0,#163b3e 0,transparent 36rem),radial-gradient(circle at 0 52%,#292044 0,transparent 42rem),var(--bg);color:var(--ink);font:15px/1.66 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1180px,calc(100% - 30px));margin:46px auto 90px}.eyebrow{color:var(--green);font:700 12px ui-monospace,monospace;letter-spacing:.15em}h1{max-width:1060px;margin:12px 0 19px;font-size:clamp(40px,6vw,70px);line-height:1.04;letter-spacing:-.045em}h2{margin:48px 0 15px;font-size:28px}h3{margin:25px 0 8px;color:var(--cyan)}p{max-width:1040px}.lede{font-size:20px;color:#d4d8df}.callout{padding:22px 24px;border:1px solid #4b6f58;border-radius:17px;background:linear-gradient(135deg,#16251e,#101821);font-size:18px}.callout.warn{border-color:#745932;background:linear-gradient(135deg,#271f14,#15171c)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:20px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--panel2),var(--panel))}.card p{margin:7px 0;color:var(--muted)}.metric{font:800 27px ui-monospace,monospace;color:var(--green)}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#26351f;color:var(--green);font:700 11px ui-monospace,monospace}.tag.warn{background:#3d2f1d;color:var(--amber)}.tag.no{background:#3c2228;color:var(--red)}table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0f141c}th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}th{background:#18212d;color:var(--green);font-size:12px;letter-spacing:.045em}code{color:#b9eee8;overflow-wrap:anywhere}.flow{display:flex;align-items:center;gap:8px;overflow:auto;padding:8px 0}.flow span{min-width:152px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#141b25;text-align:center}.flow i{color:var(--green);font-style:normal}.source{font:12px/1.55 ui-monospace,SFMono-Regular,monospace;color:#97a1b0;overflow-wrap:anywhere}.ok{color:var(--green)}.fact{color:var(--cyan)}.warntext{color:var(--amber)}ul,ol{padding-left:23px}li+li{margin-top:7px}.contract{padding:18px 20px;border-left:4px solid var(--violet);background:#151927;border-radius:0 14px 14px 0;white-space:pre-wrap;font:13px/1.62 ui-monospace,SFMono-Regular,monospace;color:#d9dcff}.review{border:1px dashed #725d3c;background:#1a1815}.footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}@media(max-width:900px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">EXECUTION REPORT · 2026-08-24 · P1.3B</div>
+  <h1>角色图不再是假按钮：<br>三条路径已经真实跑过 4090。</h1>
+  <p class="lede">P1.3B 把 Krea 母图、Qwen 身份编辑和 Krea 轻派生接进 H3Storyboard 的持久任务、共享 GPU、资产血缘与制片墙。生成结果只进入 candidate；用户批准仍是唯一身份真相。</p>
+  <div class="callout"><strong>为什么此前没有直接做：</strong>当时缺少独立图片 job、submit intent、恢复、精确取消、4090 互斥和原子资产登记。只接一个 ComfyUI 按钮会重复提交、丢状态，甚至把半成品伪装为正式角色图。用户明确扩大 P1.3 范围后，这些前置条件与真实执行一起补成了 P1.3B。</div>
+
+  <h2>现在交付了什么</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">REAL GPU</span><div class="metric">3 / 3</div><p>Krea master、Qwen identity、Krea variant 三条 graph 均在 RTX 4090 完成，不是 UI mock。</p></div>
+    <div class="card"><span class="tag">DURABLE</span><div class="metric">v20 + v21</div><p>任务、事件、GPU lease、输出生产者与唯一 immutable retry 都有编号 migration。</p></div>
+    <div class="card"><span class="tag">HUMAN GATE</span><div class="metric">candidate</div><p>所有生成图只进入候选；不会自动批准，也不会暗改 frozen current-assets manifest。</p></div>
+  </div>
+
+  <h2>4090 真机结果</h2>
+  <p>共同项目 <code>4586c44b-e866-4e04-a36a-517aefea4218</code>，角色 <code>818dc09b-7d15-4744-92b9-a215c48f804c</code>。三条 job 都是 <code>completed</code>，对应 Asset 都是 <code>candidate</code>，LoRA 三字段全部为 <code>null</code>。</p>
+  <table><thead><tr><th>路径</th><th>可追踪 ID</th><th>真实模型 / 参数</th><th>尺寸</th><th>输出真相</th></tr></thead><tbody>
+    <tr><td><strong>Krea 母图 T2I</strong></td><td class="source">job ee7fcec5-a0f3-4e71-8539-7f0fbe2ffae0<br>prompt 7141350c-a21c-4abe-950c-873914ff12e7<br>asset dec6508d-183b-484c-b2bd-703032b18027</td><td><code>krea2_turbo_fp8.safetensors</code><br>8 steps · CFG 1 · euler_ancestral · sgm_uniform · seed 2026082401</td><td>请求 480×864<br><strong>实际 480×864</strong></td><td>PNG · candidate<br><span class="source">sha256:88f22f…cdc36</span></td></tr>
+    <tr><td><strong>Qwen 身份编辑</strong></td><td class="source">job 67e73b2b-d074-4c1b-80af-4556ce50e99a<br>prompt 4e3bd267-7f5e-48bc-a868-07e2d5ce3c48<br>asset b75b38a6-bfdb-4306-a85f-12717f1b03cd</td><td><code>qwen_image_edit_2511_fp8_lightning_4steps.safetensors</code><br>4 steps · CFG 1 · euler · simple · denoise 1 · seed 2026082402</td><td>请求 480×864<br><strong>实际 752×1392</strong></td><td>PNG · candidate<br>来源锁定母图 reference / asset / SHA-256</td></tr>
+    <tr><td><strong>Krea variant i2i</strong></td><td class="source">job 720c0b84-4f3e-436f-910a-4909f2a582b0<br>prompt 3300be32-9670-46cc-9352-0dc5e3daefca<br>asset 8c58b7d3-69ac-4052-b1ef-88040121963d</td><td><code>krea2_turbo_fp8.safetensors</code><br>8 steps · CFG 1 · euler_ancestral · sgm_uniform · denoise 0.52 · seed 2026082403</td><td>请求 480×864<br><strong>实际 480×864</strong></td><td>PNG · candidate<br>来源锁定同一母图 hash</td></tr>
+  </tbody></table>
+  <p><span class="fact">尺寸事实：</span>Qwen 的 <code>FluxKontextImageScale</code> 把实际输出变成 752×1392，因此 UI 明确写 <strong>REQUEST</strong>，不能把请求尺寸冒充解码尺寸。母图运行前 GPU snapshot 约 9.47 GB free，协调并释放显式 managed 模型后约 31.62 GB free；这是该次 smoke 的观测，不是固定显存承诺。</p>
+
+  <h2>产品链与架构边界</h2>
+  <div class="flow"><span>Studio 创建任务</span><i>→</i><span>SQLite draft</span><i>→</i><span>GPU host lease</span><i>→</i><span>Comfy submit intent</span><i>→</i><span>恢复 / 轮询</span><i>→</i><span>candidate + 血缘</span><i>→</i><span>人工批准</span></div>
+  <table><thead><tr><th>层</th><th>职责</th><th>关键不变量</th></tr></thead><tbody>
+    <tr><td>Protocol / Store</td><td>独立 <code>CharacterImageJob</code>、事件、稳定失败码、migration v20/v21、source hash、retry lineage。</td><td>原任务不可改写；一次原任务最多一个 retry；HTTP/JSON snake_case。</td></tr>
+    <tr><td>Provider</td><td>Krea/Qwen 确定性 graph、上传、queue/history、输出下载、完整像素解码。</td><td>operation 决定 engine；LoRA 默认无；失败不造 placeholder。</td></tr>
+    <tr><td>Task engine</td><td>lease claim、submit intent、同任务恢复、heartbeat、backoff、精确取消、orphan quarantine。</td><td>恢复原 prompt，不盲目重提；晚到 worker 不能登记不属于自己的文件。</td></tr>
+    <tr><td>Completion</td><td>原子落盘并在单 SQLite transaction 创建 Asset、Reference、derivation、完成 job。</td><td>完成前再次验证 approved source 和 frozen hash；结果永远先是 candidate。</td></tr>
+    <tr><td>Studio</td><td>三类表单、真实 job 状态、活跃轮询、取消/重试、候选预览、批准与 manifest stale CTA。</td><td>不显示假进度；不自动批准；不自动冻结 manifest。</td></tr>
+  </tbody></table>
+
+  <h2>恢复、取消与 4090 并发</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">RECOVERY</span><p>provider I/O 前先持久化 <code>provider_client_id</code>。进程中断后从 queue/history 找同一 prompt；只有确认 queue/history 均不存在才允许重提。</p></div>
+    <div class="card"><span class="tag">EXACT CANCEL</span><p>运行中按本 job 的 prompt id interrupt/remove；API 保存非空原因。worker stop 通过 abort 退出，但保留可恢复任务状态。</p></div>
+    <div class="card"><span class="tag">ONE GPU HOST</span><p>H3 video 与 character image 共用 SQLite <code>GpuLease</code>；提交前后双查 8188/8190 队列，避免检查后竞争窗口。</p></div>
+  </div>
+  <ul>
+    <li><code>/free</code> 只发给 <code>H3_MANAGED_COMFY_ENDPOINTS</code> 显式列出的实例；默认列表为空。</li>
+    <li>队列非空或响应畸形时 fail closed，不 free、不上传、不提交；随后按可恢复 timeout/backoff 处理。</li>
+    <li>项目 generation lock 与活跃图片 job 双向互斥；同一 GPU host lease 也防止 H3 与图片 worker 并发占卡。</li>
+    <li>完成事务前再次读取 source；母图若已不再 approved 或 hash 漂移，候选不得入库。</li>
+    <li>自动恢复有指数退避和最大 8 次尝试；孤儿文件只隔离到 quarantine，不删除。</li>
+  </ul>
+
+  <h2>测试与证据矩阵</h2>
+  <table><thead><tr><th>层级</th><th>覆盖</th><th>证据性质</th></tr></thead><tbody>
+    <tr><td>Unit</td><td>协议组合、Krea/Qwen graph、capability、PNG 解码、GPU 双队列、worker submit-intent/recovery/cancel/stop、janitor、Studio form/poll。</td><td>provider/GPU 边界使用受控 doubles；用于精确错误与竞态。</td></tr>
+    <tr><td>Store</td><td>migration、状态转换、lease token、single retry、source ownership/hash、transactional completion、generation lock。</td><td>真 SQLite。</td></tr>
+    <tr><td>HTTP integration</td><td>create/list/idempotency、重启持久化、服务端 engine、LoRA allowlist、source/scope/lock、cancel/retry。</td><td>真 HTTP server + 真 SQLite。</td></tr>
+    <tr><td>Main runtime integration</td><td>启动编译后的 <code>apps/api/dist/main.js</code>，穿透 API → store → image worker → Comfy HTTP → candidate Asset；另测运行中 prompt 精确取消。</td><td>真子进程、HTTP、SQLite；Comfy endpoint 为受控测试服务。</td></tr>
+    <tr><td>Browser E2E</td><td>制片墙生成入口、三类参数、job 状态、candidate/批准、manifest stale 与重新冻结。</td><td>真实浏览器 UI 操作。</td></tr>
+    <tr><td>4090 smoke</td><td>三条 graph 的真实 provider prompt、PNG、pixel decode、SHA-256、资产血缘和 GPU snapshot。</td><td><strong>真实 RTX 4090，不是 mock。</strong></td></tr>
+  </tbody></table>
+  <div class="callout"><strong>最终门禁通过：</strong><code>pnpm check &amp;&amp; pnpm build &amp;&amp; pnpm test</code> 全绿；Vitest 33 files，225 passed、1 个显式 opt-in probe skipped；Playwright 14 passed。此前一次 Chrome <code>newContext</code> 启动超时，完整重跑通过，未出现产品断言失败。</div>
+
+  <h2>声音：绝对没有扩展</h2>
+  <p>角色图链只创建 <code>image</code> Asset，不读取、生成或混合声音。全项目仍只允许 H3 原始输出中已经存在的声音或静音；<strong>禁止 TTS、配音、声线克隆、音乐、环境声、雨声、room tone、Foley、SFX 和合成噪声</strong>。图片 worker 无权修改 H3 job 已冻结的 <code>audio_mode</code>。</p>
+
+  <h2>仍明确在 M3 范围外</h2>
+  <ul>
+    <li>v2v / rv2v 的新语义引用与视频 reference slot。</li>
+    <li>任何 audio reference slot 或后混音能力。</li>
+    <li>批量镜头生成队列及其跨镜调度。</li>
+    <li>迁移旧项目的 placeholder、跨模型 fallback 或同步 SSE 任务模型。</li>
+  </ul>
+
+  <h2>Self-Review</h2>
+  <div class="card review">
+    <span class="tag">FINAL REVIEW PASSED</span>
+    <p>四路独立 reviewer 在三轮整改后均达到 B- 以上。首轮出现的 C/C+ 阻塞全部逐条处理，没有用“下次再修”跳过严重项。</p>
+    <table><thead><tr><th>维度</th><th>关键问题 / 已修证据</th><th>评分</th></tr></thead><tbody>
+      <tr><td>A 架构与可维护性</td><td>H3 timeout 增加 2–60 秒指数退避、8 次上限及 draft 公平性；claim/cancel 拆模块，所有服务文件 ≤300；managed endpoint、双查与同 endpoint 去重关闭。</td><td><strong>B+</strong></td></tr>
+      <tr><td>B 真实 bug 与边界</td><td>全阶段 signal；心跳严格 GPU→job，失租即 abort；active/inactive cancel 均在 GPU lease 内运行并有安全 deadline；client id 三次确认。</td><td><strong>B-</strong></td></tr>
+      <tr><td>C 测试质量</td><td>真 HTTP+SQLite 双 worker、编译后 runtime、浏览器 candidate→approve→reload 及恢复/取消/退避竞态均穿透；无生产测试 fallback / PTY mock。</td><td><strong>B-</strong></td></tr>
+      <tr><td>D spec / protocol 对齐</td><td>拒绝无 owner 的假取消；稳定错误码；Qwen derived source 输出递归回到 canonical root；snake_case、v20/v21、音频禁令和 M3 边界一致。</td><td><strong>B</strong></td></tr>
+    </tbody></table>
+    <p><strong>严重项 verdict：</strong>H3 自旋/饿死、文件超限、非 poll I/O 失租双主、取消提前释放 GPU、API 假取消及 submit-intent 竞态全部已修，并由最终门禁验证。<br><strong>保留的中低风险：</strong>角色图列表 N+1 待分页/summary API；ComfyUI running cancel 的上游接口只有全局 <code>/interrupt</code>，非协作外部进程仍有 TOCTOU；H3 timed-out cancel 仍消耗一次 attempt；双 worker 反向 winner、v20 SQL CHECK、janitor rename failure 属防御性增强。<br><strong>综合评分：</strong>B。</p>
+  </div>
+
+  <div class="footer">索引：<code>.hive/research/2026-08-24-p13b-character-image-execution.md</code> · 证据：<code>.hive/evidence/p13b-character-image-smoke/result.json</code> 与 <code>derived-result.json</code>。报告基于最终代码、保存证据、全量门禁和四路独立复审。</div>
+</main></body></html>

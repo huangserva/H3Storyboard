@@ -1,6 +1,6 @@
-# Protocol 1.6
+# Protocol 1.7
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.6 keeps the Protocol 1.5 batch canvas/preflight contracts and H3-only final-audio policy, and adds the project character catalog plus durable candidate upload, approval, and image-derivation contracts.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.7 keeps the Protocol 1.6 character catalog and H3-only final-audio policy, and adds durable character-image generation jobs plus a shared GPU-host lease.
 
 ## Project lineage
 
@@ -95,6 +95,55 @@ Routes: `GET|POST|PATCH /api/projects/:project_id/characters`, `GET /api/project
 
 Protocol 1.6 adds the project-scoped character catalog, persistent uploaded reference assets, idempotent upload receipts, explicit candidate approval, and asset-level multi-angle derivation lineage. A derived upload is accepted only when its source is an approved image-backed reference in the same character.
 Uploaded reference content and lineage are immutable after registration; only display ordering may change. Root mother images may be promoted with `make_primary=true`; derived angle images are approved with `make_primary=false` so subsequent angles continue to derive from the canonical root rather than from another angle.
+
+## Character image jobs and shared GPU lease
+
+`CharacterImageJob` is separate from video-only `H3Job`. Its immutable operation is
+`master_t2i | identity_edit | variant_i2i`; the engine is respectively Krea2,
+Qwen Image Edit 2511, or Krea2. Master generation has no source and a null
+`denoise`; identity edit freezes 1–3 approved image references and variant i2i
+freezes exactly one approved root mother image, both with an explicit `denoise`.
+Each frozen source stores `reference_id`, `asset_id`, and a real SHA-256 hash.
+
+The lifecycle and submit-intent recovery discipline match H3 jobs. Completion is
+one SQLite transaction that creates a candidate image Asset, a CharacterReference,
+optional character asset derivation, and both output ids before marking the job
+completed. The Asset records `producer_image_job_id`; generated content and lineage
+are immutable. Failed, canceled, and timed-out jobs may create an immutable retry
+with a new idempotency key and `retry_of_job_id`; the original record is unchanged.
+At most one retry row may reference an original job, enforced by migration v21,
+so concurrent clicks cannot fan one failure into multiple 4090 submissions.
+
+The image worker persists a provider client id before `/prompt`, recovers the same
+task by client id or prompt id, and never resubmits while that task still exists.
+Queue-busy, insufficient-VRAM, missing-task, and timeout outcomes are recoverable
+`timed_out` states. Automatic claims use bounded exponential backoff and stop after
+eight attempts; the Studio continues polling while automatic recovery is eligible.
+Cancel removes or interrupts only the recorded provider prompt. Completion always
+creates a candidate reference: only a separate director approval can make it the
+canonical root or an approved derived angle.
+
+H3 video jobs use the same bounded eight-attempt exponential auto-recovery rule.
+Fresh drafts remain eligible while an older timed-out job is cooling down, so a
+busy shared GPU cannot make the oldest H3 job starve the rest of the queue.
+
+If the API is intentionally separated from the provider-owning worker, it must be
+given an explicit cancellation callback. Without that owner channel, canceling a
+submitted task fails with `CHARACTER_IMAGE_CANCEL_UNAVAILABLE` and leaves durable
+state unchanged; the API never reports a local cancellation while 4090 work runs.
+
+`GpuLease` provides one owner per `gpu_host` across H3 video and character-image
+workers. It freezes `owner_kind`, `owner_job_id`, a unique lease token, expiry, and
+heartbeat. Acquire, renew, release, and expired-row recovery are immediate SQLite
+transactions. A project generation lock cannot engage across active image work,
+and image work cannot be claimed while the project lock is engaged. Before a new
+submission, both configured ComfyUI queues are checked, capability discovery runs,
+and both queues are checked again. `/free` is sent only to endpoints explicitly
+listed in `H3_MANAGED_COMFY_ENDPOINTS`; there is no implicit managed endpoint.
+
+Routes: `POST /api/projects/:project_id/characters/:character_id/image_jobs`,
+`GET /api/projects/:project_id/character_image_jobs`, and scoped `retry` / `cancel`
+POST routes under `/api/projects/:project_id/character_image_jobs/:job_id`.
 
 ## Asset lifecycle and current-assets manifest
 

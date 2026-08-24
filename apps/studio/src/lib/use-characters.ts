@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type {
   Character,
   CharacterReference,
@@ -26,6 +26,13 @@ export function useCharacters(projectId: string) {
     CharacterAssetDerivation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const applyCatalog = useCallback((catalog: Awaited<
+    ReturnType<typeof api.getCharacterCatalog>>) => {
+    setCharacters(catalog.characters);
+    setReferences(catalog.references);
+    setReferenceAssets(catalog.assets);
+    setAssetDerivations(catalog.asset_derivations);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -42,10 +49,8 @@ export function useCharacters(projectId: string) {
       loadedDerivations: catalog.asset_derivations })).then(
       ({ loaded, loadedReferences, loadedAssets, loadedDerivations }) => {
         if (!active) return;
-        setCharacters(loaded);
-        setReferences(loadedReferences);
-        setReferenceAssets(loadedAssets);
-        setAssetDerivations(loadedDerivations);
+        applyCatalog({ characters: loaded, references: loadedReferences,
+          assets: loadedAssets, asset_derivations: loadedDerivations });
         setError(null);
         setBusy(false);
       },
@@ -56,7 +61,21 @@ export function useCharacters(projectId: string) {
       },
     );
     return () => { active = false; lease.release(); };
-  }, [projectId]);
+  }, [applyCatalog, projectId]);
+
+  const reload = useCallback(async () => {
+    setBusy(true);
+    try {
+      applyCatalog(await api.getCharacterCatalog(projectId));
+      setError(null);
+      return true;
+    } catch (operationError) {
+      setError(describeError(operationError));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [applyCatalog, projectId]);
 
   const create = async (input: CreateCharacterInput) => {
     setBusy(true);
@@ -96,11 +115,7 @@ export function useCharacters(projectId: string) {
     try {
       const result = await api.uploadCharacterReference(
         projectId, characterId, file, derivedFrom);
-      const catalog = await api.getCharacterCatalog(projectId);
-      setCharacters(catalog.characters);
-      setReferences(catalog.references);
-      setReferenceAssets(catalog.assets);
-      setAssetDerivations(catalog.asset_derivations);
+      applyCatalog(await api.getCharacterCatalog(projectId));
       setError(null);
       return result;
     } catch (operationError) {
@@ -117,11 +132,7 @@ export function useCharacters(projectId: string) {
     try {
       const result = await api.approveCharacterReference(
         projectId, characterId, referenceId, makePrimary);
-      const catalog = await api.getCharacterCatalog(projectId);
-      setCharacters(catalog.characters);
-      setReferences(catalog.references);
-      setReferenceAssets(catalog.assets);
-      setAssetDerivations(catalog.asset_derivations);
+      applyCatalog(await api.getCharacterCatalog(projectId));
       setError(null);
       return result;
     } catch (operationError) {
@@ -136,11 +147,7 @@ export function useCharacters(projectId: string) {
     setBusy(true);
     try {
       await api.archiveCharacterReferenceAsset(projectId, assetId);
-      const catalog = await api.getCharacterCatalog(projectId);
-      setCharacters(catalog.characters);
-      setReferences(catalog.references);
-      setReferenceAssets(catalog.assets);
-      setAssetDerivations(catalog.asset_derivations);
+      applyCatalog(await api.getCharacterCatalog(projectId));
       setError(null);
       return true;
     } catch (operationError) {
@@ -152,6 +159,6 @@ export function useCharacters(projectId: string) {
   };
 
   return { characters, references, referenceAssets, assetDerivations,
-    busy, error, create, update,
+    busy, error, reload, create, update,
     uploadReference, approveReference, archiveReference };
 }

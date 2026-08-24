@@ -13,7 +13,6 @@ import { parseInput } from './input.js';
 import {
   appendJobEvent,
   getJob,
-  requireLeaseDuration,
   requireJobTransition,
   requireLeaseToken,
 } from './job-support.js';
@@ -135,74 +134,6 @@ function enforceRepresentativeGate(db: Database.Database, shotPlanId: string,
   if (!representative) throw new StoreError('TAKE_GATE_BLOCKED',
     'Approve a representative take or provide gate_override_reason',
     { shot_plan_id: shotPlanId });
-}
-
-export function claimH3Job(
-  db: Database.Database,
-  jobId: string,
-  leaseDurationMs = 60_000,
-): H3Job {
-  requireLeaseDuration(leaseDurationMs);
-  return runWriteTransaction(db, () => claimJob(db, jobId, leaseDurationMs));
-}
-
-export function claimNextH3Job(db: Database.Database,
-  leaseDurationMs = 60_000): H3Job | null {
-  requireLeaseDuration(leaseDurationMs);
-  return runWriteTransaction(db, () => {
-    const row = db.prepare(`SELECT id FROM h3_jobs
-      WHERE provider = 'local_comfyui' AND status IN ('draft', 'timed_out')
-      ORDER BY created_at, id LIMIT 1`).get() as { id: string } | undefined;
-    return row ? claimJob(db, row.id, leaseDurationMs) : null;
-  });
-}
-
-function claimJob(db: Database.Database, jobId: string,
-  leaseDurationMs: number): H3Job {
-    const job = getJob(db, jobId);
-    requireJobTransition(job, 'submitting');
-    const nowDate = new Date();
-    if (
-      job.lease_expires_at !== null &&
-      Date.parse(job.lease_expires_at) > nowDate.getTime()
-    ) {
-      throw new StoreError(
-        'H3_JOB_STATUS_INVALID',
-        'H3 job already has an active lease',
-        { job_id: jobId, lease_expires_at: job.lease_expires_at },
-      );
-    }
-    const now = nowDate.toISOString();
-    const leaseExpiresAt = new Date(
-      nowDate.getTime() + leaseDurationMs,
-    ).toISOString();
-    const leaseToken = randomUUID();
-    const result = db.prepare(
-      `UPDATE h3_jobs
-       SET status = 'submitting', attempt = attempt + 1,
-           lease_token = ?, lease_expires_at = ?, heartbeat_at = ?, updated_at = ?,
-           provider_job_id = ?, output_asset_id = NULL,
-           error_code = NULL, error_message = NULL, completed_at = NULL
-       WHERE id = ? AND status = ?`,
-    ).run(leaseToken, leaseExpiresAt, now, now,
-      job.status === 'timed_out' ? job.provider_job_id : null,
-      jobId, job.status);
-    if (result.changes !== 1) {
-      throw new StoreError(
-        'H3_JOB_STATUS_INVALID',
-        'H3 job changed before its lease could be acquired',
-        { job_id: jobId },
-      );
-    }
-    appendJobEvent(
-      db,
-      jobId,
-      job.status,
-      'submitting',
-      'Job lease acquired',
-      now,
-    );
-    return getJob(db, jobId);
 }
 
 export function markH3JobQueued(

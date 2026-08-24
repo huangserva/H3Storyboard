@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-08-24T13:24:38.024Z",
+  "root_job_id": "ee7fcec5-a0f3-4e71-8539-7f0fbe2ffae0",
+  "records": [
+    {
+      "job": {
+        "id": "67e73b2b-d074-4c1b-80af-4556ce50e99a",
+        "project_id": "4586c44b-e866-4e04-a36a-517aefea4218",
+        "character_id": "818dc09b-7d15-4744-92b9-a215c48f804c",
+        "retry_of_job_id": null,
+        "operation": "identity_edit",
+        "provider": "local_comfyui",
+        "engine": "qwen_image_edit_2511",
+        "prompt": "Preserve the exact same adult woman identity, face geometry, hair, age and dark navy coat. Three-quarter left view, closed mouth, neutral expression, neutral studio background, realistic skin, no text.",
+        "seed": 2026082402,
+        "width": 480,
+        "height": 864,
+        "steps": 4,
+        "cfg": 1,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "lora_profile": null,
+        "lora_name": null,
+        "lora_strength": null,
+        "source_inputs": [
+          {
+            "reference_id": "4fbdfbb7-7f28-43c1-876d-c91cf3768caa",
+            "asset_id": "dec6508d-183b-484c-b2bd-703032b18027",
+            "content_hash": "sha256:88f22fb83c8e442fd99355386a04b881685827c1371db0377d0e03b4164cdc36"
+          }
+        ],
+        "idempotency_key": "real-qwen-cef95102-f3c6-4c14-9c18-45d10549354c",
+        "status": "completed",
+        "attempt": 1,
+        "provider_client_id": "9eacc426-15e5-4776-9856-13eff7887d97",
+        "provider_job_id": "4e3bd267-7f5e-48bc-a868-07e2d5ce3c48",
+        "output_asset_id": "b75b38a6-bfdb-4306-a85f-12717f1b03cd",
+        "output_reference_id": "9f7b49fc-907e-4b7a-8478-6db54141d52f",
+        "error_code": null,
+        "error_message": null,
+        "cancel_reason": null,
+        "lease_token": null,
+        "lease_expires_at": null,
+        "heartbeat_at": "2026-08-24T13:24:19.710Z",
+        "created_at": "2026-08-24T13:23:57.404Z",
+        "updated_at": "2026-08-24T13:24:19.710Z",
+        "completed_at": "2026-08-24T13:24:19.710Z"
+      },
+      "asset": {
+        "id": "b75b38a6-bfdb-4306-a85f-12717f1b03cd",
+        "project_id": "4586c44b-e866-4e04-a36a-517aefea4218",
+        "kind": "image",
+        "uri": "assets/characters/4586c44b-e866-4e04-a36a-517aefea4218/generated/67e73b2b-d074-4c1b-80af-4556ce50e99a-1-5c6e9c34-d6cc-4e10-ae5d-171e92da6991.png",
+        "content_hash": "sha256:61f86e9166d9ea6abefa9e92dc6c7009c4117be882b37670c8a76868e18dc740",
+        "status": "candidate",
+        "replaces_asset_id": null,
+        "name": "67e73b2b-d074-4c1b-80af-4556ce50e99a-1-5c6e9c34-d6cc-4e10-ae5d-171e92da6991.png",
+        "relative_path": "assets/characters/4586c44b-e866-4e04-a36a-517aefea4218/generated/67e73b2b-d074-4c1b-80af-4556ce50e99a-1-5c6e9c34-d6cc-4e10-ae5d-171e92da6991.png",
+        "derived_from_asset_id": null,
+        "derivation_kind": null,
+        "producer_job_id": null,
+        "producer_image_job_id": "67e73b2b-d074-4c1b-80af-4556ce50e99a",
+        "created_at": "2026-08-24T13:24:19.710Z",
+        "updated_at": "2026-08-24T13:24:19.710Z"
+      },
+      "decoded": {
+        "mime_type": "image/png",
+        "width": 752,
+        "height": 1392,
+        "channels": 3,
+        "pixel_bytes": 3140352
+      }
+    },
+    {
+      "job": {
+        "id": "720c0b84-4f3e-436f-910a-4909f2a582b0",
+        "project_id": "4586c44b-e866-4e04-a36a-517aefea4218",
+        "character_id": "818dc09b-7d15-4744-92b9-a215c48f804c",
+        "retry_of_job_id": null,
+        "operation": "variant_i2i",
+        "provider": "local_comfyui",
+        "engine": "krea2",
+        "prompt": "cinematic full-body reference portrait of the same adult Chinese woman, stable oval face, straight black hair, exact dark navy long coat, closed mouth, neutral expression, soft side lighting, realistic skin, no text",
+        "seed": 2026082403,
+        "width": 480,
+        "height": 864,
+        "steps": 8,
+        "cfg": 1,
+        "sampler": "euler_ancestral",
+        "scheduler": "sgm_uniform",
+        "denoise": 0.52,
+        "lora_profile": null,
+        "lora_name": null,
+        "lora_strength": null,
+        "source_inputs": [
+          {
+            "reference_id": "4fbdfbb7-7f28-43c1-876d-c91cf3768caa",
+            "asset_id": "dec6508d-183b-484c-b2bd-703032b18027",
+            "content_hash": "sha256:88f22fb83c8e442fd99355386a04b881685827c1371db0377d0e03b4164cdc36"
+          }
+        ],
+        "idempotency_key": "real-krea-variant-0aec38b1-21be-47a2-9aa5-f96303edf79a",
+        "status": "completed",
+        "attempt": 1,
+        "provider_client_id": "83955fe0-5d43-40b7-b017-f54fa32bc090",
+        "provider_job_id": "3300be32-9670-46cc-9352-0dc5e3daefca",
+        "output_asset_id": "8c58b7d3-69ac-4052-b1ef-88040121963d",
+        "output_reference_id": "7bbb2909-9a69-40f4-ab3b-2e55b49cedd0",
+        "error_code": null,
+        "error_message": null,
+        "cancel_reason": null,
+        "lease_token": null,
+        "lease_expires_at": null,
+        "heartbeat_at": "2026-08-24T13:24:38.007Z",
+        "created_at": "2026-08-24T13:24:22.001Z",
+        "updated_at": "2026-08-24T13:24:38.007Z",
+        "completed_at": "2026-08-24T13:24:38.007Z"
+      },
+      "asset": {
+        "id": "8c58b7d3-69ac-4052-b1ef-88040121963d",
+        "project_id": "4586c44b-e866-4e04-a36a-517aefea4218",
+        "kind": "image",
+        "uri": "assets/characters/4586c44b-e866-4e04-a36a-517aefea4218/generated/720c0b84-4f3e-436f-910a-4909f2a582b0-1-7c4121c6-82a9-42c9-9a3b-eab51373ee4c.png",
+        "content_hash": "sha256:495b4aef980235443a4475d27929cc7b8a47abefc5ef715eefb0a812c04da091",
+        "status": "candidate",
+        "replaces_asset_id": null,
+        "name": "720c0b84-4f3e-436f-910a-4909f2a582b0-1-7c4121c6-82a9-42c9-9a3b-eab51373ee4c.png",
+        "relative_path": "assets/characters/4586c44b-e866-4e04-a36a-517aefea4218/generated/720c0b84-4f3e-436f-910a-4909f2a582b0-1-7c4121c6-82a9-42c9-9a3b-eab51373ee4c.png",
+        "derived_from_asset_id": null,
+        "derivation_kind": null,
+        "producer_job_id": null,
+        "producer_image_job_id": "720c0b84-4f3e-436f-910a-4909f2a582b0",
+        "created_at": "2026-08-24T13:24:38.007Z",
+        "updated_at": "2026-08-24T13:24:38.007Z"
+      },
+      "decoded": {
+        "mime_type": "image/png",
+        "width": 480,
+        "height": 864,
+        "channels": 3,
+        "pixel_bytes": 1244160
+      }
+    }
+  ]
+}

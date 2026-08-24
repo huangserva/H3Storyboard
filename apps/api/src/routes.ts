@@ -19,6 +19,8 @@ import { dispatchBriefRoute } from './brief-routes.js';
 import { dispatchShotProductionRoute } from './shot-production-routes.js';
 import { dispatchRepresentativeRoute } from './representative-routes.js';
 import { dispatchJobRoute } from './job-routes.js';
+import { dispatchCharacterImageJobRoute,
+  type CharacterImageJobRouteOptions } from './character-image-job-routes.js';
 
 interface RouteResult {
   status: number;
@@ -130,6 +132,9 @@ const routes: readonly Route[] = [
 export async function dispatchRoute(
   request: IncomingMessage,
   store: ProjectStore,
+  characterImageJobs: CharacterImageJobRouteOptions = {
+    lora_allowlist: new Set(),
+  },
 ): Promise<RouteResult> {
   const method = request.method ?? 'GET';
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
@@ -144,6 +149,10 @@ export async function dispatchRoute(
     request, store, method, pathname,
   );
   if (characterResult) return characterResult;
+  const characterImageJobResult = await dispatchCharacterImageJobRoute(
+    request, store, method, pathname, characterImageJobs,
+  );
+  if (characterImageJobResult) return characterImageJobResult;
   const assetResult = await dispatchAssetRoute(request, store, method, pathname);
   if (assetResult) return assetResult;
   const modeResult = await dispatchModeRoute(request, store, method, pathname);

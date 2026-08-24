@@ -9,6 +9,10 @@ const databasePath = process.env.H3_E2E_DB ??
   join(e2eDirectory, 'storyboard.db');
 process.env.H3_E2E_DIRECTORY = e2eDirectory;
 process.env.H3_E2E_DB = databasePath;
+const apiPort = readPort(process.env.H3_E2E_API_PORT, 4187);
+const studioPort = readPort(process.env.H3_E2E_STUDIO_PORT, 5174);
+const apiOrigin = `http://127.0.0.1:${apiPort}`;
+process.env.H3_E2E_API_ORIGIN = apiOrigin;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -18,7 +22,7 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   globalTeardown: './tests/e2e/global-teardown.ts',
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: `http://127.0.0.1:${studioPort}`,
     browserName: 'chromium',
     channel: 'chrome',
     headless: true,
@@ -29,17 +33,28 @@ export default defineConfig({
   webServer: [
     {
       command: 'pnpm exec tsx apps/api/src/main.ts',
-      env: { H3_STORYBOARD_DB: databasePath, H3_STORYBOARD_PORT: '4187',
+      env: { H3_STORYBOARD_DB: databasePath,
+        H3_STORYBOARD_PORT: String(apiPort),
         H3_WORKER: '0' },
-      port: 4187,
+      port: apiPort,
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
-      command: 'pnpm --filter @h3storyboard/studio dev:serve',
-      port: 5174,
+      command: `pnpm --filter @h3storyboard/studio exec vite ` +
+        `--host 127.0.0.1 --port ${studioPort}`,
+      env: { H3_STORYBOARD_API_ORIGIN: apiOrigin },
+      port: studioPort,
       reuseExistingServer: false,
       timeout: 60_000,
     },
   ],
 });
+
+function readPort(raw: string | undefined, fallback: number): number {
+  if (raw === undefined) return fallback;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error(
+    'Playwright ports must be integers from 1 through 65535');
+  return port;
+}

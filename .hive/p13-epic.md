@@ -53,5 +53,28 @@
 
 - 当前阶段：完成
 - 已完成阶段：1–5
-- 阻塞：无；Krea2 执行器明确属于下一独立 milestone。
-- 最终门禁：四路 review A / A- / A / A-，严重与中等项全部闭环。
+- 阻塞：无；原先延期的 Krea/Qwen 执行器已由下方 P1.3B 需求变更补回。
+- 原 P1.3 门禁：四路 review A / A- / A / A-；P1.3B 最终门禁见下方。
+
+## P1.3B 需求变更 — 真实角色图生成闭环
+
+2026-08-24 用户明确要求把原先延期的 4090 与角色图生成补回 P1.3，
+因此不改写上面的历史验收结论，追加 P1.3B 作为同一 epic 的增量范围。
+
+- [x] 独立 `CharacterImageJob`、事件、immutable single retry 与 SQLite migration v20–v21。
+- [x] Krea 母图、Qwen identity edit、Krea i2i 三条确定性 graph；默认无 LoRA，
+  服务端 allowlist 之外的 LoRA 拒绝。
+- [x] H3 video / character image 共用按 GPU host 的持久 lease；提交前同时检查
+  8188/8190 队列，仅释放配置为 managed 的实例并验证最小空闲显存。
+- [x] submit intent、同 task 恢复、heartbeat、retry、精确 cancel、稳定失败码。
+- [x] 完整像素解码、原子落盘、candidate Asset/Reference/derivation 单事务登记、
+  运行末再次校验 frozen source；孤儿文件仅隔离，不删除。
+- [x] 制片墙生成表单、active-only polling、真实状态、取消/重试、candidate 人工批准、
+  manifest stale 与重新冻结 CTA。
+- [x] 真 HTTP+SQLite、浏览器 E2E 与真实 4090 三路径 smoke。
+- [x] 编译后主进程贯通 image worker，并覆盖 provider active cancel/interrupt、
+  submit-intent 恢复、停止保留远端任务、双 worker GPU lease 互斥与退避上限。
+- [x] 四路独立 review 与整改：最终 A/B/C/D = B+ / B- / B- / B；全部严重项关闭。
+
+仍明确不做：M3 的 v2v/rv2v、视频/音频引用槽与批量镜头队列；任何 TTS、
+配音、音乐、环境声、雨声、SFX 或后混音。

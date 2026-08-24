@@ -43,6 +43,9 @@ protocol (single JSON contract)
 17. Worker completion exposes the candidate asset, completed job, and pending take in one immediate SQLite transaction. Files are staged under attempt-and-lease-qualified paths, so a late worker can compensate only its own output.
 18. Provider graph builders share one Director/LoRA/sampler/output skeleton. Capability discovery is the union of node classes emitted by representative i2v, fl2v, stock r2v, and hybrid r2v graphs.
 19. Final video audio is either the original audio present in the H3 output or silence. External audio assets and post-generation audio layers never enter the render path.
+20. Character-image generation has its own durable job and event stream; it never masquerades as an H3 video job or writes directly over an approved reference.
+21. H3 video and character-image workers acquire the same durable GPU-host lease and inspect every configured queue before any new submission or explicitly managed memory release.
+22. A generated character image becomes a candidate Asset and CharacterReference in one transaction. Director approval, manifest freeze, and H3 binding remain separate later decisions.
 
 ## Production-policy boundary
 
@@ -52,7 +55,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.6 module ownership
+## Protocol 1.7 module ownership
 
 ```text
 packages/protocol
@@ -65,13 +68,13 @@ packages/project-store
     +-- TakeStore         representative selection/review
   domain operations       assets/manifests, shots, jobs, migrations
 packages/h3-provider
-  pure binding compiler + exact submitted-input audit
+  pure binding compiler + H3/Krea/Qwen graphs + strict ComfyUI transport
 packages/task-engine
-  lease state machine + interface-driven H3 worker orchestration
+  shared GPU coordinator + H3/image workers + orphan quarantine
 apps/api
-  small domain route dispatchers + default-on H3 worker (`H3_WORKER=0` disables)
+  small domain route dispatchers + independently switchable H3/image workers
 apps/studio
-  director UI consuming only Protocol 1.6 API shapes
+  director UI consuming only Protocol 1.7 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
@@ -90,7 +93,7 @@ rejects an audio handler or a missing video handler. `pnpm demo:canvas` always
 sets `H3_WORKER=0`, so opening the test canvas cannot submit to ComfyUI or wake
 the 4090. Demo state is not a fallback in the API or Studio runtime.
 
-Migrations v7–v19 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`. V17 adds idempotent character-reference upload receipts, V18 records asset-level character angle derivations, and V19 repairs legacy duplicate/derived primary slots before enforcing one root primary per character.
+Migrations v7–v21 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`. V17 adds idempotent character-reference upload receipts, V18 records asset-level character angle derivations, and V19 repairs legacy duplicate/derived primary slots before enforcing one root primary per character. V20 adds durable character-image jobs/events, the shared GPU-host lease, image-output lineage, and retry ancestry. V21 enforces one immutable retry per original image job.
 
 ## Initial deployment
 

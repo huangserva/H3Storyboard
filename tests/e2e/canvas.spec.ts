@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
-const API_ORIGIN = 'http://127.0.0.1:4187';
+const API_ORIGIN = process.env.H3_E2E_API_ORIGIN ?? 'http://127.0.0.1:4187';
 const projectTitle = `Canvas E2E ${crypto.randomUUID().slice(0, 8)}`;
 let projectId = '';
 let shotId = '';

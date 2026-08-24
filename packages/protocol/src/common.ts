@@ -113,6 +113,7 @@ export const AssetSchema = z
     derived_from_asset_id: IdSchema.nullable(),
     derivation_kind: AssetDerivationKindSchema.nullable(),
     producer_job_id: IdSchema.nullable(),
+    producer_image_job_id: IdSchema.nullable().default(null),
     created_at: TimestampSchema,
     updated_at: TimestampSchema,
   })

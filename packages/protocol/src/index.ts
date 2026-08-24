@@ -3,6 +3,8 @@ export * from './compiled-binding.js';
 export * from './asset-manifest.js';
 export * from './canvas.js';
 export * from './character.js';
+export * from './character-image-job.js';
+export * from './gpu-lease.js';
 export * from './h3-job.js';
 export * from './mode.js';
 export * from './production-brief.js';

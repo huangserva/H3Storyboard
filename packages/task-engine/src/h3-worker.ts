@@ -11,24 +11,31 @@ import { basename, resolve } from 'node:path';
 import {
   H3WorkerError,
   safeDataPath,
+  startLeaseHeartbeat,
   workerDelay,
   workerFailure,
   writeWorkerOutput,
   type H3LeaseWorkerOptions,
   type H3WorkerRunResult,
 } from './h3-worker-support.js';
+import {
+  cancelH3Job,
+  type ActiveH3Execution,
+} from './h3-worker-cancel.js';
 
 export * from './h3-worker-support.js';
-
 export class H3LeaseWorker {
   readonly #options: Required<Omit<H3LeaseWorkerOptions,
-    'loras' | 'on_error'>> & Pick<H3LeaseWorkerOptions, 'on_error'> &
+    'loras' | 'on_error' | 'gpu_coordinator'>> &
+    Pick<H3LeaseWorkerOptions, 'on_error'> &
     { loras: readonly H3Lora[] };
+  readonly #gpuCoordinator: H3LeaseWorkerOptions['gpu_coordinator'];
   #stopping = false;
   #loop: Promise<void> | null = null;
-  readonly #active = new Map<string, AbortController>();
+  readonly #active = new Map<string, ActiveH3Execution>();
 
   constructor(options: H3LeaseWorkerOptions) {
+    this.#gpuCoordinator = options.gpu_coordinator;
     this.#options = {
       ...options,
       data_directory: resolve(options.data_directory),
@@ -56,11 +63,30 @@ export class H3LeaseWorker {
       this.#options.lease_duration_ms);
     if (!job) return { outcome: 'idle' };
     const leaseToken = job.lease_token!;
+    let gpuLeaseToken: string | null = null;
     let ownedOutputPath: string | null = null;
     const controller = new AbortController();
-    this.#active.set(job.id, controller);
+    const active: ActiveH3Execution = { controller,
+      cancelController: new AbortController(), cancelRequested: false,
+      cancellation: null };
+    this.#active.set(job.id, active);
+    const stopLeaseHeartbeat = startLeaseHeartbeat(
+      this.#options.lease_duration_ms,
+      () => {
+        if (gpuLeaseToken) this.#gpuCoordinator?.heartbeat(gpuLeaseToken);
+        this.#options.store.heartbeatH3Job(job.id, leaseToken,
+          this.#options.lease_duration_ms);
+      },
+      (error) => {
+        controller.abort(error);
+        this.#options.on_error?.(error);
+      },
+    );
     try {
-      const providerTaskId = await this.#resolveProviderTask(job, leaseToken);
+      gpuLeaseToken = this.#gpuCoordinator?.acquire('h3_video', job.id)
+        .lease_token ?? null;
+      const providerTaskId = await this.#resolveProviderTask(
+        job, leaseToken, controller.signal);
       this.#options.store.markH3JobQueued(job.id, leaseToken, providerTaskId);
       this.#options.store.markH3JobRunning(job.id, leaseToken);
       this.#options.store.heartbeatH3Job(job.id, leaseToken,
@@ -75,14 +101,18 @@ export class H3LeaseWorker {
         on_attempt: () => {
           const current = this.#options.store.getH3Job(job.id);
           if (current.status === 'canceled') controller.abort();
-          else this.#options.store.heartbeatH3Job(job.id, leaseToken,
-            this.#options.lease_duration_ms);
+          else {
+            this.#options.store.heartbeatH3Job(job.id, leaseToken,
+              this.#options.lease_duration_ms);
+            if (gpuLeaseToken) this.#gpuCoordinator?.heartbeat(gpuLeaseToken);
+          }
         },
       });
       this.#options.store.heartbeatH3Job(job.id, leaseToken,
         this.#options.lease_duration_ms);
       const item = this.#options.client.firstOutput(history);
-      const bytes = await this.#options.client.downloadOutput(item);
+      const bytes = await this.#options.client.downloadOutput(
+        item, controller.signal);
       const written = await writeWorkerOutput(
         this.#options.data_directory, job, bytes);
       ownedOutputPath = written.absolutePath;
@@ -95,15 +125,38 @@ export class H3LeaseWorker {
       return { outcome: 'completed', job_id: job.id,
         provider_task_id: providerTaskId, output_path: written.relativePath };
     } catch (error) {
+      stopLeaseHeartbeat();
       if (ownedOutputPath) await rm(ownedOutputPath, { force: true }).catch(() => undefined);
       const failure = workerFailure(error);
+      await active.cancellation?.catch(() => undefined);
       const current = this.#options.store.getH3Job(job.id);
       if (current.status === 'canceled') return { outcome: 'failed', job_id: job.id,
         error_code: 'H3_COMFY_ABORTED', error_message: 'Job was canceled' };
+      if (this.#stopping && controller.signal.aborted) {
+        this.#options.store.deferH3Job(job.id, leaseToken,
+          'H3_COMFY_TIMEOUT',
+          'H3 worker stopped; provider task remains recoverable');
+        return { outcome: 'timed_out', job_id: job.id,
+          provider_task_id: current.provider_job_id ?? '',
+          error_code: 'H3_COMFY_TIMEOUT', error_message: 'H3 worker stopped' };
+      }
+      if (active.cancelRequested && controller.signal.aborted) {
+        this.#options.store.deferH3Job(job.id, leaseToken,
+          'H3_COMFY_TIMEOUT',
+          'Provider cancellation could not be confirmed; task remains recoverable');
+        return { outcome: 'timed_out', job_id: job.id,
+          provider_task_id: current.provider_job_id ?? '',
+          error_code: 'H3_COMFY_TIMEOUT',
+          error_message: 'Provider cancellation could not be confirmed' };
+      }
       if (failure.code === 'H3_COMFY_TIMEOUT' ||
-        failure.code === 'H3_COMFY_QUEUE_BUSY') {
-        if (current.provider_job_id) await this.#options.client.cancelTask(
-          current.provider_job_id).catch(this.#options.on_error);
+        failure.code === 'H3_COMFY_QUEUE_BUSY' ||
+        failure.code === 'H3_COMFY_GPU_INSUFFICIENT' ||
+        failure.code === 'GPU_LEASE_BUSY') {
+        if (failure.code === 'H3_COMFY_TIMEOUT' && current.provider_job_id) {
+          await this.#options.client.cancelTask(
+          current.provider_job_id, controller.signal).catch(this.#options.on_error);
+        }
         this.#options.store.deferH3Job(job.id, leaseToken,
           failure.code, failure.message);
         return { outcome: 'timed_out', job_id: job.id,
@@ -120,16 +173,19 @@ export class H3LeaseWorker {
       }
       return { outcome: 'failed', job_id: job.id,
         error_code: failure.code, error_message: failure.message };
-    } finally { this.#active.delete(job.id); }
+    } finally {
+      stopLeaseHeartbeat();
+      await active.cancellation?.catch(() => undefined);
+      if (gpuLeaseToken) {
+        try { this.#gpuCoordinator?.release(gpuLeaseToken); }
+        catch (error) { this.#options.on_error?.(error); }
+      }
+      if (this.#active.get(job.id) === active) this.#active.delete(job.id);
+    }
   }
 
   async cancel(jobId: string, reason: string): Promise<H3Job> {
-    const before = this.#options.store.getH3Job(jobId);
-    const canceled = this.#options.store.cancelH3Job(jobId, reason);
-    this.#active.get(jobId)?.abort();
-    if (before.provider_job_id) await this.#options.client.cancelTask(
-      before.provider_job_id).catch(this.#options.on_error);
-    return canceled;
+    return cancelH3Job(this.#cancellationOptions(), this.#active, jobId, reason);
   }
 
   start(): void {
@@ -140,28 +196,46 @@ export class H3LeaseWorker {
 
   async stop(): Promise<void> {
     this.#stopping = true;
+    for (const active of this.#active.values()) {
+      active.controller.abort();
+      active.cancelController.abort();
+    }
     await this.#loop;
     this.#loop = null;
   }
 
-  async #resolveProviderTask(job: H3Job, leaseToken: string): Promise<string> {
+  async #resolveProviderTask(job: H3Job, leaseToken: string,
+    signal: AbortSignal): Promise<string> {
     if (job.provider_job_id && await this.#options.client.taskExists(
-      job.provider_job_id, undefined, 3)) return job.provider_job_id;
+      job.provider_job_id, signal, 3)) {
+      await this.#gpuCoordinator?.prepareRecovery(
+        this.#options.client, job.provider_job_id, signal);
+      return job.provider_job_id;
+    }
     if (job.provider_client_id) {
       const claimed = await this.#options.client.findTaskByClientId(
-        job.provider_client_id);
-      if (claimed) return claimed;
+        job.provider_client_id, signal, 3);
+      if (claimed) {
+        await this.#gpuCoordinator?.prepareRecovery(
+          this.#options.client, claimed, signal);
+        return claimed;
+      }
       this.#options.store.clearH3ProviderTask(job.id, leaseToken);
     } else if (job.provider_job_id) {
       this.#options.store.clearH3ProviderTask(job.id, leaseToken);
     }
-    await this.#options.client.assertQueueIdle();
+    if (this.#gpuCoordinator) await this.#gpuCoordinator.prepareNewSubmission(signal);
+    else {
+      await this.#options.client.assertQueueIdle(signal);
+      if (this.#options.free_before_submit) await this.#options.client.free(signal);
+    }
     const clientId = this.#options.client.createClientId();
     this.#options.store.markH3SubmitIntent(job.id, leaseToken, clientId);
-    return this.#submit(job, clientId);
+    return this.#submit(job, clientId, signal);
   }
 
-  async #submit(job: H3Job, clientId: string): Promise<string> {
+  async #submit(job: H3Job, clientId: string,
+    signal: AbortSignal): Promise<string> {
     if (job.mode !== 'i2v' && job.mode !== 'fl2v' && job.mode !== 'r2v') {
       throw new H3WorkerError('H3_WORKER_MODE_UNSUPPORTED',
         'H3 worker supports i2v, fl2v, and r2v jobs');
@@ -187,11 +261,10 @@ export class H3LeaseWorker {
         'H3_WORKER_INPUT_EMPTY', 'Compiled image asset is empty');
       images.push({ path, bytes });
     }
-    if (this.#options.free_before_submit) await this.#options.client.free();
     const names: string[] = [];
     for (const [slot, image] of images.entries()) names.push(
       await this.#options.client.uploadImage(new Blob([Uint8Array.from(image.bytes)]),
-        `${job.id}-slot${slot}-${basename(image.path)}`));
+        `${job.id}-slot${slot}-${basename(image.path)}`, signal));
     const common = { prompt: job.prompt, width: this.#options.width,
       height: this.#options.height,
       frames: framesForDuration(job.duration_seconds, this.#options.fps),
@@ -207,7 +280,14 @@ export class H3LeaseWorker {
           end_name: names[1]! })
         : buildH3R2VGraph({ ...common, reference_names: names,
           loader: this.#options.r2v_loader });
-    return this.#options.client.submitPrompt(graph, clientId);
+    return this.#options.client.submitPrompt(graph, clientId, signal);
+  }
+
+  #cancellationOptions() {
+    return { store: this.#options.store, client: this.#options.client,
+      ...(this.#gpuCoordinator ? { gpu_coordinator: this.#gpuCoordinator } : {}),
+      lease_duration_ms: this.#options.lease_duration_ms,
+      ...(this.#options.on_error ? { on_error: this.#options.on_error } : {}) };
   }
 
   async #runLoop(): Promise<void> {

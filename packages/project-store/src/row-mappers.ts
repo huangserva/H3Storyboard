@@ -2,6 +2,8 @@ import {
   AssetSchema,
   CanvasNodeSchema,
   CharacterReferenceSchema,
+  CharacterImageJobEventSchema,
+  CharacterImageJobSchema,
   CharacterSchema,
   H3JobSchema,
   JobEventSchema,
@@ -16,6 +18,8 @@ import {
   type CanvasNode,
   type Character,
   type CharacterReference,
+  type CharacterImageJob,
+  type CharacterImageJobEvent,
   type H3Job,
   type JobEvent,
   type Mode,
@@ -90,6 +94,7 @@ export function mapAsset(row: unknown): Asset {
     status: record.status ?? 'approved',
     replaces_asset_id: record.replaces_asset_id ?? null,
     updated_at: record.updated_at ?? record.created_at,
+    producer_image_job_id: record.producer_image_job_id ?? null,
   });
 }
 
@@ -106,6 +111,21 @@ export function mapCharacter(row: unknown): Character {
 
 export const mapCharacterReference = (row: unknown): CharacterReference =>
   decode(CharacterReferenceSchema, objectRow(row));
+
+export function mapCharacterImageJob(row: unknown): CharacterImageJob {
+  const record = objectRow(row);
+  return decode(CharacterImageJobSchema, {
+    ...record,
+    source_inputs: jsonColumn(record, 'source_inputs_json'),
+  });
+}
+
+export const mapCharacterImageJobEvent = (
+  row: unknown,
+): CharacterImageJobEvent => decode(
+  CharacterImageJobEventSchema,
+  objectRow(row),
+);
 
 export function mapShotPlan(row: unknown): ShotPlan {
   const record = objectRow(row);

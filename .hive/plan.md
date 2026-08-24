@@ -37,7 +37,7 @@ last_review: 2026-08-24
 - [x] 下载、hash、canonical asset 注册、pending take
 - [x] actual 结果捕获 + QC verdict 契约
 
-### M2 · 无限画布 Studio · in_progress
+### M2 · 无限画布 Studio · done
 - [x] P1：React Flow 产品画布与 `H3 原声 | 静音` 五层硬约束（commit `a621432`）
 - [x] P1.1：canvas batch upsert + project batch preflight；100 Shot 首载固定为 1 次画布写入 + 1 次 preflight 读取
 - [x] 无限画布：分镜卡片自由布局、平移缩放、SQLite v6 `canvas_nodes` 持久化（含旧 localStorage 一次迁移）
@@ -50,6 +50,9 @@ last_review: 2026-08-24
 - [x] 画布直接操作化：节点内生成/新 Take、同视图 inspector、per-job 进度、Take 预览与 QC（P1.2 已用真实媒体 fixture、精确 Job→Asset→Take 血缘和浏览器穿透收口）
 - [x] P1.2 可测试画布：真实角色参考、两条可解码静音 MP4、媒体 lightbox、Take/QC/代表片、同镜重复聚焦、幂等离线 demo；`H3_WORKER=0`，不访问 4090
 - [x] P1.3 制片墙：默认高密度角色大卡、场景资产带、三列 Plan/Latest Take 分镜墙；角色 catalog 单请求、真实图片上传/候选批准/多角度血缘、React Flow graph builder 拆分；旧 Flow 与计划/实测视图继续共存
+- [x] P1.3B 真实角色图闭环：持久 CharacterImageJob、Krea/Qwen/Krea-i2i、
+  8188/8190 共享 GPU lease、恢复/取消/重试、像素解码、candidate 血缘、
+  manifest CTA；真实 4090 三路径与浏览器 E2E 均通过
 
 ### M3 · 多模态 H3 · open
 - [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列
@@ -70,7 +73,10 @@ last_review: 2026-08-24
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M2 — P1/P1.1/P1.2/P1.3 已完成并通过最终质量门；默认制片墙可直接本地体验。P1.3 四路最终评分 A / A- / A / A-。Krea2/Qwen 图片生成已完成源码调研，但不会在没有持久 CharacterImageJob 前暴露假按钮。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+M2 — P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
+P1.3B 已完成最终全量门禁与四路 review（B+ / B- / B- / B）。默认制片墙可直接本地体验，角色图完成后只进入
+candidate，仍需导演人工批准。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v
+证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。

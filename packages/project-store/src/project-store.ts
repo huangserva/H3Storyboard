@@ -28,15 +28,16 @@ import {
 import { CanvasStore } from './canvas-store.js';
 import { CharacterStore } from './character-store.js';
 import { CharacterMediaStore } from './character-media-store.js';
+import { CharacterImageJobStore } from './character-image-job-store.js';
+import { GpuLeaseStore } from './gpu-lease-store.js';
 import {
-  claimH3Job,
-  claimNextH3Job,
   createH3Job,
   markH3JobQueued,
   markH3JobRunning,
   markH3SubmitIntent,
   clearH3ProviderTask,
 } from './job-operations.js';
+import { claimH3Job, claimNextH3Job } from './h3-job-claim.js';
 import { completeH3Job } from './job-completion.js';
 import {
   cancelH3Job,
@@ -81,6 +82,8 @@ export class ProjectStore {
   readonly takes: TakeStore;
   readonly characters: CharacterStore;
   readonly characterMedia: CharacterMediaStore;
+  readonly characterImageJobs: CharacterImageJobStore;
+  readonly gpuLeases: GpuLeaseStore;
   readonly canvas: CanvasStore;
   #closed = false;
   constructor(databasePath: string) {
@@ -93,6 +96,8 @@ export class ProjectStore {
     this.takes = new TakeStore(this.#database);
     this.characters = new CharacterStore(this.#database);
     this.characterMedia = new CharacterMediaStore(this.#database);
+    this.characterImageJobs = new CharacterImageJobStore(this.#database);
+    this.gpuLeases = new GpuLeaseStore(this.#database);
     this.canvas = new CanvasStore(this.#database);
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('busy_timeout = 5000');
@@ -100,6 +105,8 @@ export class ProjectStore {
     try {
       migrateDatabase(this.#database);
       recoverExpiredH3Jobs(this.#database);
+      this.characterImageJobs.recoverExpired();
+      this.gpuLeases.recoverExpired();
     } catch (error) {
       this.#database.close();
       this.#closed = true;
