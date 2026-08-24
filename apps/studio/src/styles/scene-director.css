@@ -1,0 +1,173 @@
+.scene-canvas-navigator {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.scene-canvas-title {
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 14px;
+}
+
+.scene-canvas-title span { color: var(--paper); }
+.scene-canvas-title small { color: var(--faint); }
+
+.scene-canvas-tabs {
+  display: flex;
+  gap: 4px;
+  max-width: min(58vw, 720px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scene-canvas-tabs::-webkit-scrollbar { display: none; }
+
+.scene-canvas-tabs button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  font: 650 8px/1 var(--mono);
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 9px;
+}
+
+.scene-canvas-tabs button i {
+  color: var(--faint);
+  font-size: 7px;
+  font-style: normal;
+}
+
+.scene-canvas-tabs button[aria-pressed="true"] {
+  background: rgba(201, 243, 107, .1);
+  border-color: rgba(201, 243, 107, .28);
+  color: var(--acid);
+}
+
+.scene-canvas-tabs button:active { transform: scale(.97); }
+
+.storyboard-flow[data-scene-isolated]:not([data-scene-isolated="all"])
+  .flow-scene-node {
+  background:
+    linear-gradient(90deg, rgba(200,165,106,.028) 0 34%,
+      transparent 34% 68%, rgba(83,213,189,.024) 68% 100%),
+    rgba(169, 182, 255, .018);
+  border-color: rgba(201, 243, 107, .3);
+}
+
+.scene-director-lane-guide {
+  display: grid;
+  grid-template-columns: 670px 700px minmax(800px, 1fr);
+  inset: 72px 42px 40px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.scene-director-lane-guide > div {
+  border-left: 1px solid rgba(238,234,222,.1);
+  padding-left: 18px;
+}
+
+.scene-director-lane-guide b {
+  color: var(--faint);
+  display: block;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: .09em;
+}
+
+.scene-director-lane-guide small {
+  display: block;
+  margin: 6px 0 0;
+}
+
+.canvas-shot-card[data-director-card="true"] { padding: 14px; }
+
+.canvas-shot-media-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  height: 142px;
+  margin: 11px 0 10px;
+}
+
+.canvas-shot-media-slot {
+  background: var(--ink-0);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-shot-media-slot > header {
+  align-items: center;
+  background: linear-gradient(rgba(5,8,7,.9), rgba(5,8,7,.5));
+  display: flex;
+  inset: 0 0 auto;
+  justify-content: space-between;
+  padding: 7px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.canvas-shot-media-slot > header span,
+.canvas-shot-media-slot > header small {
+  color: var(--paper);
+  font: 700 7px/1 var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-shot-media-slot > header small { color: var(--faint); font-size: 6px; }
+.canvas-shot-media-slot .canvas-media-trigger { height: 100%; width: 100%; }
+.canvas-shot-media-slot img,
+.canvas-shot-media-slot video { height: 100%; object-fit: cover; width: 100%; }
+
+.canvas-shot-media-empty {
+  align-items: center;
+  background: radial-gradient(circle, rgba(169,182,255,.08), transparent 66%);
+  color: var(--faint);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  height: 100%;
+  justify-content: center;
+}
+
+.canvas-shot-media-empty span { font: 300 20px/1 var(--mono); }
+.canvas-shot-media-empty small { font: 650 7px/1 var(--mono); }
+
+@media (max-width: 1500px) {
+  .canvas-context-bar:has(.scene-canvas-navigator) { display: flex; }
+  .scene-canvas-title { display: none; }
+  .scene-canvas-tabs { max-width: 46vw; }
+}
+
+@media (max-width: 900px) {
+  .scene-canvas-tabs { max-width: 44vw; }
+  .scene-canvas-tabs button i { display: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .scene-canvas-tabs button:hover {
+    background: rgba(238,234,222,.07);
+    border-color: var(--line);
+    color: var(--paper);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-canvas-tabs button:active { transform: none; }
+}

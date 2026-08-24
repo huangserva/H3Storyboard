@@ -5,9 +5,12 @@ import type {
 } from '@h3storyboard/protocol';
 import type { Node } from '@xyflow/react';
 import type { StoryboardViewNode } from '../lib/storyboard-graph.js';
+import type { ShotMediaSlot } from '../lib/storyboard-scene-director.js';
 
 export interface StoryboardFlowData extends Record<string, unknown> {
   view: StoryboardViewNode;
+  directorMode: boolean;
+  mediaSlots: ShotMediaSlot[];
   preflight: GenerationPreflight | null;
   busy: boolean;
   characterReference: CharacterReference | null;

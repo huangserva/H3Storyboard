@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard P1.5A · 场景导演画布交付</title>
+<style>
+:root{color-scheme:dark;--bg:#080b0a;--panel:#111714;--panel2:#17211c;--ink:#f0eee7;--muted:#9da69f;--line:#304039;--acid:#c9f36b;--teal:#53d5bd;--amber:#e9b968}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 84% 0,#173f36 0,transparent 34rem),var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1120px,calc(100% - 30px));margin:46px auto 90px}.eyebrow{color:var(--acid);font:700 12px ui-monospace,monospace;letter-spacing:.15em}h1{margin:10px 0 18px;font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.045em}h2{margin:44px 0 14px;font-size:27px}.lede{color:#d2d8d3;font-size:19px}.callout,.card{border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,var(--panel2),var(--panel));padding:20px}.callout{border-color:#507051;font-size:18px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.metric{color:var(--acid);font:800 25px ui-monospace,monospace}.card p{color:var(--muted);margin:7px 0}.tag{display:inline-block;border-radius:999px;background:#28381f;color:var(--acid);font:700 10px ui-monospace,monospace;padding:4px 9px}table{width:100%;border-collapse:collapse;border:1px solid var(--line);background:#0e1311}th,td{border:1px solid var(--line);padding:12px 13px;text-align:left;vertical-align:top}th{background:#17211d;color:var(--acid);font-size:12px}code{color:#b4eee4;overflow-wrap:anywhere}.ok{color:var(--acid)}.warn{color:var(--amber)}ul{padding-left:22px}.review{border-style:dashed;border-color:#6b6545}.footer{margin-top:45px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px}@media(max-width:860px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+</style></head><body><main>
+<div class="eyebrow">DELIVERY REPORT · 2026-08-25 · P1.5A</div>
+<h1>全景留作导航，<br>当前场景才是导演工作台。</h1>
+<p class="lede">P1.5A 把 xyz-video-creator 的“媒体优先、按场景工作”表达融入 H3Storyboard 的真实 React Flow：非当前场景收成导航标签，当前场景展开为参考、Plan、H3 Actual/QC 三条生产泳道。Plan、Job、Asset、Take 仍是独立实体，没有复制旧产品的计划/结果混写。</p>
+<div class="callout"><strong>交付结论：</strong>场景隔离、场景切换、机位记忆、三泳道、三媒体槽、跨场连续性和 100 镜投影均已完成，可在 <code>http://127.0.0.1:5174</code> 直接测试。</div>
+
+<h2>Before / After</h2>
+<table><thead><tr><th>此前</th><th>P1.5A</th></tr></thead><tbody>
+<tr><td>所有场景、参考、Job、Take 同时铺在一张总图上。</td><td>总览负责导航；进入场景导演后，只展开当前场完整生产链，其他场景变为顶部标签。</td></tr>
+<tr><td>Shot 卡只有一个综合预览，首尾帧与 Take 的语义不够清晰。</td><td>每张 Plan 卡固定分离“首帧 / 尾帧 / 最新 Take”三个媒体槽；尾帧兼容 <code>reference_target_state</code>，角色 target 会解析批准的身份参考图。</td></tr>
+<tr><td>当前场景只是一次 camera fit。</td><td>每场独立保存 zoom/pan；SC-01 → SC-02 → SC-01、快速切场、专注/浏览器全屏均保持正确机位。</td></tr>
+</tbody></table>
+
+<h2>三条生产泳道</h2><div class="grid">
+<div class="card"><span class="tag">01 · REFERENCES</span><div class="metric">角色 / 场景</div><p>角色母图、派生身份图、场景输入和跨场 continuity boundary 只按当前场需要投影。</p></div>
+<div class="card"><span class="tag">02 · PLAN</span><div class="metric">首 / 尾 / Take</div><p>520×340 大卡保留镜头意图、动作、生成入口，并把三个媒体槽分开呈现。</p></div>
+<div class="card"><span class="tag">03 · H3 ACTUAL</span><div class="metric">Job → QC</div><p>真实边连接 Job、输出 Asset、Take/QC；重复尝试会动态增高行，不会覆盖下一镜。</p></div>
+</div>
+
+<h2>原始任务逐条 verdict</h2>
+<table><thead><tr><th>要求</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+<tr><td>场景隔离与其他场景导航标签</td><td class="ok">完成</td><td>顶部“全部 / SC-xx”导航；隔离图只保留当前场镜头、必要参考、当前 Actual 与跨场 boundary。</td></tr>
+<tr><td>参考 → Plan → H3 Job/Take/QC 三泳道</td><td class="ok">完成</td><td>纯投影布局保留真实 edge；空 Actual 也保留完整泳道边界，多次重试按内容动态增高。</td></tr>
+<tr><td>首帧、尾帧、最新 Take 大媒体卡</td><td class="ok">完成</td><td>三槽独立；director 显示最新 Take（含 rejected 以便 QC），overview 继续与最新非 rejected 预览保持一致。</td></tr>
+<tr><td>场景切换与机位恢复</td><td class="ok">完成</td><td>视口以 <code>string | null</code> 键隔离；快速切场用 movement revision 防止动画中间态污染。</td></tr>
+<tr><td>100 镜头可用</td><td class="ok">完成</td><td>纯函数精确投影 10 镜；真 Chrome 中每场 MiniMap 精确 41 节点，仍只挂载可见 DOM。</td></tr>
+<tr><td>P1.5B 多选绑定与批量任务</td><td class="warn">按计划未做</td><td>这是下一阶段，当前不引入半套 selection 状态；开工前先继续拆分 247/250 行的 <code>StoryboardFlow</code>。</td></tr>
+</tbody></table>
+
+<h2>审查中修掉的真问题</h2><ul>
+<li>Actual 泳道从固定镜距改为按 Job/Asset/Take 行数动态增长，第三次及更多重试不再压住下一镜。</li>
+<li>媒体选择从每镜重建全资产 Map 的 O(shots×assets)，降为每次投影只建一次 Map。</li>
+<li>首尾帧支持 character target；<code>reference_target_state</code> 正确进入尾帧槽。</li>
+<li>拖拽 PATCH 尚未结束就切场时，从最新投影恢复导演坐标；失败回滚也不再写回旧模式坐标。</li>
+<li>总览视口不再用可与合法 scene ID 冲突的 <code>__overview__</code> sentinel。</li>
+<li>快速切场加入 camera movement revision，旧动画完成不会覆盖新场景机位。</li>
+<li>新增 Job/Take 改变节点数时不再自动 fit，用户当前机位不会被后台结果刷新抢走。</li>
+<li>Scene 容器即使没有 Job/Take，也会覆盖完整 Actual 泳道并纳入 fit 边界。</li>
+</ul>
+
+<h2>测试证据</h2>
+<table><thead><tr><th>层</th><th>最终结果</th><th>覆盖</th></tr></thead><tbody>
+<tr><td>TypeScript / Build</td><td class="ok">通过</td><td><code>pnpm build</code>；360 modules，生产 Vite bundle 成功。</td></tr>
+<tr><td>Vitest</td><td class="ok">36 files · 238 passed · 1 skipped</td><td>隔离、三槽、character/target-state、重复尝试、空 Actual、非法 scene、缺容器、100 镜、跨场 continuity；其余 unit/integration 全回归。唯一 skip 是明确 opt-in 的 live ComfyUI probe。</td></tr>
+<tr><td>Playwright</td><td class="ok">22 passed</td><td>真 HTTP + SQLite + Chrome：场景切换、快速切场、专注/全屏机位、拖拽 PATCH 竞态、精确百镜子图、媒体、QC、Plan/Take 分离及既有 Production Board。</td></tr>
+</tbody></table>
+
+<h2>改动、删除与边界</h2><ul>
+<li>拆出 flow projection 与 drag controller；新增 scene director selector/layout、场景导航、三槽卡片和独立样式。<code>StoryboardFlow</code> 由功能膨胀后的 259 行拆回 247 行。</li>
+<li>增强既有 focus 与 100-shot E2E；新增 scene director unit。没有删除测试，没有为测试添加生产 fallback/分支，曾加入的纯测试计数字段已在审查中删除。</li>
+<li>没有改数据库 schema、生成协议、4090/ComfyUI worker、H3 Job 状态机或任何音频资产。</li>
+<li>声音边界未变：所有新增视频缩略图强制静音；只有既有受控播放器在 <code>producer_job_id → H3 job → audio_mode=h3_native</code> 成立时可播放 H3 原声。没有 TTS、配音、音乐、环境声、雨声或音效。</li>
+</ul>
+
+<h2>Self-Review</h2><div class="card review"><span class="tag">4 INDEPENDENT REVIEWS · 2 ROUNDS</span>
+<table><thead><tr><th>维度</th><th>首轮 / 中间 → 最终</th><th>关键 verdict</th></tr></thead><tbody>
+<tr><td>A 架构/维护性</td><td>C+ → B- → <strong>B+</strong></td><td>动态 Actual 高度、O(shots×assets)、最新 Take 冲突、后台 refit、空泳道边界均关闭；P1.5B 多选延期合理，但开工前必须再拆 Flow。</td></tr>
+<tr><td>B 真 bug/边界</td><td>B- → C+ → <strong>A</strong></td><td>拖拽切场、character frame、target-state、sentinel 冲突、快速动画切场和 overview/scene fullscreen 行为均关闭。</td></tr>
+<tr><td>C 测试质量</td><td>B- → B → <strong>A-</strong></td><td>删除测试感染字段，修假否定断言，补真实边、跨场 continuity、百镜精确子图、PATCH 竞态和快速机位恢复；最终整轮 gate 全绿。</td></tr>
+<tr><td>D 产品/spec 对齐</td><td>发现 1 项错配 → <strong>A</strong></td><td>overview 与 director 的 rejected Take 语义已分开；Plan/Job/Take 和 H3-only 音频边界无回归，P1.5A 完成度 100%。</td></tr>
+</tbody></table>
+<p><strong>严重项 verdict：</strong>唯一严重项“多次 Actual 与下一镜重叠”已修并有失败优先单测；其余所有中等项均修复或明确裁决。<br><strong>不修项：</strong>P1.5B multi-select/batch 不属于 P1.5A，当前不制造半套状态模型。<br><strong>综合评分：</strong>A-。四个维度均高于交付下限。</p></div>
+<div class="footer">索引：<code>.hive/research/2026-08-25-p15a-scene-director.md</code> · 分支：<code>codex/p0-p1-h3-canvas</code> · 基于最终代码、全量门禁与四路独立复核。</div>
+</main></body></html>

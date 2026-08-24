@@ -1,5 +1,6 @@
 interface CanvasViewportToolbarProps {
   sceneLabel: string;
+  sceneIsolated: boolean;
   focusMode: boolean;
   browserFullscreen: boolean;
   browserFullscreenBusy: boolean;
@@ -11,7 +12,8 @@ interface CanvasViewportToolbarProps {
   onToggleBrowserFullscreen: () => void;
 }
 
-export function CanvasViewportToolbar({ sceneLabel, focusMode, browserFullscreen,
+export function CanvasViewportToolbar({ sceneLabel, sceneIsolated, focusMode,
+  browserFullscreen,
   browserFullscreenBusy, assetDrawerOpen, onToggleAssetDrawer, onFocusScene, onFitOverview,
   onToggleFocusMode, onToggleBrowserFullscreen }: CanvasViewportToolbarProps) {
   return <div className="canvas-viewport-toolbar" role="toolbar"
@@ -22,9 +24,10 @@ export function CanvasViewportToolbar({ sceneLabel, focusMode, browserFullscreen
       title={assetDrawerOpen ? '关闭资产抽屉' : '打开资产抽屉'} type="button">
       <b aria-hidden="true">▦</b><span className="canvas-tool-label">资产</span>
     </button>
-    <button aria-label="聚焦当前场景" onClick={onFocusScene}
-      title="聚焦当前场景" type="button">
-      <b aria-hidden="true">⌖</b><span className="canvas-tool-label">当前场景</span>
+    <button aria-label="聚焦当前场景" aria-pressed={sceneIsolated}
+      onClick={onFocusScene} title="进入当前场景导演视图" type="button">
+      <b aria-hidden="true">⌖</b><span className="canvas-tool-label">
+        {sceneIsolated ? '场景导演' : '当前场景'}</span>
     </button>
     <button aria-label="显示画布全景" onClick={onFitOverview}
       title="显示画布全景" type="button">

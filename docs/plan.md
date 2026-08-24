@@ -48,6 +48,12 @@ capability inventory. A post-fix real i2v run completed end to end on 2026-08-12
   Qwen identity edit, Krea i2i, shared 8188/8190 GPU coordination,
   candidate-only completion, recovery/cancel/single-retry, bounded backoff,
   compiled-runtime integration, and production-board controls.
+- [x] P1.4 immersive canvas focus mode, inspector/asset drawers, real browser
+  fullscreen, enlarged media cards, active-scene camera focus, and compact-window
+  controls.
+- [x] P1.5A scene director projection with scene isolation/navigation, per-scene
+  viewport restoration, reference → Plan → H3 Actual/QC lanes, and separate
+  first-frame / last-frame / latest-Take media slots on every Plan card.
 
 P1.3B passed the final architecture, bug, test, and protocol reviews at
 B+ / B- / B- / B. The final gate passed 225 Vitest assertions plus 14 browser

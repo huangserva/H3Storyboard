@@ -14,6 +14,7 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
     const job = view.shot_jobs?.at(-1) ?? null;
     return <>{handles}<CanvasShotCard shot={view.shot} actuals={actuals}
       previewAsset={view.preview_asset ?? null} selected={selected}
+      directorMode={data.directorMode} mediaSlots={data.mediaSlots}
       compileReady={data.preflight?.ready ?? false} busy={data.busy}
       job={job} preflight={data.preflight}
       onGenerate={(reason) => data.preflight
@@ -31,6 +32,12 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
   if (view.kind === 'scene') {
     return <>{handles}<section className="flow-scene-node" data-selected={selected}>
       <span>{view.kicker}</span><strong>{view.title}</strong><small>{view.summary}</small>
+      {data.directorMode ? <div className="scene-director-lane-guide"
+        aria-hidden="true">
+        <div><b>01 · REFERENCES</b><small>角色 / 场景 / 连续性参考</small></div>
+        <div><b>02 · PLAN</b><small>首帧 / 尾帧 / 镜头意图</small></div>
+        <div><b>03 · H3 ACTUAL</b><small>任务 / 输出 / TAKE / QC</small></div>
+      </div> : null}
     </section></>;
   }
 

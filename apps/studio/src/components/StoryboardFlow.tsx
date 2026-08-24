@@ -10,24 +10,29 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MarkerType,
   MiniMap,
   Panel,
   ReactFlow,
   type ReactFlowInstance,
+  type Viewport,
   useNodesState,
   type Edge,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import type {
   StoryboardGraph,
-  StoryboardViewEdge,
   StoryboardViewNode,
 } from '../lib/storyboard-graph.js';
 import { selectCanvasFocusNodeId } from '../lib/storyboard-focus.js';
+import { isolateStoryboardScene, listStoryboardScenes } from
+  '../lib/storyboard-scene-director.js';
 import { CanvasFlowNode } from './CanvasFlowNode.js';
 import { CanvasViewportToolbar } from './CanvasViewportToolbar.js';
+import { SceneCanvasNavigator } from './SceneCanvasNavigator.js';
+import { minimapColor, projectStoryboardEdges, projectStoryboardNodes } from
+  './storyboard-flow-projection.js';
 import type { StoryboardFlowNode } from './storyboard-flow-types.js';
+import { useStoryboardNodeDrag } from './use-storyboard-node-drag.js';
 
 interface StoryboardFlowProps {
   graph: StoryboardGraph;
@@ -57,6 +62,7 @@ interface StoryboardFlowProps {
 }
 
 const nodeTypes = { storyboard: CanvasFlowNode };
+const NO_PENDING_SCENE = Symbol('no-pending-scene');
 
 export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   activeSceneId, focusRevision, focusMode, browserFullscreen,
@@ -64,125 +70,142 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   loading, error, preflights, characterReferences, onSelect, onGenerate, onSetup,
   onNewShot, onOpenMedia, onToggleAssetDrawer, onToggleFocusMode,
   onToggleBrowserFullscreen, onPersist }: StoryboardFlowProps) {
-  const projectedNodes = useMemo(() => graph.nodes.map((view): StoryboardFlowNode => ({
-    id: view.id,
-    type: 'storyboard',
-    position: { x: view.x, y: view.y },
-    width: view.width,
-    height: view.height,
-    zIndex: view.z_index,
-    draggable: view.persisted_node_id !== null,
-    selectable: view.kind !== 'scene',
-    selected: view.id === selectedNodeId,
-    className: `flow-node-shell flow-kind-${view.kind}`,
-    style: { width: view.width, height: view.height },
-    ariaLabel: `${view.kicker}: ${view.title}`,
-    data: { view, busy,
-      preflight: view.shot_id ? preflights.get(view.shot_id) ?? null : null,
-      characterReference: view.kind === 'character'
-        ? characterReferences.get(view.entity_id) ?? null : null,
-      onGenerate, onSetup, onOpenMedia },
-  })), [busy, characterReferences, graph.nodes, onGenerate, onOpenMedia,
-    onSetup, preflights, selectedNodeId]);
+  const scenes = useMemo(() => listStoryboardScenes(graph), [graph]);
+  const [isolatedSceneId, setIsolatedSceneId] = useState<string | null>(null);
+  const displayedGraph = useMemo(() => isolatedSceneId
+    ? isolateStoryboardScene(graph, isolatedSceneId) : graph,
+  [graph, isolatedSceneId]);
+  const projectedNodes = useMemo(() => projectStoryboardNodes({
+    graph: displayedGraph, snapshot, selectedNodeId, busy,
+    directorMode: isolatedSceneId !== null, preflights, characterReferences,
+    onGenerate, onSetup, onOpenMedia,
+  }), [busy, characterReferences, displayedGraph, isolatedSceneId, onGenerate,
+    onOpenMedia, onSetup, preflights, selectedNodeId, snapshot]);
   const [nodes, setNodes, onNodesChange] = useNodesState(projectedNodes);
   const [fitRevision, setFitRevision] = useState(0);
-  const edges = useMemo(() => graph.edges.map(toFlowEdge), [graph.edges]);
+  const edges = useMemo(() => projectStoryboardEdges(displayedGraph),
+    [displayedGraph]);
   const flowInstance = useRef<ReactFlowInstance<StoryboardFlowNode, Edge> | null>(
     null);
   const fittedTarget = useRef('');
   const activeSceneIdRef = useRef(activeSceneId);
   const selectedNodeIdRef = useRef(selectedNodeId);
-  const pendingFit = useRef(false);
-  const dragSessions = useRef(new Map<string, number>());
-  const dragStartPositions = useRef(new Map<string, { x: number; y: number }>());
-  const nextDragSession = useRef(0);
+  const pendingSceneRestore = useRef<string | null | symbol>(NO_PENDING_SCENE);
+  const sceneViewports = useRef(new Map<string | null, Viewport>());
+  const programmaticCameraBusy = useRef(false);
+  const cameraMovementRevision = useRef(0);
+  const handledFocusRevision = useRef(focusRevision);
   activeSceneIdRef.current = activeSceneId;
   selectedNodeIdRef.current = selectedNodeId;
+  const sceneKey = isolatedSceneId;
+  const sceneTargetKey = sceneKey === null ? 'overview' : `scene:${sceneKey}`;
+  const sceneKeyRef = useRef<string | null>(sceneKey);
+  sceneKeyRef.current = sceneKey;
 
-  const fitOverview = (duration = 220) => {
-    void flowInstance.current?.fitView({ padding: 0.12, minZoom: 0.18,
-      maxZoom: 0.9, duration });
+  const fitOverview = (duration = 220): Promise<boolean> => {
+    return flowInstance.current?.fitView({ padding: isolatedSceneId ? 0.07 : 0.12,
+      minZoom: isolatedSceneId ? 0.5 : 0.18,
+      maxZoom: 0.9, duration }) ?? Promise.resolve(false);
   };
 
-  const fitFocusTarget = (targetId: string | null, duration = 220) => {
+  const fitFocusTarget = (targetId: string | null,
+    duration = 220): Promise<boolean> => {
     const instance = flowInstance.current;
     const target = targetId ? instance?.getNode(targetId) : null;
-    if (!instance || !target) {
-      fitOverview(duration);
-      return;
-    }
-    void instance.fitView({ nodes: [target], padding: 0.16,
+    if (!instance || !target) return fitOverview(duration);
+    return instance.fitView({ nodes: [target], padding: 0.16,
       minZoom: 0.46, maxZoom: 1.05, duration });
   };
+  const drag = useStoryboardNodeDrag({ projectedNodes, setNodes, onPersist,
+    onDeferredFit: () => setFitRevision((value) => value + 1) });
 
-  useEffect(() => setNodes((current) => {
-    const currentById = new Map(current.map((node) => [node.id, node]));
-    return projectedNodes.map((node) => {
-      const dragged = currentById.get(node.id);
-      return dragSessions.current.has(node.id) && dragged
-        ? { ...node, position: dragged.position,
-          dragging: dragged.dragging ?? false }
-        : node;
-    });
-  }), [projectedNodes, setNodes]);
+  const selectScene = (nextSceneId: string | null) => {
+    if (nextSceneId === isolatedSceneId) {
+      trackCameraMovement(sceneKey, fitOverview());
+      return;
+    }
+    const viewport = flowInstance.current?.getViewport();
+    if (viewport && !programmaticCameraBusy.current) {
+      sceneViewports.current.set(sceneKey, viewport);
+    }
+    pendingSceneRestore.current = nextSceneId;
+    fittedTarget.current = '';
+    setIsolatedSceneId(nextSceneId);
+    onSelect(null);
+  };
 
   useEffect(() => {
-    if (loading || graph.nodes.length === 0) return;
-    const target = `${graph.nodes.length}:${fitRevision}:${focusRevision}:` +
-      `${focusMode}:${browserFullscreen}`;
+    if (loading || displayedGraph.nodes.length === 0) return;
+    const modeTarget = isolatedSceneId === null
+      ? `${focusMode}:${browserFullscreen}` : 'scene-camera';
+    const target = `${sceneTargetKey}:${fitRevision}:${focusRevision}:${modeTarget}`;
     if (fittedTarget.current === target) return;
     const frame = window.requestAnimationFrame(() => {
-      if (dragSessions.current.size > 0) {
-        pendingFit.current = true;
+      if (drag.deferFitIfDragging()) return;
+      fittedTarget.current = target;
+      if (pendingSceneRestore.current !== NO_PENDING_SCENE &&
+        pendingSceneRestore.current === sceneKey) {
+        const viewport = sceneViewports.current.get(sceneKey);
+        pendingSceneRestore.current = NO_PENDING_SCENE;
+        const movement = viewport
+          ? flowInstance.current?.setViewport(viewport, { duration: 0 }) ??
+            Promise.resolve(false)
+          : fitOverview();
+        trackCameraMovement(sceneKey, movement);
         return;
       }
-      fittedTarget.current = target;
-      pendingFit.current = false;
       const selectedId = focusMode ? null : selectedNodeIdRef.current;
-      fitFocusTarget(selectCanvasFocusNodeId(
-        graph.nodes, selectedId, activeSceneIdRef.current), selectedId ? 0 : 220);
+      trackCameraMovement(sceneKey, fitFocusTarget(selectCanvasFocusNodeId(
+        displayedGraph.nodes, selectedId, activeSceneIdRef.current),
+      selectedId ? 0 : 220));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [browserFullscreen, fitRevision, focusMode, focusRevision, graph.nodes,
-    loading]);
+  }, [browserFullscreen, displayedGraph.nodes, fitRevision, focusMode,
+    focusRevision, loading, sceneKey, sceneTargetKey]);
+
+  useEffect(() => {
+    if (handledFocusRevision.current === focusRevision) return;
+    handledFocusRevision.current = focusRevision;
+    if (!isolatedSceneId || !activeSceneId ||
+      isolatedSceneId === activeSceneId) return;
+    const viewport = flowInstance.current?.getViewport();
+    if (viewport && !programmaticCameraBusy.current) {
+      sceneViewports.current.set(sceneKey, viewport);
+    }
+    pendingSceneRestore.current = activeSceneId;
+    fittedTarget.current = '';
+    setIsolatedSceneId(activeSceneId);
+  }, [activeSceneId, focusRevision, isolatedSceneId, sceneKey]);
 
   const onNodeClick: NodeMouseHandler<StoryboardFlowNode> = (_event, node) => {
     onSelect(node.data.view);
   };
 
-  return <div className="storyboard-flow" data-empty={graph.nodes.length <= 1}>
+  function trackCameraMovement(key: string | null,
+    movement: Promise<boolean>): void {
+    cameraMovementRevision.current += 1;
+    const revision = cameraMovementRevision.current;
+    programmaticCameraBusy.current = true;
+    void movement.finally(() => {
+      if (cameraMovementRevision.current !== revision ||
+        sceneKeyRef.current !== key) return;
+      programmaticCameraBusy.current = false;
+      const viewport = flowInstance.current?.getViewport();
+      if (viewport) sceneViewports.current.set(key, viewport);
+    });
+  }
+
+  return <div className="storyboard-flow" data-empty={graph.nodes.length <= 1}
+    data-scene-isolated={isolatedSceneId ?? 'all'}>
     <ReactFlow<StoryboardFlowNode, Edge> nodes={nodes} edges={edges}
       onInit={(instance) => { flowInstance.current = instance; }}
       nodeTypes={nodeTypes} onNodesChange={onNodesChange}
+      onMoveEnd={(_event, viewport) => {
+        sceneViewports.current.set(sceneKeyRef.current, viewport);
+      }}
       onNodeClick={onNodeClick} onPaneClick={() => onSelect(null)}
-      onNodeDragStart={(_event, node) => {
-        nextDragSession.current += 1;
-        dragSessions.current.set(node.id, nextDragSession.current);
-        dragStartPositions.current.set(node.id, node.position);
-      }}
-      onNodeDragStop={(_event, node) => {
-        const persistedId = node.data.view.persisted_node_id;
-        const session = dragSessions.current.get(node.id);
-        const start = dragStartPositions.current.get(node.id);
-        if (!persistedId || session === undefined) {
-          dragSessions.current.delete(node.id);
-          dragStartPositions.current.delete(node.id);
-          return;
-        }
-        void onPersist({ node_id: persistedId, x: node.position.x,
-          y: node.position.y, z_index: node.data.view.z_index })
-          .catch(() => {
-            if (dragSessions.current.get(node.id) !== session || !start) return;
-            setNodes((current) => current.map((candidate) => candidate.id === node.id
-              ? { ...candidate, position: start } : candidate));
-          })
-          .finally(() => {
-            if (dragSessions.current.get(node.id) !== session) return;
-            dragSessions.current.delete(node.id);
-            dragStartPositions.current.delete(node.id);
-            if (pendingFit.current) setFitRevision((value) => value + 1);
-          });
-      }}
+      onNodeDragStart={drag.onNodeDragStart}
+      onNodeDragStop={drag.onNodeDragStop}
       fitView fitViewOptions={{ padding: 0.12, minZoom: 0.18, maxZoom: 0.9 }}
       minZoom={0.18} maxZoom={2.4} onlyRenderVisibleElements
       nodesConnectable={false} edgesReconnectable={false}
@@ -196,18 +219,19 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
         nodeColor={(node) => minimapColor(
           (node as StoryboardFlowNode).data.view.kind)} />
       <Panel position="top-left" className="flow-toolbar canvas-context-bar">
-        <div><span>UNIVERSAL STORYBOARD</span>
-          <small>媒体优先 · 角色 → 场景 → 分镜 → 成片</small></div>
+        <SceneCanvasNavigator scenes={scenes} activeSceneId={isolatedSceneId}
+          onSelectScene={selectScene} />
       </Panel>
       <Panel position="top-right">
-        <CanvasViewportToolbar sceneLabel={activeSceneId ?? 'ALL SCENES'}
+        <CanvasViewportToolbar sceneLabel={isolatedSceneId ??
+          activeSceneId ?? 'ALL SCENES'} sceneIsolated={isolatedSceneId !== null}
           focusMode={focusMode} browserFullscreen={browserFullscreen}
           browserFullscreenBusy={browserFullscreenBusy}
           assetDrawerOpen={assetDrawerOpen}
           onToggleAssetDrawer={onToggleAssetDrawer}
-          onFocusScene={() => fitFocusTarget(selectCanvasFocusNodeId(
-            graph.nodes, null, activeSceneId))}
-          onFitOverview={() => fitOverview()}
+          onFocusScene={() => selectScene(isolatedSceneId ?? activeSceneId ??
+            scenes[0]?.scene_id ?? null)}
+          onFitOverview={() => selectScene(null)}
           onToggleFocusMode={onToggleFocusMode}
           onToggleBrowserFullscreen={onToggleBrowserFullscreen} />
       </Panel>
@@ -220,27 +244,4 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
       <button className="button button-primary" disabled={busy}
         onClick={onNewShot} type="button">＋ 新增计划镜头</button></div> : null}
   </div>;
-}
-
-function toFlowEdge(view: StoryboardViewEdge): Edge {
-  const color = edgeColor(view.kind);
-  return { id: view.id, source: view.source, target: view.target,
-    label: view.label, animated: view.animated,
-    type: view.kind === 'continuity' ? 'smoothstep' : 'default',
-    markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
-    style: { stroke: color, strokeWidth: view.kind === 'structure' ? 1 : 1.6,
-      strokeDasharray: view.kind === 'continuity' ? '6 5' : undefined },
-    labelStyle: { fill: '#878e89', fontSize: 8, fontWeight: 650 },
-    labelBgStyle: { fill: '#0b0e0d', fillOpacity: 0.88 },
-    labelBgPadding: [4, 3], labelBgBorderRadius: 3 };
-}
-
-function edgeColor(kind: StoryboardViewEdge['kind']): string {
-  return { structure: '#3d4641', reference: '#c8a56a', identity: '#7f8cff',
-    generation: '#c9f36b', output: '#53d5bd', continuity: '#a9b6ff' }[kind];
-}
-
-function minimapColor(kind: StoryboardViewNode['kind']): string {
-  return { script: '#7f8cff', scene: '#313a36', asset: '#c8a56a',
-    character: '#a9b6ff', shot: '#c9f36b', job: '#6f7d76', take: '#53d5bd' }[kind];
 }

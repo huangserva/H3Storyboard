@@ -132,6 +132,8 @@ test.describe.serial('immersive storyboard canvas', () => {
       const overviewZoom = await viewportZoom(viewport);
 
       await page.getByRole('button', { name: '聚焦当前场景' }).click();
+      await expect(page.locator('.storyboard-flow'))
+        .toHaveAttribute('data-scene-isolated', 'SC-01');
       await expect.poll(() => viewport.getAttribute('style'))
         .not.toBe(overviewTransform);
       await expect.poll(() => viewportZoom(viewport)).toBeGreaterThan(overviewZoom);
@@ -151,8 +153,85 @@ test.describe.serial('immersive storyboard canvas', () => {
       const shot = shotNode(page);
       await expect.poll(() => shot.evaluate((element) =>
         Number.parseFloat(getComputedStyle(element).width))).toBeGreaterThanOrEqual(300);
-      await expect.poll(() => shot.locator('.canvas-card-frame').evaluate((element) =>
-        Number.parseFloat(getComputedStyle(element).height))).toBeGreaterThanOrEqual(120);
+      await expect.poll(() => shot.locator('.canvas-shot-media-grid')
+        .evaluate((element) => Number.parseFloat(getComputedStyle(element).height)))
+        .toBeGreaterThanOrEqual(140);
+    });
+
+  test('switches isolated scenes, restores each camera, and separates three media slots',
+    async ({ page }) => {
+      await openDemo(page);
+      await page.getByRole('button', { name: '聚焦当前场景' }).click();
+      const flow = page.locator('.storyboard-flow');
+      const viewport = page.locator('.react-flow__viewport');
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-01');
+      await expect(page.getByRole('navigation', { name: '场景导航' })).toBeVisible();
+      const sceneGroup = page.locator(
+        '.react-flow__node[data-id="scene:SC-01"]');
+      await expect(sceneGroup).toContainText('01 · REFERENCES');
+      await expect(sceneGroup).toContainText('02 · PLAN');
+      await expect(sceneGroup).toContainText('03 · H3 ACTUAL');
+      await expect(page.locator('.react-flow__node.flow-kind-shot')).toHaveCount(2);
+      await expect(page.locator(
+        `.react-flow__node[data-id="shot:${fixture.shot_ids[2]}"]`)).toHaveCount(0);
+
+      const shot = shotNode(page);
+      await expect(shot.locator('[data-media-slot]')).toHaveCount(3);
+      await expect(shot.locator('[data-media-slot="first_frame"] img')).toBeVisible();
+      await expect(shot.locator('[data-media-slot="last_frame"]'))
+        .toHaveAttribute('data-empty', 'true');
+      await expect(shot.locator('[data-media-slot="latest_take"] video')).toBeVisible();
+
+      const sceneOneZoom = await viewportZoom(viewport);
+      await page.getByRole('button', { name: 'Zoom In' }).click();
+      await expect.poll(() => viewportZoom(viewport)).toBeGreaterThan(sceneOneZoom);
+      const sceneOneViewport = await viewport.getAttribute('style');
+      await page.getByRole('button', { name: '进入浏览器全屏' }).click();
+      await expect.poll(() => page.evaluate(() =>
+        document.fullscreenElement === document.documentElement)).toBe(true);
+      expect(await viewport.getAttribute('style')).toBe(sceneOneViewport);
+      await page.getByRole('button', { name: '退出浏览器全屏' }).click();
+      await expect.poll(() => page.evaluate(() => document.fullscreenElement === null))
+        .toBe(true);
+      expect(await viewport.getAttribute('style')).toBe(sceneOneViewport);
+      await page.getByRole('button', { name: '退出画布专注模式' }).click();
+      expect(await viewport.getAttribute('style')).toBe(sceneOneViewport);
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-02' })
+        .click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-02');
+      await expect(page.locator('.react-flow__node.flow-kind-shot')).toHaveCount(1);
+      await expect(page.locator(
+        `.react-flow__node[data-id="shot:${fixture.shot_ids[2]}"]`)).toBeVisible();
+      await page.getByRole('button', { name: 'Zoom Out' }).click();
+      const sceneTwoZoomedOut = await viewport.getAttribute('style');
+      const sceneTwoZoom = await viewportZoom(viewport);
+      await page.getByRole('button', { name: '聚焦当前场景' }).click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-02');
+      await expect.poll(() => viewportZoom(viewport)).toBeGreaterThan(sceneTwoZoom);
+      expect(await viewport.getAttribute('style')).not.toBe(sceneTwoZoomedOut);
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-01' })
+        .click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-01');
+      await expect.poll(() => viewport.getAttribute('style')).toBe(sceneOneViewport);
+
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-02' })
+        .click();
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-01' })
+        .click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-01');
+      await expect.poll(() => viewport.getAttribute('style')).toBe(sceneOneViewport);
+
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: '全部' })
+        .click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'all');
+      await expect(page.locator('.react-flow__node.flow-kind-shot')).toHaveCount(3);
+
+      await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-01' })
+        .click();
+      await page.getByRole('button', { name: /03 窗前停步/ }).click();
+      await expect(flow).toHaveAttribute('data-scene-isolated', 'SC-02');
+      await expect(page.locator(
+        `.react-flow__node[data-id="shot:${fixture.shot_ids[2]}"]`)).toBeVisible();
     });
 
   test('keeps focus controls usable in a compact application window',

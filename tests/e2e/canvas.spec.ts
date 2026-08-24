@@ -93,6 +93,36 @@ test.describe.serial('React Flow storyboard canvas', () => {
       }
     });
 
+  test('reprojects a pending overview drag when scene director mode opens',
+    async ({ page }) => {
+      await openProject(page);
+      const patchStarted = deferred();
+      const releasePatch = deferred();
+      let heldPatch = false;
+      await page.route('**/api/projects/*/canvas_nodes', async (route) => {
+        if (!heldPatch && route.request().method() === 'PATCH') {
+          heldPatch = true;
+          patchStarted.resolve();
+          await releasePatch.promise;
+        }
+        await route.continue();
+      });
+
+      try {
+        await dragBy(page, shotNode(page), 52, 36);
+        await patchStarted.promise;
+        await page.getByRole('button', { name: '聚焦当前场景' }).click();
+        await expect(page.locator('.storyboard-flow'))
+          .toHaveAttribute('data-scene-isolated', 'SC-01');
+        releasePatch.resolve();
+        await expect.poll(() => nodeWorldPosition(shotNode(page)))
+          .toEqual({ x: 760, y: 180 });
+      } finally {
+        releasePatch.resolve();
+        await page.unrouteAll({ behavior: 'wait' });
+      }
+    });
+
   test('shows a real persistence error and rolls the failed drag back',
     async ({ page }) => {
       await openProject(page);
@@ -274,6 +304,32 @@ test.describe.serial('React Flow storyboard canvas', () => {
         expect(canvasRows(project.data.id)).toEqual({ count: 100, refs: 100 });
         await expect(page.getByRole('toolbar', { name: '画布视图工具' }))
           .toBeVisible();
+        await page.getByRole('button', { name: '聚焦当前场景' }).click();
+        await expect(page.locator('.storyboard-flow'))
+          .toHaveAttribute('data-scene-isolated', 'SC-01');
+        await expect(page.locator('.react-flow__minimap-node')).toHaveCount(41);
+        expect(await page.locator('.react-flow__node.flow-kind-shot').count())
+          .toBeLessThanOrEqual(10);
+        expect(await page.locator('.react-flow__node.flow-kind-shot').count())
+          .toBeGreaterThan(0);
+        await expect(page.locator('.scene-canvas-tabs button')).toHaveCount(11);
+        expect(firstCalls.filter(({ method, url }) =>
+          method === 'PATCH' && url.endsWith(canvasUrl))).toHaveLength(0);
+        const viewport = page.locator('.react-flow__viewport');
+        const fittedSceneOne = await viewport.getAttribute('style');
+        await page.getByRole('button', { name: 'Zoom In' }).click();
+        await expect.poll(() => viewport.getAttribute('style'))
+          .not.toBe(fittedSceneOne);
+        const sceneOneViewport = await viewport.getAttribute('style');
+        await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-02' })
+          .click();
+        await expect(page.locator('.storyboard-flow'))
+          .toHaveAttribute('data-scene-isolated', 'SC-02');
+        await expect(page.locator('.react-flow__minimap-node')).toHaveCount(41);
+        await page.locator('.scene-canvas-tabs button').filter({ hasText: 'SC-01' })
+          .click();
+        await expect.poll(() => viewport.getAttribute('style'))
+          .toBe(sceneOneViewport);
       } finally {
         await secondPage.close();
       }
