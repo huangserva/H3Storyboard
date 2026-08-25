@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>H3Storyboard · 剧本与提示词上游评估</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0b0d0c; --panel:#121613; --panel2:#171b18; --line:#2a332b; --text:#eef3e8; --muted:#a3afa0; --accent:#b8f34b; --cyan:#67dfd0; --warn:#f0c25b; --bad:#ff8077; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.65 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1160px,calc(100% - 40px)); margin:48px auto 80px; }
+    h1 { max-width:900px; margin:4px 0 10px; font-size:40px; line-height:1.12; letter-spacing:-.035em; }
+    h2 { margin:46px 0 14px; font-size:23px; }
+    h3 { margin:22px 0 8px; font-size:17px; }
+    p { margin:8px 0; }
+    a { color:var(--cyan); }
+    code { padding:.12em .4em; border-radius:5px; background:#1d231e; color:#dfff9e; }
+    .eyebrow { color:var(--accent); font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .lead { max-width:930px; color:#d4ddd0; font-size:19px; }
+    .verdict { display:grid; grid-template-columns:160px 1fr; gap:22px; margin:28px 0; padding:24px; border:1px solid #506c32; border-radius:18px; background:linear-gradient(135deg,#172211,#111611); }
+    .verdict strong { color:var(--accent); font-size:34px; line-height:1; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:18px; }
+    .card { padding:20px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    .card b { display:block; margin-bottom:6px; color:var(--accent); font-size:17px; }
+    .muted { color:var(--muted); }
+    table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); background:#101310; font-size:12px; letter-spacing:.07em; text-transform:uppercase; }
+    tr:last-child td { border-bottom:0; }
+    .a { color:var(--accent); font-weight:800; }
+    .b { color:var(--cyan); font-weight:800; }
+    .c { color:var(--warn); font-weight:800; }
+    .no { color:var(--bad); font-weight:800; }
+    .flow { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; align-items:center; margin:20px 0; }
+    .step { min-height:86px; display:flex; align-items:center; justify-content:center; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); text-align:center; }
+    .arrow { color:var(--muted); text-align:center; font-size:20px; }
+    .note { padding:17px 19px; border-left:3px solid var(--warn); background:#19160e; color:#e9dfc4; }
+    ul,ol { padding-left:22px; }
+    li { margin:6px 0; }
+    footer { margin-top:54px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); }
+    @media(max-width:850px) { .grid{grid-template-columns:1fr}.verdict{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)} main{width:calc(100% - 24px);margin-top:28px} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Research · 2026-08-25</div>
+  <h1>H3Storyboard 剧本与提示词上游评估</h1>
+  <p class="lead">对 6 个候选仓库做了源码、协议、许可证和自测核查，并对照 H3Storyboard Protocol 1.9。核心判断：应补一套原生的 Script Studio，但不应把小说 IDE、短剧 skill 或通用 Prompt 产品直接合并进 H3Storyboard。</p>
+
+  <section class="verdict">
+    <strong>有用</strong>
+    <div><b>优先吸收 `shuohao-skills` 的结构化剧本与确定性质量门，再吸收 `drama-skills` 的创作者体验和阶段边界。</b><br>H3Storyboard 自己拥有持久化协议、版本、审核、Scene/Beat 到 ShotPlan 的编译关系；外部仓库只作为方法和可许可实现的参考。</div>
+  </section>
+
+  <h2>一、H3Storyboard 的真实缺口</h2>
+  <div class="grid">
+    <div class="card"><b>有 ScriptVersion 表</b><code>title/content/status</code> 已存在，状态枚举也有 <code>draft/locked/superseded</code>。</div>
+    <div class="card"><b>但产品只会锁定</b>新建项目必须粘贴至少 20 字，API 在同一事务里直接创建并锁定 Script V1，没有草稿编辑、版本历史或 diff。</div>
+    <div class="card"><b>没有剧本工作流</b>没有点子/小说导入、故事开发、场景与节拍结构、角色抽取、时长/覆盖校验，也没有剧本到 ShotPlan 的编译器。</div>
+  </div>
+  <p class="note">所以“项目没有做剧本部分”这个判断是正确的。现在的 ScriptVersion 是一个生产输入封套，不是创作系统；<code>ShotPlan.scene_id</code> 仍只是字符串，也没有可追溯到具体剧本节拍的来源关系。</p>
+
+  <h2>二、候选项目结论</h2>
+  <table>
+    <thead><tr><th>项目</th><th>证据</th><th>评分</th><th>对 H3 有用的部分</th><th>不能直接引入</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><a href="https://github.com/eternityspring/shuohao-skills">shuohao-skills</a></td>
+        <td>1,992★；2026-08-22 推送；Apache-2.0；5 组共 1,170 项自测通过</td>
+        <td class="a">A</td>
+        <td>Outline → Character/Art → Script → Storyboard 的结构化 JSON；场次/动作/对白 beat；确定性时长、覆盖、角色/场景/道具对账；H3 多图时间对齐。</td>
+        <td>短剧钩子/爽点和 2–5 秒切镜不应成为通用协议；TTS、soundscape、BGM 与 H3-only audio 冲突；不能照搬它的 H3 Prompt 文本。</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/zenstory-ai/drama-skills">drama-skills</a></td>
+        <td>1,085★；2026-08-25 推送；MIT；10 个 skill 自测全部通过</td>
+        <td class="a">A-</td>
+        <td>Creator-first 五文档体验；已有材料可从任意阶段进入；剧本/资产/分镜/提示词 owner 边界；独立 review；不为补流水线伪造上游。</td>
+        <td>Markdown 不能成为 H3 的唯一业务真相；文件系统 Dashboard、SFX/音乐/生产 skill 不应成为运行时依赖。</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/lingfengQAQ/webnovel-writer">webnovel-writer</a></td>
+        <td>6,765★；2026-08-02 推送；GPL-3.0</td>
+        <td class="b">B</td>
+        <td>长篇原著导入时的事实链、章节 commit、状态投影、角色/伏笔长期记忆、失败断点恢复。</td>
+        <td>200 万字 RAG/网文 IDE 对影视剧本核心链过重；GPL 代码不进入 H3Storyboard。只借事件与投影思想。</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/freestylefly/awesome-gpt-image-2">awesome-gpt-image-2</a></td>
+        <td>16,058★；2026-08-24 推送；MIT；532 案例、结构化 style library</td>
+        <td class="b">B+</td>
+        <td>角色设定图、场景气氛图、造型表的模板分类、风格标签、负面约束和 Prompt-as-Code 组织方式。</td>
+        <td>GPT-Image2 模板不能直接作为 H3/ComfyUI 提示词；500 多案例不应全部灌入产品。</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/liangdabiao/make-prompt-seedance2">make-prompt-seedance2</a></td>
+        <td>636★；2026-08-16 推送；无许可证</td>
+        <td class="c">C</td>
+        <td>时间轴、素材引用、意图优先等提示词组织方式可做对照。</td>
+        <td>Seedance 专用、包含音频引用、参数和能力假设不等于 H3；无许可证，代码和模板均不复制。</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/linshenkx/prompt-optimizer">prompt-optimizer</a></td>
+        <td>33,319★；2026-08-13 推送；AGPL-3.0-only</td>
+        <td class="b">B-</td>
+        <td>Prompt 版本、变量、对比评测、案例绑定和可复现实验的产品概念。</td>
+        <td>通用优化器体量过大且 AGPL；不嵌入、不复制 UI/服务，只在 H3 内原生实现小型 Prompt Recipe + Eval。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>三、推荐产品边界：P2 Script Studio</h2>
+  <p>H3Storyboard 不应变成“写 200 万字小说的 IDE”，而应成为从创作材料到可生成镜头的导演工作台：</p>
+  <div class="flow">
+    <div class="step">点子 / 小说 / 现成剧本</div><div class="arrow">→</div>
+    <div class="step">版本化剧本<br>Scene + Beat</div><div class="arrow">→</div>
+    <div class="step">资产与连续性抽取</div><div class="arrow">→</div>
+    <div class="step">草稿 ShotPlan<br>人工锁定</div>
+  </div>
+
+  <h3>P2.0 · 剧本内核</h3>
+  <ul>
+    <li>让项目先创建 <code>draft</code> ScriptVersion；支持导入现成剧本、编辑、锁定、新建后继版本、diff 与 supersede。</li>
+    <li>新增结构化 <code>ScriptScene</code> 和 <code>ScriptBeat</code>：动作、对白、转场、画面文字分开；对白保存 speaker、line、delivery。</li>
+    <li>每次锁定生成不可变版本；已存在的 ShotPlan / Job / Take 不随剧本修改而变。</li>
+  </ul>
+
+  <h3>P2.1 · AI 剧本工作流</h3>
+  <ul>
+    <li>入口支持：一句话、故事大纲、小说/长文、现成剧本；材料足够时允许跳过上游阶段。</li>
+    <li>AI 负责内容，代码负责门禁：时长预算、对白长度、角色合法性、场景/道具对账、每场可见动作、跨场状态连续。</li>
+    <li>长篇材料只引入按需检索和事实摘要，不把 webnovel-writer 的整套 RAG 系统装进核心。</li>
+  </ul>
+
+  <h3>P2.2 · 剧本编译成分镜</h3>
+  <ul>
+    <li>新增来源映射：每个 ShotPlan 记录对应 Scene 与 Beat 区间，做到原文覆盖、不重不漏。</li>
+    <li>编译只创建“草稿镜头”；导演确认后锁定，再进入现有角色参考、H3 Job、Take/QC 和 M3 batch。</li>
+    <li>剧本改版产生新镜头集合和差异清单，绝不改写旧生成历史。</li>
+  </ul>
+
+  <h3>P2.3 · Prompt Recipe 与评测</h3>
+  <ul>
+    <li>把提示词作为版本化 Recipe：<code>task/provider/model/version/template/constraints</code>，而不是散落的“万能 prompt 库”。</li>
+    <li>视频 Recipe 由 H3 binding、镜头起止状态、角色/场景参考和时间点确定性编译。</li>
+    <li>角色/场景静帧可以引入 provider-neutral 风格标签；实际 prompt 由当前图像 provider adapter 编译。</li>
+    <li>评测以代表图/代表 Take 对比为中心，不再造一个通用 Prompt Optimizer 产品。</li>
+  </ul>
+
+  <h2>四、必须守住的边界</h2>
+  <ol>
+    <li><b>Plan / Take 不合并：</b>剧本、分镜计划、H3 Job、实际 Take 继续分别持久化。</li>
+    <li><b>声音不回退：</b>外部 skill 中的 TTS、配音、BGM、soundscape、SFX 和音频参考全部不迁；仍只允许 H3 原生声音或静音。</li>
+    <li><b>许可证隔离：</b>Apache/MIT 可在保留许可与 NOTICE 的前提下评估代码复用；GPL、AGPL、无许可证仓库只借思想，不复制实现或模板。</li>
+    <li><b>不把 Markdown 当数据库：</b>可以提供创作者友好的 Markdown 导入/导出，但 SQLite + protocol 仍是唯一真相。</li>
+    <li><b>不直接生成：</b>AI 剧本和自动分镜必须经过显式锁定，不能从一句话直接越过审核提交到 4090。</li>
+  </ol>
+
+  <h2>五、优先级裁决</h2>
+  <p><b>建议先做 P2.0 + P2.1，再继续 M3B。</b>原因是 M3B 扩大的是视频参考模式覆盖，而 Script Studio 补的是产品入口；没有剧本上游，H3Storyboard 仍要求用户在别处完成最核心的创作，然后手工粘贴和逐镜录入。</p>
+  <p class="note">最小可测试交付应是：创建空项目 → 写/导入 draft 剧本 → AI 或人工拆成 Scene/Beat → 质量门 → 锁定 Script V1 → 一键生成可审阅的草稿 ShotPlan。到这一步才算补上剧本能力，不需要在第一版实现长篇 RAG、TTS、音乐或全自动出片。</p>
+
+  <h2>六、本次核查范围</h2>
+  <ul>
+    <li>6 个仓库均浅克隆到 <code>~/development</code>，未安装为运行时依赖。</li>
+    <li>核验了 GitHub 官方仓库元数据、最新提交、README、关键 SKILL、schema、H3 prompt 规则和许可证。</li>
+    <li><code>shuohao-skills</code> 五组自测全部通过；<code>drama-skills</code> 十个 skill 自测全部通过。</li>
+    <li>本轮只产出研究结论，没有修改 H3Storyboard 生产代码。</li>
+  </ul>
+
+  <footer>H3Storyboard upstream assessment · 2026-08-25</footer>
+</main>
+</body>
+</html>
