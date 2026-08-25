@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  BindShotReferenceInput,
   CharacterReference,
   GenerationPreflight,
   ProjectSnapshot,
@@ -7,32 +8,23 @@ import type {
   UpdateCanvasNodeInput,
 } from '@h3storyboard/protocol';
 import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  MiniMap,
-  Panel,
-  ReactFlow,
   type ReactFlowInstance,
   type Viewport,
   useNodesState,
   type Edge,
   type NodeMouseHandler,
 } from '@xyflow/react';
-import type {
-  StoryboardGraph,
-  StoryboardViewNode,
-} from '../lib/storyboard-graph.js';
+import type { StoryboardGraph, StoryboardViewNode } from '../lib/storyboard-graph.js';
 import { selectCanvasFocusNodeId } from '../lib/storyboard-focus.js';
+import { buildShotBinding, type ShotBindingTarget } from '../lib/storyboard-binding.js';
 import { isolateStoryboardScene, listStoryboardScenes } from
   '../lib/storyboard-scene-director.js';
-import { CanvasFlowNode } from './CanvasFlowNode.js';
-import { CanvasViewportToolbar } from './CanvasViewportToolbar.js';
-import { SceneCanvasNavigator } from './SceneCanvasNavigator.js';
-import { minimapColor, projectStoryboardEdges, projectStoryboardNodes } from
+import { projectStoryboardEdges, projectStoryboardNodes } from
   './storyboard-flow-projection.js';
+import { StoryboardFlowSurface } from './StoryboardFlowSurface.js';
 import type { StoryboardFlowNode } from './storyboard-flow-types.js';
 import { useStoryboardNodeDrag } from './use-storyboard-node-drag.js';
+import { useStoryboardSelection } from './use-storyboard-selection.js';
 
 interface StoryboardFlowProps {
   graph: StoryboardGraph;
@@ -53,6 +45,9 @@ interface StoryboardFlowProps {
   onSelect: (node: StoryboardViewNode | null) => void;
   onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
     reason: string | null) => Promise<boolean>;
+  onGenerateBatch: (shots: ShotPlan[], preflights: Map<string, GenerationPreflight>,
+    reason: string | null) => Promise<boolean>;
+  onBindReference: (shotId: string, input: BindShotReferenceInput) => Promise<boolean>;
   onSetup: () => void;
   onOpenMedia: (assetId: string) => void;
   onToggleAssetDrawer: () => void;
@@ -61,13 +56,12 @@ interface StoryboardFlowProps {
   onPersist: (input: UpdateCanvasNodeInput) => Promise<void>;
 }
 
-const nodeTypes = { storyboard: CanvasFlowNode };
 const NO_PENDING_SCENE = Symbol('no-pending-scene');
-
 export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   activeSceneId, focusRevision, focusMode, browserFullscreen,
   browserFullscreenBusy, assetDrawerOpen,
   loading, error, preflights, characterReferences, onSelect, onGenerate, onSetup,
+  onGenerateBatch, onBindReference,
   onNewShot, onOpenMedia, onToggleAssetDrawer, onToggleFocusMode,
   onToggleBrowserFullscreen, onPersist }: StoryboardFlowProps) {
   const scenes = useMemo(() => listStoryboardScenes(graph), [graph]);
@@ -76,12 +70,14 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
     ? isolateStoryboardScene(graph, isolatedSceneId) : graph,
   [graph, isolatedSceneId]);
   const projectedNodes = useMemo(() => projectStoryboardNodes({
-    graph: displayedGraph, snapshot, selectedNodeId, busy,
+    graph: displayedGraph, snapshot, selectedNodeId: null, busy,
     directorMode: isolatedSceneId !== null, preflights, characterReferences,
     onGenerate, onSetup, onOpenMedia,
   }), [busy, characterReferences, displayedGraph, isolatedSceneId, onGenerate,
-    onOpenMedia, onSetup, preflights, selectedNodeId, snapshot]);
+    onOpenMedia, onSetup, preflights, snapshot]);
   const [nodes, setNodes, onNodesChange] = useNodesState(projectedNodes);
+  const selection = useStoryboardSelection({ setNodes,
+    shots: snapshot.shot_plans, onSelect });
   const [fitRevision, setFitRevision] = useState(0);
   const edges = useMemo(() => projectStoryboardEdges(displayedGraph),
     [displayedGraph]);
@@ -92,7 +88,6 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   const selectedNodeIdRef = useRef(selectedNodeId);
   const pendingSceneRestore = useRef<string | null | symbol>(NO_PENDING_SCENE);
   const sceneViewports = useRef(new Map<string | null, Viewport>());
-  const programmaticCameraBusy = useRef(false);
   const cameraMovementRevision = useRef(0);
   const handledFocusRevision = useRef(focusRevision);
   activeSceneIdRef.current = activeSceneId;
@@ -125,13 +120,11 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
       return;
     }
     const viewport = flowInstance.current?.getViewport();
-    if (viewport && !programmaticCameraBusy.current) {
-      sceneViewports.current.set(sceneKey, viewport);
-    }
+    if (viewport) sceneViewports.current.set(sceneKey, viewport);
     pendingSceneRestore.current = nextSceneId;
     fittedTarget.current = '';
     setIsolatedSceneId(nextSceneId);
-    onSelect(null);
+    selection.clearSelection();
   };
 
   useEffect(() => {
@@ -166,12 +159,11 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   useEffect(() => {
     if (handledFocusRevision.current === focusRevision) return;
     handledFocusRevision.current = focusRevision;
+    selection.clearShotSelection();
     if (!isolatedSceneId || !activeSceneId ||
       isolatedSceneId === activeSceneId) return;
     const viewport = flowInstance.current?.getViewport();
-    if (viewport && !programmaticCameraBusy.current) {
-      sceneViewports.current.set(sceneKey, viewport);
-    }
+    if (viewport) sceneViewports.current.set(sceneKey, viewport);
     pendingSceneRestore.current = activeSceneId;
     fittedTarget.current = '';
     setIsolatedSceneId(activeSceneId);
@@ -181,67 +173,71 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
     onSelect(node.data.view);
   };
 
+  const resolveBinding = (connection: { source: string | null;
+    sourceHandle?: string | null; target: string | null;
+    targetHandle?: string | null }) => {
+    const sourceNode = nodes.find(({ id }) => id === connection.source);
+    const targetNode = nodes.find(({ id }) => id === connection.target);
+    const source = sourceNode?.data.bindingSources.find(
+      ({ handle_id }) => handle_id === connection.sourceHandle);
+    const purpose = connection.targetHandle?.startsWith('target:')
+      ? connection.targetHandle.slice(7) as ShotBindingTarget : null;
+    return source && purpose && targetNode?.data.view.shot
+      ? { shot: targetNode.data.view.shot,
+        input: buildShotBinding(source, purpose, targetNode.data.view.shot.id) }
+      : null;
+  };
+
   function trackCameraMovement(key: string | null,
     movement: Promise<boolean>): void {
     cameraMovementRevision.current += 1;
     const revision = cameraMovementRevision.current;
-    programmaticCameraBusy.current = true;
     void movement.finally(() => {
       if (cameraMovementRevision.current !== revision ||
         sceneKeyRef.current !== key) return;
-      programmaticCameraBusy.current = false;
       const viewport = flowInstance.current?.getViewport();
       if (viewport) sceneViewports.current.set(key, viewport);
     });
   }
 
-  return <div className="storyboard-flow" data-empty={graph.nodes.length <= 1}
-    data-scene-isolated={isolatedSceneId ?? 'all'}>
-    <ReactFlow<StoryboardFlowNode, Edge> nodes={nodes} edges={edges}
-      onInit={(instance) => { flowInstance.current = instance; }}
-      nodeTypes={nodeTypes} onNodesChange={onNodesChange}
-      onMoveEnd={(_event, viewport) => {
+  return <StoryboardFlowSurface graph={graph} snapshot={snapshot} scenes={scenes}
+    isolatedSceneId={isolatedSceneId} activeSceneId={activeSceneId}
+    focusMode={focusMode} browserFullscreen={browserFullscreen}
+    browserFullscreenBusy={browserFullscreenBusy} assetDrawerOpen={assetDrawerOpen}
+    loading={loading} error={error} busy={busy} selectedShots={selection.selectedShots}
+    preflights={preflights} onNewShot={onNewShot} onSelectScene={selectScene}
+    onClearSelection={selection.clearSelection}
+    onGenerateBatch={onGenerateBatch} onSetup={onSetup}
+    onToggleAssetDrawer={onToggleAssetDrawer}
+    onToggleFocusMode={onToggleFocusMode}
+    onToggleBrowserFullscreen={onToggleBrowserFullscreen}
+    flowProps={{ nodes, edges,
+      onInit: (instance) => { flowInstance.current = instance; },
+      onNodesChange,
+      onMoveEnd: (_event, viewport) => {
         sceneViewports.current.set(sceneKeyRef.current, viewport);
-      }}
-      onNodeClick={onNodeClick} onPaneClick={() => onSelect(null)}
-      onNodeDragStart={drag.onNodeDragStart}
-      onNodeDragStop={drag.onNodeDragStop}
-      fitView fitViewOptions={{ padding: 0.12, minZoom: 0.18, maxZoom: 0.9 }}
-      minZoom={0.18} maxZoom={2.4} onlyRenderVisibleElements
-      nodesConnectable={false} edgesReconnectable={false}
-      deleteKeyCode={null} selectionKeyCode={null}
-      zoomOnDoubleClick={false} panOnScroll panOnDrag={[0, 1]}
-      colorMode="dark" defaultEdgeOptions={{ selectable: false }}>
-      <Background variant={BackgroundVariant.Dots} gap={24} size={1.1}
-        color="rgba(238,234,222,.16)" />
-      <Controls position="bottom-left" showInteractive={false} />
-      <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2}
-        nodeColor={(node) => minimapColor(
-          (node as StoryboardFlowNode).data.view.kind)} />
-      <Panel position="top-left" className="flow-toolbar canvas-context-bar">
-        <SceneCanvasNavigator scenes={scenes} activeSceneId={isolatedSceneId}
-          onSelectScene={selectScene} />
-      </Panel>
-      <Panel position="top-right">
-        <CanvasViewportToolbar sceneLabel={isolatedSceneId ??
-          activeSceneId ?? 'ALL SCENES'} sceneIsolated={isolatedSceneId !== null}
-          focusMode={focusMode} browserFullscreen={browserFullscreen}
-          browserFullscreenBusy={browserFullscreenBusy}
-          assetDrawerOpen={assetDrawerOpen}
-          onToggleAssetDrawer={onToggleAssetDrawer}
-          onFocusScene={() => selectScene(isolatedSceneId ?? activeSceneId ??
-            scenes[0]?.scene_id ?? null)}
-          onFitOverview={() => selectScene(null)}
-          onToggleFocusMode={onToggleFocusMode}
-          onToggleBrowserFullscreen={onToggleBrowserFullscreen} />
-      </Panel>
-    </ReactFlow>
-    {loading ? <div className="canvas-status">正在加载持久化布局…</div> : null}
-    {error ? <div className="canvas-status" role="alert">{error}</div> : null}
-    {snapshot.shot_plans.length === 0 ? <div className="canvas-empty">
-      <span>EMPTY STORYBOARD</span><h2>从第一镜开始搭建叙事流程</h2>
-      <p>素材、角色、生成任务和 Take 会围绕计划镜头自动形成可追溯关系。</p>
-      <button className="button button-primary" disabled={busy}
-        onClick={onNewShot} type="button">＋ 新增计划镜头</button></div> : null}
-  </div>;
+      },
+      onNodeClick,
+      onPaneClick: selection.clearSelection,
+      onSelectionChange: ({ nodes: selected }) =>
+        selection.updateSelectedShots(selected),
+      onConnect: (connection) => {
+        if (busy) return;
+        const binding = resolveBinding(connection);
+        if (binding?.input) void onBindReference(binding.shot.id, binding.input);
+      },
+      isValidConnection: (connection) => !busy &&
+        Boolean(resolveBinding(connection)?.input),
+      onNodeDragStart: drag.onNodeDragStart,
+      onNodeDragStop: drag.onNodeDragStop,
+      fitView: true,
+      fitViewOptions: { padding: 0.12, minZoom: 0.18, maxZoom: 0.9 },
+      minZoom: 0.18, maxZoom: 2.4, onlyRenderVisibleElements: true,
+      nodesConnectable: isolatedSceneId !== null && !busy,
+      edgesReconnectable: false,
+      deleteKeyCode: null, selectionKeyCode: 'Shift',
+      multiSelectionKeyCode: ['Meta', 'Control'],
+      zoomOnDoubleClick: false, panOnScroll: true, panOnDrag: [0, 1],
+      colorMode: 'dark', defaultEdgeOptions: { selectable: false },
+    }} />;
 }

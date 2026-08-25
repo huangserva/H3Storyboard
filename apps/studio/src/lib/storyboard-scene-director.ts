@@ -58,6 +58,9 @@ export function isolateStoryboardScene(
   const shotIds = new Set(sceneShots.map(({ entity_id }) => entity_id));
   const included = new Set<string>([`scene:${sceneId}`,
     ...sceneShots.map(({ id }) => id),
+    ...graph.nodes.filter(({ kind, asset_role, take }) =>
+      kind === 'character' || (kind === 'asset' && asset_role === 'reference') ||
+      (kind === 'take' && take?.qc_verdict === 'approved')).map(({ id }) => id),
     ...graph.nodes.filter(({ shot_id }) => shot_id !== null &&
       shotIds.has(shot_id)).map(({ id }) => id),
   ]);

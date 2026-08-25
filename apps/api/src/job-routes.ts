@@ -1,4 +1,5 @@
-import { CreateH3JobInputSchema, GenerationPreflightBatchSchema,
+import { CreateH3JobBatchInputSchema, CreateH3JobBatchResultSchema,
+  CreateH3JobInputSchema, GenerationPreflightBatchSchema,
   type GenerationPreflight,
   type GenerationPreflightBatch, type ProjectSnapshot } from '@h3storyboard/protocol';
 import { StoreError, type BindingCompilationOutcome,
@@ -12,6 +13,7 @@ interface JobRouteResult { status: number; body: unknown }
 const JOBS = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs$/;
 const PREFLIGHT = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs\/preflight$/;
 const BATCH_PREFLIGHT = /^\/api\/projects\/([^/]+)\/jobs\/preflights$/;
+const BATCH_JOBS = /^\/api\/projects\/([^/]+)\/jobs\/batch$/;
 
 export async function dispatchJobRoute(request: IncomingMessage,
   store: ProjectStore, method: string,
@@ -30,6 +32,21 @@ export async function dispatchJobRoute(request: IncomingMessage,
           compilations.get(id)) })) };
     return { status: 200,
       body: parseResponseContract(GenerationPreflightBatchSchema, body) };
+  }
+  const batchJobs = BATCH_JOBS.exec(pathname);
+  if (batchJobs && method === 'POST') {
+    const projectId = decode(batchJobs[1] ?? '', 'project_id');
+    const parsed = CreateH3JobBatchInputSchema.safeParse(await readJson(request));
+    if (!parsed.success) throw new ApiError(422, 'H3_BATCH_INVALID',
+      'H3 job batch does not satisfy the provider contract',
+      parsed.error.issues);
+    const unavailable = parsed.data.items.find(({ job }) =>
+      job.provider === 'local_comfyui' && !isWorkerMode(job.mode));
+    if (unavailable) throw new ApiError(409, 'H3_MODE_UNAVAILABLE',
+      `本机常驻 worker 尚不支持 ${unavailable.job.mode}，请调整 Production Mode`);
+    return { status: 201, body: parseResponseContract(
+      CreateH3JobBatchResultSchema,
+      store.createH3JobBatch(projectId, parsed.data)) };
   }
   const preflight = PREFLIGHT.exec(pathname);
   if (preflight && method === 'GET') {

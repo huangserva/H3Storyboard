@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Asset, GenerationPreflight, ProjectSnapshot, ShotPlan,
+import type { Asset, BindShotReferenceInput, GenerationPreflight,
+  ProjectSnapshot, ShotPlan,
   UpdateCanvasNodeInput } from '@h3storyboard/protocol';
 import { buildStoryboardGraph } from '../lib/storyboard-graph.js';
 import { allowsH3NativeAudio } from '../lib/h3-audio-policy.js';
@@ -26,6 +27,11 @@ interface InfiniteCanvasProps {
   preflights: Map<string, GenerationPreflight>;
   onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
     reason: string | null) => Promise<boolean>;
+  onGenerateBatch: (shots: ShotPlan[],
+    preflights: Map<string, GenerationPreflight>,
+    reason: string | null) => Promise<boolean>;
+  onBindReference: (shotId: string,
+    input: BindShotReferenceInput) => Promise<boolean>;
   onSetup: () => void;
   onReviewActual: (actualId: string,
     verdict: 'approved' | 'rejected') => Promise<boolean>;
@@ -38,7 +44,8 @@ interface InfiniteCanvasProps {
 export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
   canvasFocusMode, onCanvasFocusModeChange, shotFocusRevision, onSelectShot,
   preflights, onGenerate, onSetup, onReviewActual, onMarkRepresentative,
-  onReviewRepresentative }: InfiniteCanvasProps) {
+  onReviewRepresentative, onGenerateBatch,
+  onBindReference }: InfiniteCanvasProps) {
   const canvasRoot = useRef<HTMLDivElement>(null);
   const fullscreen = useBrowserFullscreen();
   const { nodes: canvasNodes, loading, error, persistNode, placeCharacter } =
@@ -163,6 +170,7 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
       assetDrawerOpen={assetDrawerOpen}
       preflights={preflights} characterReferences={characterReferences}
       onNewShot={onNewShot} onGenerate={onGenerate} onSetup={onSetup}
+      onGenerateBatch={onGenerateBatch} onBindReference={onBindReference}
       onToggleAssetDrawer={() => { setAssetDrawerOpen(!assetDrawerOpen);
         if (assetDrawerOpen) focusCanvas('打开资产抽屉'); }}
       onToggleFocusMode={toggleFocusMode}

@@ -6,13 +6,17 @@ import type { StoryboardFlowNode } from './storyboard-flow-types.js';
 
 export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>) {
   const { view } = data;
-  const handles = <><Handle type="target" position={Position.Left} />
-    <Handle type="source" position={Position.Right} /></>;
+  const handles = <><Handle id="lineage:target" isConnectable={false}
+    type="target" position={Position.Left} />
+    <Handle id="lineage:source" isConnectable={false}
+      type="source" position={Position.Right} /></>;
 
   if (view.kind === 'shot' && view.shot) {
     const actuals = view.shot_actuals ?? [];
     const job = view.shot_jobs?.at(-1) ?? null;
-    return <>{handles}<CanvasShotCard shot={view.shot} actuals={actuals}
+    return <>{handles}{data.directorMode
+      ? <ShotBindingTargets disabled={data.busy} /> : null}
+      <CanvasShotCard shot={view.shot} actuals={actuals}
       previewAsset={view.preview_asset ?? null} selected={selected}
       directorMode={data.directorMode} mediaSlots={data.mediaSlots}
       compileReady={data.preflight?.ready ?? false} busy={data.busy}
@@ -24,7 +28,9 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
   }
 
   if (view.kind === 'character' && view.character) {
-    return <>{handles}<CanvasCharacterCard character={view.character}
+    return <>{handles}<BindingSourceHandles disabled={data.busy}
+      sources={data.bindingSources} />
+      <CanvasCharacterCard character={view.character}
       reference={data.characterReference} selected={selected}
       onOpenMedia={data.onOpenMedia} /></>;
   }
@@ -43,7 +49,9 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
 
   const preview = view.preview_asset?.kind === 'image' ||
     view.preview_asset?.kind === 'video' ? view.preview_asset : null;
-  return <>{handles}<article className="flow-entity-node" data-kind={view.kind}
+  return <>{handles}<BindingSourceHandles disabled={data.busy}
+    sources={data.bindingSources} />
+    <article className="flow-entity-node" data-kind={view.kind}
     data-status={view.status} data-selected={selected}>
     <header><span>{view.kicker}</span><i>{view.status}</i></header>
     {preview ? <div className="flow-entity-preview"><button
@@ -65,4 +73,30 @@ export function CanvasFlowNode({ data, selected }: NodeProps<StoryboardFlowNode>
       <span>{view.take.is_representative ? 'REPRESENTATIVE' : 'CANDIDATE'}</span>
     </footer> : null}
   </article></>;
+}
+
+function BindingSourceHandles({ sources, disabled }: {
+  sources: StoryboardFlowNode['data']['bindingSources'];
+  disabled: boolean;
+}) {
+  return <>{sources.map((source, index) => <div className="binding-source"
+    key={source.handle_id} style={{ top: 74 + index * 34 }}>
+    <span>{source.label}</span><Handle id={source.handle_id}
+      aria-label={`拖拽${source.label}`} className="binding-handle binding-handle-source"
+      isConnectable={!disabled} type="source" position={Position.Right} />
+  </div>)}</>;
+}
+
+function ShotBindingTargets({ disabled }: { disabled: boolean }) {
+  const targets = [
+    ['first_frame', '首帧'],
+    ['last_frame', '尾帧'],
+    ['reference_character', '角色'],
+  ] as const;
+  return <>{targets.map(([purpose, label], index) =>
+    <div className="binding-target" key={purpose} style={{ top: 94 + index * 62 }}>
+      <Handle id={`target:${purpose}`} aria-label={`绑定到${label}`}
+        className="binding-handle binding-handle-target" type="target"
+        isConnectable={!disabled} position={Position.Left} /><span>{label}</span>
+    </div>)}</>;
 }

@@ -55,7 +55,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.7 module ownership
+## Protocol 1.8 module ownership
 
 ```text
 packages/protocol
@@ -74,7 +74,7 @@ packages/task-engine
 apps/api
   small domain route dispatchers + independently switchable H3/image workers
 apps/studio
-  director UI consuming only Protocol 1.7 API shapes
+  director UI consuming only Protocol 1.8 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.

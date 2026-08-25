@@ -1,5 +1,7 @@
-import { GenerationPreflightBatchSchema } from '@h3storyboard/protocol';
+import { CreateH3JobBatchResultSchema, GenerationPreflightBatchSchema } from
+  '@h3storyboard/protocol';
 import type {
+  BindShotReferenceInput,
   CreateProjectInput,
   CreateShotPlanInput,
   CreateModeInput,
@@ -18,6 +20,9 @@ import type {
   GenerationPreflight,
   GenerationPreflightBatch,
   CreateH3JobInput,
+  CreateH3JobBatchInput,
+  CreateH3JobBatchResult,
+  ShotPlan,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -154,6 +159,23 @@ export async function createH3Job(projectId: string, shotId: string,
   return request<H3Job>(`/api/projects/${projectId}/shots/${shotId}/jobs`, {
     method: 'POST', body: JSON.stringify(input),
   });
+}
+
+export async function createH3JobBatch(projectId: string,
+  input: CreateH3JobBatchInput): Promise<CreateH3JobBatchResult> {
+  const result = await request<unknown>(
+    `/api/projects/${encodeURIComponent(projectId)}/jobs/batch`, {
+      method: 'POST', body: JSON.stringify(input),
+    });
+  return CreateH3JobBatchResultSchema.parse(result);
+}
+
+export async function bindShotReference(projectId: string, shotId: string,
+  input: BindShotReferenceInput): Promise<ShotPlan> {
+  return request<ShotPlan>(`/api/projects/${encodeURIComponent(projectId)}` +
+    `/shots/${encodeURIComponent(shotId)}/bindings`, {
+      method: 'POST', body: JSON.stringify(input),
+    });
 }
 
 export function assetFileUrl(assetId: string): string {

@@ -26,7 +26,7 @@ export function useStoryboardNodeDrag({ projectedNodes, setNodes, onPersist,
       return sessions.current.has(node.id) && dragged
         ? { ...node, position: dragged.position,
           dragging: dragged.dragging ?? false }
-        : node;
+        : dragged ? { ...node, selected: dragged.selected ?? false } : node;
     });
   }), [projectedNodes, setNodes]);
 

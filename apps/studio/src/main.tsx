@@ -20,6 +20,7 @@ import './styles/production.css';
 import './styles/production-board.css';
 import './styles/canvas-focus.css';
 import './styles/scene-director.css';
+import './styles/canvas-binding.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');

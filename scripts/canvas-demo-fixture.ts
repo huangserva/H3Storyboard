@@ -164,6 +164,16 @@ function createFixture(store: ProjectStore, dataDirectory: string,
   store.takes.markRepresentative(first.actual.id, { representative: true });
   store.takes.reviewRepresentative(first.actual.id,
     { representative_status: 'approved' });
+  store.production.updateLock(project.id, { engaged: false });
+  const tail = store.createAsset(project.id, { kind: 'image',
+    name: '雨巷重逢 · 已批准 Take 尾帧',
+    relative_path: media.take_one_tail.relative_path,
+    content_hash: media.take_one_tail.content_hash,
+    derived_from_asset_id: first.actual.output_asset_id,
+    derivation_kind: 'last_frame' });
+  store.updateAsset(project.id, { asset_id: tail.id, status: 'approved' });
+  store.production.updateLock(project.id,
+    { engaged: true, reason: 'Canvas demo fixture is immutable during testing' });
   const second = completeTake(store, shots[0]!.id, media.take_two,
     'canvas-demo-take-02', null);
 

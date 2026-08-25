@@ -1,6 +1,6 @@
-# Protocol 1.7
+# Protocol 1.8
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.7 keeps the Protocol 1.6 character catalog and H3-only final-audio policy, and adds durable character-image generation jobs plus a shared GPU-host lease.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.8 keeps the Protocol 1.7 character-image jobs, GPU-host lease, and H3-only final-audio policy, and adds atomic multi-shot H3 job creation plus semantic Plan reference binding.
 
 ## Project lineage
 
@@ -231,6 +231,23 @@ shot ordinal order. Each item contains `shot_plan_id` and the existing
 shot's stable `blocking_error`; an unexpected server failure still fails the
 whole request. The single-shot preflight route remains compatible.
 
+`POST /api/projects/:project_id/jobs/batch` accepts 1–100 unique
+`shot_plan_id` items, each with the existing immutable `CreateH3JobInput`.
+Every shot must belong to the path project and pass the same locked brief,
+manifest, binding, representative, provider, and H3-native-audio validation as
+single-job creation. Validation and inserts run in one immediate SQLite
+transaction: any invalid item or database failure rolls back the whole batch.
+Exact idempotency-key retries return the existing jobs in request order;
+different keys cannot create a second active job for the same shot.
+
+`POST /api/projects/:project_id/shots/:shot_plan_id/bindings` mutates only an
+unlocked Plan. A semantic binding accepts a non-archived project image or a
+non-archived project character. A continuity binding additionally requires an
+approved Take from a different source shot and an image boundary truly derived
+from that Take's output asset. The transaction updates semantic references,
+asset bindings, continuity dependencies, and the derived continuity mode
+together; it never mutates a Take or adds an external audio input.
+
 ## Local HTTP API
 
 Success envelope:
@@ -273,9 +290,11 @@ Error envelope:
 | `GET/PUT` | `/api/projects/:project_id/generation_lock` | read or engage/release lock |
 | `PATCH` | `/api/shots/:shot_plan_id` | update semantic references and shot states |
 | `POST` | `/api/shots/:shot_plan_id/compile_bindings` | dry-run deterministic compilation |
-| `POST` | `/api/shots/:shot_plan_id/jobs` | idempotently create a validated draft job |
+| `POST` | `/api/projects/:project_id/shots/:shot_plan_id/jobs` | idempotently create a validated draft job |
 | `GET` | `/api/projects/:project_id/shots/:shot_plan_id/jobs/preflight` | read one shot generation preflight |
 | `GET` | `/api/projects/:project_id/jobs/preflights` | read all project shot preflights in one ordered response |
+| `POST` | `/api/projects/:project_id/jobs/batch` | atomically and idempotently create 1–100 validated H3-native jobs |
+| `POST` | `/api/projects/:project_id/shots/:shot_plan_id/bindings` | bind a semantic image/character or approved Take boundary to an unlocked Plan |
 | `POST` | `/api/shots/:shot_plan_id/actuals` | append a pending generated take |
 | `POST` | `/api/actuals/:actual_id/review` | approve or reject a pending take once |
 | `POST` | `/api/actuals/:actual_id/representative` | select or withdraw representative |

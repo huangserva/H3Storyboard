@@ -20,6 +20,7 @@ export interface CanvasDemoMediaSource {
   woman_image: SourceMedia;
   man_image: SourceMedia;
   take_one: SourceMedia;
+  take_one_tail: SourceMedia;
   take_two: SourceMedia;
 }
 
@@ -41,6 +42,8 @@ export async function loadCanvasDemoMedia(
       '顾承远身份参考图。'),
     take_one: await load('rain-night-take-01.mp4', 'take-01-silent.mp4',
       '两人在旅店门廊停步，人物身份、绿色旗袍与炭灰西装连续。'),
+    take_one_tail: await load('rain-night-take-01-tail.png',
+      'take-01-tail.png', '已批准 Take 01 的真实尾帧，用于连续性拖拽测试。'),
     take_two: await load('rain-night-take-02.mp4', 'take-02-silent.mp4',
       '替代 Take；人物服装保持一致，女主向前一步，等待导演 QC。'),
   };
@@ -75,6 +78,7 @@ export function installCanvasDemoMedia(projectId: string,
     woman_image: install(source.woman_image),
     man_image: install(source.man_image),
     take_one: install(source.take_one),
+    take_one_tail: install(source.take_one_tail),
     take_two: install(source.take_two),
   };
 }

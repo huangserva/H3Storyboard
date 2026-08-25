@@ -54,14 +54,22 @@ capability inventory. A post-fix real i2v run completed end to end on 2026-08-12
 - [x] P1.5A scene director projection with scene isolation/navigation, per-scene
   viewport restoration, reference → Plan → H3 Actual/QC lanes, and separate
   first-frame / last-frame / latest-Take media slots on every Plan card.
+- [x] P1.5B scene-canvas multi-select, semantic reference/character binding,
+  approved-Take boundary continuity binding, and atomic idempotent H3 batch job
+  creation; UI, API, and SQLite are covered by real Chrome integration.
 
 P1.3B passed the final architecture, bug, test, and protocol reviews at
 B+ / B- / B- / B. The final gate passed 225 Vitest assertions plus 14 browser
 tests; the single skipped test is the explicit opt-in live ComfyUI probe.
+
+P1.5B passed the final architecture, bug, test, and protocol reviews at
+B- / A / B / A. The final gate passed 252 Vitest assertions plus 24 browser
+tests; the single skipped test remains the explicit opt-in live ComfyUI probe.
 
 ## M3 — multimodal H3
 
 - [ ] `v2v` and `rv2v`.
 - [ ] Video and audio reference slots.
 - [ ] Prompt-to-upload binding audit.
-- [ ] Batch queue and per-shot retry.
+- [ ] Worker-side batch scheduling, progress policy, and per-shot retry (P1.5B
+  creates the selected immutable jobs atomically; execution remains per job).

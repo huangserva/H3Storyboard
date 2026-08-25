@@ -101,6 +101,22 @@ function canvas(id: string, nodeType: 'shot_plan' | 'character', refId: string,
 }
 
 describe('storyboard graph', () => {
+  it('exposes approved unbound images as director binding sources', () => {
+    const input = fixture();
+    const candidate = { ...input.snapshot.assets[0]!, id: crypto.randomUUID(),
+      name: 'unbound-reference.png', uri: 'refs/unbound-reference.png',
+      relative_path: 'refs/unbound-reference.png' };
+    const audio = { ...candidate, id: crypto.randomUUID(), kind: 'audio' as const,
+      name: 'forbidden.wav', uri: 'refs/forbidden.wav',
+      relative_path: 'refs/forbidden.wav' };
+    input.snapshot.assets.push(candidate, audio);
+
+    const graph = buildStoryboardGraph(input);
+    expect(graph.nodes.find(({ id }) => id === `asset:${candidate.id}`))
+      .toEqual(expect.objectContaining({ asset_role: 'reference' }));
+    expect(graph.nodes.some(({ id }) => id === `asset:${audio.id}`)).toBe(false);
+  });
+
   it('derives media, generation, take, identity, and continuity lineage', () => {
     const graph = buildStoryboardGraph(fixture());
 

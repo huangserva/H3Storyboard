@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard P1.5B · 批量生成与语义绑定交付</title>
+<style>
+:root{color-scheme:dark;--bg:#080b0a;--panel:#111714;--panel2:#17211c;--ink:#f0eee7;--muted:#9da69f;--line:#304039;--acid:#c9f36b;--teal:#53d5bd;--amber:#e9b968}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 84% 0,#173f36 0,transparent 34rem),var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1120px,calc(100% - 30px));margin:46px auto 90px}.eyebrow{color:var(--acid);font:700 12px ui-monospace,monospace;letter-spacing:.15em}h1{margin:10px 0 18px;font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.045em}h2{margin:44px 0 14px;font-size:27px}.lede{color:#d2d8d3;font-size:19px}.callout,.card{border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,var(--panel2),var(--panel));padding:20px}.callout{border-color:#507051;font-size:18px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.metric{color:var(--acid);font:800 25px ui-monospace,monospace}.card p{color:var(--muted);margin:7px 0}.tag{display:inline-block;border-radius:999px;background:#28381f;color:var(--acid);font:700 10px ui-monospace,monospace;padding:4px 9px}table{width:100%;border-collapse:collapse;border:1px solid var(--line);background:#0e1311}th,td{border:1px solid var(--line);padding:12px 13px;text-align:left;vertical-align:top}th{background:#17211d;color:var(--acid);font-size:12px}code{color:#b4eee4;overflow-wrap:anywhere}.ok{color:var(--acid)}.warn{color:var(--amber)}ul{padding-left:22px}.review{border-style:dashed;border-color:#6b6545}.footer{margin-top:45px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px}@media(max-width:860px){.grid{grid-template-columns:1fr}table{display:block;overflow:auto}}
+</style></head><body><main>
+<div class="eyebrow">DELIVERY REPORT · 2026-08-25 · P1.5B</div>
+<h1>画布从“看血缘”，<br>进入“直接编排生产”。</h1>
+<p class="lede">P1.5B 在 P1.5A 场景导演画布上补齐了多选批量入队和语义拖拽绑定。导演可以直接选择多个 Plan 原子创建 H3 Job，也可以把参考图、角色或 approved Take 的真实首尾帧拖到镜头槽位。所有写入都经过共享协议、HTTP、SQLite 事务和锁门禁。</p>
+<div class="callout"><strong>交付结论：</strong>P1.5B 范围全部完成。稳定幂等、丢响应重试、跨项目隔离、同边界双槽、归档资源拒绝、Plan/Take 分离和 H3-only 音频均已穿透验证；专用 demo 含一个从静音 H3 Take 真实提取的尾帧。</div>
+
+<h2>Before / After</h2>
+<table><thead><tr><th>P1.5A</th><th>P1.5B</th></tr></thead><tbody>
+<tr><td>Plan 只能逐镜点击生成。</td><td>Meta/Ctrl 多选后显示底部批量栏，统一展示可生成、阻塞、活跃状态，一次原子创建 1–100 个 H3 Job。</td></tr>
+<tr><td>参考、角色、Take 血缘只能查看。</td><td>图像、角色和 approved Take 边界带语义 source handle，可拖到 Plan 的首帧、尾帧或角色槽。</td></tr>
+<tr><td>客户端失败后无法判断任务是否已创建。</td><td>同一选择保留精确 idempotency key；即使服务端已提交而响应丢失，重试仍返回原 Job，不重复生成。</td></tr>
+<tr><td>示例只能查看既有媒体。</td><td>demo 额外提供 Take 01 的真实尾帧，可实测 Take → 下一镜首帧的 chained continuity。</td></tr>
+</tbody></table>
+
+<h2>三条生产能力</h2><div class="grid">
+<div class="card"><span class="tag">BATCH</span><div class="metric">1–100 镜</div><p>项目、锁、Brief、Manifest、Mode、绑定和代表 Take 全部校验后，在一个 immediate SQLite transaction 内写入。</p></div>
+<div class="card"><span class="tag">SEMANTIC DRAG</span><div class="metric">3 类来源</div><p>非归档图像、非归档角色、approved Take 的真实派生边界；目标和来源都按稳定 handle 解析。</p></div>
+<div class="card"><span class="tag">RECOVERY</span><div class="metric">Exactly-once</div><p>响应丢失沿用原 idempotency key；不同 key 的同镜活跃 Job 被服务端拒绝，事务不会留下半批数据。</p></div>
+</div>
+
+<h2>原始任务逐条 verdict</h2>
+<table><thead><tr><th>要求</th><th>Verdict</th><th>证据</th></tr></thead><tbody>
+<tr><td>画布多选与批量操作栏</td><td class="ok">完成</td><td>Plan 多选、清除选择、ready/blocked/active 计数和 disabled 状态均接入真实 preflight/job snapshot。</td></tr>
+<tr><td>原子批量创建 H3 Job</td><td class="ok">完成</td><td><code>POST /api/projects/:project_id/jobs/batch</code>；1–100 唯一 shot，所有权先验校验，单事务写入，中途真实 SQLite trigger 失败会全量回滚。</td></tr>
+<tr><td>幂等与丢响应恢复</td><td class="ok">完成</td><td>浏览器拦截首次成功响应后重试，服务端只保留两个原 Job；不同 key 的重复活跃任务返回 <code>H3_JOB_ACTIVE</code>。</td></tr>
+<tr><td>参考图与角色拖拽</td><td class="ok">完成</td><td>只允许项目内、类型正确、非归档来源；绑定只修改未锁定 Plan，成功后刷新完整 project snapshot。</td></tr>
+<tr><td>approved Take 边界连续性</td><td class="ok">完成</td><td>校验 Take/Shot/Project、QC approved、派生源、首尾帧类型、自引用；支持同一真实边界同时占首尾槽而不丢血缘。</td></tr>
+<tr><td>Plan / Take 与声音边界</td><td class="ok">完成</td><td>拖拽从不修改 Take；Studio 批量输入固定 <code>audio_mode=h3_native</code>，协议拒绝外部音频，没有 TTS、配音、BGM、雨声或音效注入。</td></tr>
+<tr><td>共享协议与能力协商</td><td class="ok">完成</td><td>新增 batch/binding JSON schema，协议和 health 同步升至 1.8，端点语义写入 <code>docs/protocol.md</code>。</td></tr>
+</tbody></table>
+
+<h2>审查中修掉的真问题</h2><ul>
+<li>把 271 行的 <code>use-studio</code> 拆为生成 action、notice 和稳定批次 attempt cache；主 hook 回到 175 行。</li>
+<li>批量锁门禁在 store transaction 内强制，不依赖客户端 preflight；解锁直调 HTTP 会返回 <code>LOCK_REQUIRED</code>。</li>
+<li>服务端已提交但浏览器丢响应时，不再生成新 key；只有 project snapshot 刷新成功后才清除 attempt。</li>
+<li>不同客户端用不同 key 并发提交同一镜时，active-job guard 阻止重复活跃 Job。</li>
+<li>continuity mode 改为从完整 dependency + role 集合派生，不受拖拽顺序影响；同一 asset 多 role 不再覆盖或误删依赖。</li>
+<li>归档角色、归档图像、归档边界不再暴露或被 API 接受；跨项目、pending Take、伪边界和自引用均拒绝。</li>
+<li>场景 rail 聚焦会清除旧批量选择；绑定期间禁用连线，成功快照带 project guard，避免切项目后的陈旧覆盖。</li>
+<li>百镜场景切换总是保存用户当前可见 viewport，关闭初始 fit 动画与用户 zoom 的恢复竞态。</li>
+<li>所有 shot production 路由参数统一安全解码；畸形 URI 稳定返回 400，不再成为 500。</li>
+</ul>
+
+<h2>测试证据</h2>
+<table><thead><tr><th>层</th><th>最终结果</th><th>覆盖</th></tr></thead><tbody>
+<tr><td>TypeScript / Build</td><td class="ok">通过</td><td><code>pnpm check</code>、<code>pnpm build</code>；369 modules，生产 Vite bundle 成功。</td></tr>
+<tr><td>Vitest</td><td class="ok">41 files · 252 passed · 1 skipped</td><td>协议、幂等 attempt、绑定映射、锁门禁、原子回滚、active guard、pending/伪/自引用边界、同 asset 双槽、归档资源、协议 1.8、demo 尾帧及所有既有回归。唯一 skip 为明确 opt-in 的 live ComfyUI probe。</td></tr>
+<tr><td>Playwright</td><td class="ok">24 passed</td><td>真 HTTP + SQLite + Chrome：多选、原子 batch、丢响应同 key 重试、active 禁用、图像拖拽、approved Take 尾帧拖拽，以及既有 fullscreen、媒体/QC、Production Board、100 镜相机恢复。</td></tr>
+</tbody></table>
+
+<h2>改动、删除与边界</h2><ul>
+<li>新增 batch/binding 协议、API、store transaction、画布选择/连接控制器、批量栏、样式和真实 demo 尾帧；拆分既有 job/store 与 Studio controller。</li>
+<li>扩展既有 graph、scene director、demo、health 和百镜回归；新增 unit、真 HTTP+SQLite integration 和真 Chrome E2E。没有删除测试，没有测试专用生产 fallback，没有 mock 链冒充集成测试。</li>
+<li>没有新增 TTS、配音、音乐、环境声、雨声或音效；demo 两段视频仍经 seeder 强制验证为无音轨，新增 PNG 尾帧不含声音。</li>
+<li>不属于 P1.5B、尚未实现：M3 的 worker-side batch scheduling、跨任务进度策略和逐镜 retry；当前原子创建后仍由既有 worker 按单 Job 生命周期执行。</li>
+<li>非阻塞维护边界：<code>StoryboardFlow.tsx</code> 243 行但仍有 28 个 props，<code>ProjectStore</code> facade 299 行；P1.6 再扩展前必须继续拆分。</li>
+</ul>
+
+<h2>Self-Review</h2><div class="card review"><span class="tag">4 INDEPENDENT REVIEWS · MULTI-ROUND</span>
+<table><thead><tr><th>维度</th><th>首轮 → 最终</th><th>关键 verdict</th></tr></thead><tbody>
+<tr><td>A 架构/维护性</td><td>C+ → <strong>B-</strong></td><td><code>use-studio</code> 超限已拆；锁门禁误报由真实负测证实已存在；Flow 243、ProjectStore 299 均未超硬限制，但是 P1.6 拆分前置。</td></tr>
+<tr><td>B 真 bug/边界</td><td>B → B+ → <strong>A</strong></td><td>丢响应幂等、active 冲突、旧选择、跨场来源、归档资源、continuity 顺序/同 asset 多 role、相机竞态和路由解码全部关闭。</td></tr>
+<tr><td>C 测试质量</td><td><strong>B</strong></td><td>新链路使用真 HTTP + SQLite + Chrome；审查提出的 continuity 负向盲区与失败重试已补。Ctrl/框选和百镜下新交互仍是低风险覆盖增强，不阻断功能。</td></tr>
+<tr><td>D spec/协议对齐</td><td>发现 SSOT/版本缺口 → <strong>A</strong></td><td>两个端点、snake_case、原子幂等、Plan/Take、H3-only audio 已写入 Protocol 1.8，health 与测试同步，完成度 100%。</td></tr>
+</tbody></table>
+<p><strong>严重项 verdict：</strong><code>use-studio</code> 超 250 行已修；“批量可绕过锁”经实现追踪判定为误报，并用解锁直调真 HTTP 负测固化。<br><strong>中等项 verdict：</strong>影响正确性的幂等、active 重复、连续性、归档资源、相机竞态均已修；Flow props 与 facade 余量作为 P1.6 拆分前置，当前未违规且不影响 P1.5B。<br><strong>综合评分：</strong>B+。四个维度均达到交付下限，B/D 最终复审无剩余问题。</p></div>
+<div class="footer">索引：<code>.hive/research/2026-08-25-p15b-batch-binding.md</code> · 分支：<code>codex/p0-p1-h3-canvas</code> · 基于最终代码、完整门禁与四路独立复核。</div>
+</main></body></html>

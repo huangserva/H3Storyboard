@@ -108,6 +108,39 @@ export const H3JobSchema = z.object({
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
 
+export const CreateH3JobBatchItemSchema = z.object({
+  shot_plan_id: IdSchema,
+  job: CreateH3JobInputSchema,
+});
+export type CreateH3JobBatchItem = z.input<
+  typeof CreateH3JobBatchItemSchema
+>;
+
+export const CreateH3JobBatchInputSchema = z.object({
+  items: z.array(CreateH3JobBatchItemSchema).min(1).max(100),
+}).superRefine((value, context) => {
+  const seen = new Set<string>();
+  value.items.forEach((item, index) => {
+    if (seen.has(item.shot_plan_id)) context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'shot_plan_id must be unique within a job batch',
+      path: ['items', index, 'shot_plan_id'],
+    });
+    seen.add(item.shot_plan_id);
+  });
+});
+export type CreateH3JobBatchInput = z.input<
+  typeof CreateH3JobBatchInputSchema
+>;
+
+export const CreateH3JobBatchResultSchema = z.object({
+  project_id: IdSchema,
+  items: z.array(z.object({ shot_plan_id: IdSchema, job: H3JobSchema })),
+});
+export type CreateH3JobBatchResult = z.infer<
+  typeof CreateH3JobBatchResultSchema
+>;
+
 export const GenerationPreflightSchema = z.object({
   ready: z.boolean(),
   blocking_error: z.object({

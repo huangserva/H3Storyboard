@@ -90,6 +90,12 @@ export function buildStoryboardGraph({ snapshot, canvasNodes,
   for (const reference of characterReferences) {
     if (reference.asset_id) referencedAssets.add(reference.asset_id);
   }
+  for (const asset of snapshot.assets) {
+    if (asset.kind === 'image' && asset.status !== 'archived' &&
+      asset.derived_from_asset_id === null && !outputAssetIds.has(asset.id)) {
+      referencedAssets.add(asset.id);
+    }
+  }
   for (const persisted of canvasNodes.filter(
     ({ node_type }) => node_type === 'character')) {
     referencedCharacters.add(persisted.ref_id);

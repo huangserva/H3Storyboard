@@ -1,7 +1,10 @@
 import type {
   Asset,
   CurrentAssetsManifestSnapshot,
+  BindShotReferenceInput,
   CreateAssetInput,
+  CreateH3JobBatchInput,
+  CreateH3JobBatchResult,
   CreateH3JobInput,
   CreateProjectInput,
   CreateShotActualInput,
@@ -31,12 +34,12 @@ import { CharacterMediaStore } from './character-media-store.js';
 import { CharacterImageJobStore } from './character-image-job-store.js';
 import { GpuLeaseStore } from './gpu-lease-store.js';
 import {
-  createH3Job,
   markH3JobQueued,
   markH3JobRunning,
   markH3SubmitIntent,
   clearH3ProviderTask,
 } from './job-operations.js';
+import { createH3Job, createH3JobBatch } from './job-creation.js';
 import { claimH3Job, claimNextH3Job } from './h3-job-claim.js';
 import { completeH3Job } from './job-completion.js';
 import {
@@ -69,6 +72,7 @@ import {
   updateShotPlan,
   reviewShotActual,
 } from './shot-operations.js';
+import { bindShotReference } from './shot-binding-operations.js';
 import {
   finalizeWorkerOutput,
   type WorkerOutputInput,
@@ -160,8 +164,18 @@ export class ProjectStore {
     return updateShotPlan(this.#database, input);
   }
 
+  bindShotReference(projectId: string, shotPlanId: string,
+    input: BindShotReferenceInput): ShotPlan {
+    return bindShotReference(this.#database, projectId, shotPlanId, input);
+  }
+
   createH3Job(shotPlanId: string, input: CreateH3JobInput): H3Job {
     return createH3Job(this.#database, shotPlanId, input);
+  }
+
+  createH3JobBatch(projectId: string,
+    input: CreateH3JobBatchInput): CreateH3JobBatchResult {
+    return createH3JobBatch(this.#database, projectId, input);
   }
 
   claimH3Job(jobId: string, leaseDurationMs?: number): H3Job {

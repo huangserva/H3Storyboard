@@ -170,6 +170,7 @@ export function validateContinuityDependencies(
             actual.qc_verdict AS qc_verdict,
             asset.project_id AS reference_project_id,
             asset.kind AS reference_kind,
+            asset.status AS reference_status,
             asset.derived_from_asset_id AS derived_from_asset_id,
             asset.derivation_kind AS derivation_kind
      FROM shot_plans source
@@ -197,6 +198,7 @@ export function validateContinuityDependencies(
           qc_verdict: string;
           reference_project_id: string;
           reference_kind: string;
+          reference_status: string;
           derived_from_asset_id: string | null;
           derivation_kind: string | null;
         }
@@ -207,6 +209,7 @@ export function validateContinuityDependencies(
       row.actual_shot_plan_id === dependency.source_shot_plan_id &&
       row.qc_verdict === 'approved' &&
       row.reference_project_id === projectId &&
+      row.reference_status !== 'archived' &&
       (dependency.boundary === 'full_video'
         ? row.reference_kind === 'video' &&
           row.source_output_asset_id === dependency.reference_asset_id

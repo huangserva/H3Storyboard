@@ -5,31 +5,11 @@ import type {
   Project,
   ProjectSnapshot,
   UpdateShotPlanInput,
-  GenerationPreflight,
-  ShotPlan,
 } from '@h3storyboard/protocol';
 import * as api from './api.js';
-
-export interface Notice {
-  tone: 'success' | 'error';
-  text: string;
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof api.ApiError) {
-    const message = ({
-      LOCK_REQUIRED: '请先完成 Production Brief 并锁定生成上下文',
-      MANIFEST_REQUIRED: '请先批准参考资产并冻结当前资产清单',
-      MODE_BLOCKED: '当前 Production Mode 已停用',
-      H3_MODE_UNAVAILABLE: '本机 worker 暂不支持该生成方式',
-      TAKE_GATE_BLOCKED: '请先批准代表 Take，或填写门禁跳过原因',
-      BINDING_MISSING_INPUT: '镜头缺少可用的参考输入',
-      MODE_CAPABILITY_MISMATCH: '当前 Mode 不支持该镜头的生成方式',
-    } satisfies Readonly<Record<string, string>>)[error.code] ?? error.message;
-    return `${message} · ${error.code}`;
-  }
-  return error instanceof Error ? error.message : '发生未知错误';
-}
+import { describeError, type Notice } from './studio-notice.js';
+import { useGenerationActions } from './use-generation-actions.js';
+export type { Notice } from './studio-notice.js';
 
 export function useStudio() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -38,6 +18,8 @@ export function useStudio() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const selectionRequest = useRef(0);
+  const generation = useGenerationActions({ snapshot, setSnapshot, setBusy,
+    setNotice });
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -172,34 +154,6 @@ export function useStudio() {
       verdict === 'approved' ? 'Take QC 已批准' : 'Take QC 已拒绝',
     ), [updateActual]);
 
-  const generate = useCallback(async (shot: ShotPlan,
-    preflight: GenerationPreflight, gateOverrideReason: string | null) => {
-    if (!snapshot || !preflight.ready || !preflight.mode) return false;
-    setBusy(true);
-    try {
-      const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
-      await api.createH3Job(snapshot.project.id, shot.id, {
-        mode: preflight.mode,
-        provider: 'local_comfyui',
-        model: 'H3-local',
-        prompt: shot.prompt,
-        duration_seconds: shot.duration_seconds,
-        seed,
-        steps: 4,
-        audio_mode: 'h3_native',
-        idempotency_key: `studio-${crypto.randomUUID()}`,
-        input_bindings: preflight.input_bindings,
-        ...(gateOverrideReason ? { gate_override_reason: gateOverrideReason } : {}),
-      });
-      setSnapshot(await api.getProject(snapshot.project.id));
-      setNotice({ tone: 'success', text: '生成任务已入队，可在分镜卡片查看进度' });
-      return true;
-    } catch (error) {
-      setNotice({ tone: 'error', text: describeError(error) });
-      return false;
-    } finally { setBusy(false); }
-  }, [snapshot]);
-
   return {
     projects,
     snapshot,
@@ -215,7 +169,7 @@ export function useStudio() {
     markRepresentative,
     reviewRepresentative,
     reviewActual,
-    generate,
+    ...generation,
     dismissNotice: () => setNotice(null),
   };
 }

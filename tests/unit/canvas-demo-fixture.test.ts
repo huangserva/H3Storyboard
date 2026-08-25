@@ -45,6 +45,10 @@ describe('canvas demo fixture with real SQLite and media files', () => {
         is_representative: true,
         representative_status: 'approved',
       });
+      expect(snapshot.assets).toContainEqual(expect.objectContaining({
+        kind: 'image', status: 'approved', derivation_kind: 'last_frame',
+        derived_from_asset_id: snapshot.shot_actuals[0]!.output_asset_id,
+      }));
       expect(store.characters.list(first.project_id)).toHaveLength(2);
       expect(store.characters.listReferences(
         first.project_id, first.character_ids[0]!)).toHaveLength(1);
@@ -138,6 +142,7 @@ describe('canvas demo fixture with real SQLite and media files', () => {
       await mkdir(fixtureDirectory);
       const sourceDirectory = join(process.cwd(), 'tests/fixtures/canvas-demo');
       for (const name of ['su-wanning.jpg', 'gu-chengyuan.jpg',
+        'rain-night-take-01-tail.png',
         'rain-night-take-02.mp4']) {
         await copyFile(join(sourceDirectory, name), join(fixtureDirectory, name));
       }

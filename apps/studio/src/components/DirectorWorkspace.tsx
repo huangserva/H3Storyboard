@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import type { GenerationPreflight, ProjectSnapshot, ShotPlan,
+import type { BindShotReferenceInput, GenerationPreflight, ProjectSnapshot, ShotPlan,
   UpdateShotPlanInput } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
 import { PlannedShotPanel } from './PlannedShotPanel.js';
@@ -36,6 +36,11 @@ interface DirectorWorkspaceProps {
     verdict: 'approved' | 'rejected') => Promise<boolean>;
   onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
     gateOverrideReason: string | null) => Promise<boolean>;
+  onGenerateBatch: (shots: ShotPlan[],
+    preflights: Map<string, GenerationPreflight>,
+    gateOverrideReason: string | null) => Promise<boolean>;
+  onBindReference: (shotId: string,
+    input: BindShotReferenceInput) => Promise<boolean>;
 }
 
 export function DirectorWorkspace({
@@ -52,6 +57,8 @@ export function DirectorWorkspace({
   onReviewRepresentative,
   onReviewActual,
   onGenerate,
+  onGenerateBatch,
+  onBindReference,
 }: DirectorWorkspaceProps) {
   const [view, setView] = useState<'board' | 'flow' | 'director'>('board');
   const [productionOpen, setProductionOpen] = useState(false);
@@ -136,6 +143,8 @@ export function DirectorWorkspace({
             selectedShotId={selectedShot?.id ?? null} snapshot={snapshot}
             shotFocusRevision={shotFocusRevision}
             preflights={preflights} onGenerate={onGenerate}
+            onGenerateBatch={onGenerateBatch}
+            onBindReference={onBindReference}
             onSetup={() => setProductionOpen(true)}
             onReviewActual={onReviewActual}
             onMarkRepresentative={onMarkRepresentative}

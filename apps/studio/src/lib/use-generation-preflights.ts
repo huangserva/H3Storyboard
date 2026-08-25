@@ -14,7 +14,8 @@ export function useGenerationPreflights(snapshot: ProjectSnapshot | null,
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const loadKey = snapshot
-    ? `${snapshot.project.id}:${snapshot.shot_plans.map(({ id }) => id).join(',')}`
+    ? `${snapshot.project.id}:${snapshot.project.updated_at}:` +
+      snapshot.shot_plans.map(({ id, updated_at }) => `${id}:${updated_at}`).join(',')
     : 'none';
 
   useEffect(() => {

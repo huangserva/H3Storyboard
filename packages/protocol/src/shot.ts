@@ -144,6 +144,28 @@ export const UpdateShotPlanInputSchema = z.object({
 { message: 'At least one shot production field must be updated' });
 export type UpdateShotPlanInput = z.infer<typeof UpdateShotPlanInputSchema>;
 
+export const BindShotReferenceInputSchema = z.discriminatedUnion(
+  'binding_type',
+  [
+    z.object({
+      binding_type: z.literal('semantic'),
+      purpose: SemanticReferencePurposeSchema,
+      target: SemanticReferenceSchema.shape.target,
+    }),
+    z.object({
+      binding_type: z.literal('continuity'),
+      purpose: z.enum(['first_frame', 'last_frame']),
+      source_shot_plan_id: IdSchema,
+      source_take_id: IdSchema,
+      reference_asset_id: IdSchema,
+      boundary: z.enum(['first_frame', 'last_frame']),
+    }),
+  ],
+);
+export type BindShotReferenceInput = z.infer<
+  typeof BindShotReferenceInputSchema
+>;
+
 export const ShotPlanSchema = z
   .object({
     ...shotPlanFields,

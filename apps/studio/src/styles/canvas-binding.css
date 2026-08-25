@@ -1,0 +1,97 @@
+.binding-source,
+.binding-target {
+  align-items: center;
+  display: flex;
+  position: absolute;
+  z-index: 12;
+}
+
+.binding-source { right: -5px; }
+.binding-target { left: -5px; }
+
+.binding-source span,
+.binding-target span {
+  background: rgba(7, 10, 9, .94);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--faint);
+  font: 700 7px/1 var(--mono);
+  letter-spacing: .04em;
+  padding: 4px 6px;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.binding-source span { right: 13px; }
+.binding-target span { left: 13px; }
+
+.binding-handle.react-flow__handle {
+  background: var(--acid);
+  border: 2px solid #0b0e0d;
+  height: 12px;
+  position: relative;
+  top: auto;
+  transform: none;
+  width: 12px;
+}
+
+.binding-handle-source.react-flow__handle { right: auto; }
+.binding-handle-target.react-flow__handle { left: auto; }
+.flow-kind-take .binding-handle { background: var(--teal); }
+.flow-kind-character .binding-handle { background: var(--planned); }
+
+.canvas-batch-bar {
+  align-items: center;
+  backdrop-filter: blur(18px);
+  background: rgba(13, 16, 15, .95);
+  border: 1px solid rgba(201, 243, 107, .32);
+  border-radius: 9px;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, .46);
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 9px 10px 9px 14px;
+}
+
+.canvas-batch-bar > div:first-child {
+  align-items: baseline;
+  border-right: 1px solid var(--line);
+  display: flex;
+  gap: 7px;
+  padding-right: 14px;
+}
+
+.canvas-batch-bar > div:first-child span,
+.canvas-batch-summary span {
+  color: var(--faint);
+  font: 650 8px/1 var(--mono);
+}
+
+.canvas-batch-bar > div:first-child strong {
+  color: var(--paper);
+  font: 720 13px/1 var(--mono);
+}
+
+.canvas-batch-summary { display: flex; gap: 9px; }
+.canvas-batch-summary span[data-tone="ready"] { color: var(--teal); }
+.canvas-batch-summary span[data-tone="blocked"] { color: var(--danger); }
+.canvas-batch-summary span[data-tone="active"] { color: var(--planned); }
+
+.flow-kind-shot.selected .canvas-shot-card,
+.flow-kind-shot:has(.canvas-shot-card[data-selected="true"]) .canvas-shot-card {
+  border-color: var(--acid);
+  box-shadow: 0 0 0 2px rgba(201, 243, 107, .12),
+    0 18px 46px rgba(0, 0, 0, .42);
+}
+
+.canvas-batch-bar button:active { transform: scale(.97); }
+
+@media (hover: hover) and (pointer: fine) {
+  .binding-source:hover span,
+  .binding-target:hover span { border-color: rgba(201, 243, 107, .5); color: var(--paper); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-batch-bar button:active { transform: none; }
+}

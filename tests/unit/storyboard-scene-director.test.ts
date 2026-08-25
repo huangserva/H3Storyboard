@@ -13,6 +13,15 @@ import type {
 const NOW = '2026-08-25T00:00:00.000Z';
 
 describe('storyboard scene director', () => {
+  it('keeps all available reference assets in an isolated scene for binding', () => {
+    const graph = sceneGraph();
+    graph.nodes.push(node({ id: 'asset:unbound', kind: 'asset',
+      entity_id: 'unbound', asset_role: 'reference' }));
+
+    const isolated = isolateStoryboardScene(graph, 'SC-01');
+    expect(isolated.nodes.map(({ id }) => id)).toContain('asset:unbound');
+  });
+
   it('isolates one complete production lineage into reference, Plan, and Actual lanes', () => {
     const graph = sceneGraph();
     const isolated = isolateStoryboardScene(graph, 'SC-01');
@@ -20,10 +29,10 @@ describe('storyboard scene director', () => {
 
     expect(ids).toEqual(expect.arrayContaining([
       'scene:SC-01', 'character:woman', 'asset:first', 'shot:shot-1',
-      'job:job-1', 'asset:output-1', 'take:take-1',
+      'job:job-1', 'asset:output-1', 'take:take-1', 'character:unused',
     ]));
     for (const excluded of ['script:script-1', 'scene:SC-02', 'shot:shot-2',
-      'character:unused']) expect(ids).not.toContain(excluded);
+    ]) expect(ids).not.toContain(excluded);
     expect(isolated.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: 'asset:first', target: 'shot:shot-1' }),
       expect.objectContaining({ source: 'shot:shot-1', target: 'job:job-1' }),
@@ -191,6 +200,18 @@ describe('storyboard scene director', () => {
       source: 'take:external', target: 'shot:shot-1', kind: 'continuity',
     }));
   });
+
+  it('offers an unbound approved Take from another scene as a continuity source',
+    () => {
+      const graph = sceneGraph();
+      graph.nodes.push(node({ id: 'take:unbound-external', kind: 'take',
+        entity_id: 'unbound-external', shot_id: 'external-shot',
+        take: actual('unbound-external', 'external-shot', 'external-output',
+          1, 'approved') }));
+
+      expect(isolateStoryboardScene(graph, 'SC-01').nodes.map(({ id }) => id))
+        .toContain('take:unbound-external');
+    });
 });
 
 function sceneGraph(): StoryboardGraph {

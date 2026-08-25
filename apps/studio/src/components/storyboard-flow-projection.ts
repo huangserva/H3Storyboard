@@ -7,6 +7,8 @@ import type {
 import { MarkerType, type Edge } from '@xyflow/react';
 import { selectShotMediaSlots } from
   '../lib/storyboard-scene-director.js';
+import { selectStoryboardBindingSources } from
+  '../lib/storyboard-binding.js';
 import type {
   StoryboardGraph,
   StoryboardViewEdge,
@@ -18,6 +20,7 @@ interface ProjectNodesInput {
   graph: StoryboardGraph;
   snapshot: ProjectSnapshot;
   selectedNodeId: string | null;
+  selectedNodeIds?: ReadonlySet<string>;
   busy: boolean;
   directorMode: boolean;
   preflights: Map<string, GenerationPreflight>;
@@ -28,7 +31,8 @@ interface ProjectNodesInput {
   onOpenMedia: (assetId: string) => void;
 }
 
-export function projectStoryboardNodes({ graph, snapshot, selectedNodeId, busy,
+export function projectStoryboardNodes({ graph, snapshot, selectedNodeId,
+  selectedNodeIds = new Set(), busy,
   directorMode, preflights, characterReferences, onGenerate, onSetup,
   onOpenMedia }: ProjectNodesInput): StoryboardFlowNode[] {
   const assetById = new Map(snapshot.assets.map((asset) => [asset.id, asset]));
@@ -41,7 +45,7 @@ export function projectStoryboardNodes({ graph, snapshot, selectedNodeId, busy,
     zIndex: view.z_index,
     draggable: !directorMode && view.persisted_node_id !== null,
     selectable: view.kind !== 'scene',
-    selected: view.id === selectedNodeId,
+    selected: selectedNodeIds.has(view.id) || view.id === selectedNodeId,
     className: `flow-node-shell flow-kind-${view.kind}` +
       (directorMode ? ' flow-scene-director-node' : ''),
     style: { width: view.width, height: view.height },
@@ -52,6 +56,8 @@ export function projectStoryboardNodes({ graph, snapshot, selectedNodeId, busy,
       preflight: view.shot_id ? preflights.get(view.shot_id) ?? null : null,
       characterReference: view.kind === 'character'
         ? characterReferences.get(view.entity_id) ?? null : null,
+      bindingSources: directorMode
+        ? selectStoryboardBindingSources(view, snapshot) : [],
       onGenerate, onSetup, onOpenMedia },
   }));
 }

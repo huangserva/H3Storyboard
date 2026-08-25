@@ -52,6 +52,8 @@ export function App() {
           onReviewRepresentative={studio.reviewRepresentative}
           onReviewActual={studio.reviewActual}
           onGenerate={studio.generate}
+          onGenerateBatch={studio.generateBatch}
+          onBindReference={studio.bindReference}
           selectedShot={studio.selectedShot}
           shotFocusRevision={shotFocusRevision}
           snapshot={studio.snapshot}
