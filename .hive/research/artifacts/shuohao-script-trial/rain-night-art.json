@@ -1,0 +1,43 @@
+{
+  "source": "雨夜回房",
+  "style": "realistic",
+  "scenes": [
+    {
+      "id": "S01",
+      "name": "石库门厢房",
+      "primary": true,
+      "summary": "全片唯一空间，以油灯暖光和窗外冷霓虹形成封闭、私密且可持续识别的视觉舞台。",
+      "anchors": [
+        {
+          "name": "红木架子床",
+          "desc": "房间右侧的深色红木架子床，挂着半透明白纱帐"
+        },
+        {
+          "name": "霓虹雨窗",
+          "desc": "房间左侧窗玻璃布满雨痕，窗外红绿霓虹被拉成长条"
+        },
+        {
+          "name": "油灯与藤椅",
+          "desc": "床前小桌放一盏暖黄油灯，旁边是一张深色藤椅"
+        }
+      ],
+      "lighting": [
+        {
+          "state": "油灯暖光与窗外冷霓虹",
+          "prompt": "warm amber oil-lamp key light inside the room, cold red and green neon reflections filtered through rain-streaked glass, deep cinematic shadows"
+        }
+      ],
+      "image": {
+        "prompt": "Empty 1930s Shanghai shikumen bedroom, dark redwood canopy bed with translucent white gauze curtains, warm oil lamp on a small table, rain-streaked window reflecting cold red and green neon, dark rattan chair, no people",
+        "negativePrompt": "people, human figures, characters, crowds, silhouettes, modern furniture, daylight, text, watermark, signature",
+        "sheet": "Environment reference sheet on ONE 16:9 landscape canvas, panels separated by thin hairline rules. MAIN ZONE: the canonical wide view of the same empty 1930s Shanghai shikumen bedroom. RIGHT COLUMN: close-up studies of the redwood canopy bed and rain-streaked neon window. BOTTOM ROW: close-up studies of the warm oil lamp, dark rattan chair, aged plaster and wood materials. Every panel shows the SAME room with identical geometry and anchors. Absolutely no people anywhere. Semi-realistic environment concept art, painterly rendering with visible brush texture, grounded architectural perspective, cinematic depth. Weathered, lived-in materials and atmospheric depth.",
+        "tags": ["semi-realistic", "environment sheet", "1930s Shanghai", "rainy night"]
+      },
+      "usage": {
+        "episodes": [1],
+        "beats": []
+      }
+    }
+  ],
+  "props": []
+}

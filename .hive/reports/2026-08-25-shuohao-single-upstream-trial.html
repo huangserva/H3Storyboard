@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>H3Storyboard · shuohao-skills 单上游试跑</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0d0c;--panel:#121613;--line:#2b352b;--text:#eef3e8;--muted:#a5b0a1;--accent:#b8f34b;--cyan:#68dfd0;--warn:#efc15a;--bad:#ff8178}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}main{width:min(1080px,calc(100% - 40px));margin:48px auto 80px}h1{margin:4px 0 10px;font-size:39px;line-height:1.12;letter-spacing:-.035em}h2{margin:42px 0 14px;font-size:23px}h3{margin:22px 0 8px}.eyebrow{color:var(--accent);font-weight:800;letter-spacing:.14em;text-transform:uppercase}.lead{max-width:860px;color:#d5ded1;font-size:19px}.verdict{margin:26px 0;padding:22px;border:1px solid #536d34;border-radius:17px;background:#151e11}.verdict b{display:block;color:var(--accent);font-size:26px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:19px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}.card b{display:block;margin-bottom:5px;color:var(--cyan);font-size:17px}.pass{color:var(--accent);font-weight:800}.fail{color:var(--bad);font-weight:800}table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-size:12px;letter-spacing:.07em;text-transform:uppercase}tr:last-child td{border-bottom:0}code{padding:.12em .4em;border-radius:5px;background:#1d231e;color:#dfff9e}.note{padding:17px 19px;border-left:3px solid var(--warn);background:#19160e;color:#eadfc4}ul,ol{padding-left:22px}li{margin:6px 0}footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted)}@media(max-width:760px){.grid{grid-template-columns:1fr}main{width:calc(100% - 24px);margin-top:28px}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">Controlled Trial · 2026-08-25</div>
+  <h1>只选 shuohao-skills：上海雨夜试跑</h1>
+  <p class="lead">用用户已有的 <code>story.json</code>、<code>INTENT.md</code> 和 14 镜执行表，投影成 shuohao 的 Outline / Art / Script 数据，并运行其原生校验器。没有调用模型、没有修改 H3Storyboard 数据库、没有提交 4090 任务。</p>
+
+  <section class="verdict"><b>最终裁决：选它，但只采用 novel-script 核心。</b>Scene/Beat 和确定性质量门适合作为 P2 Script Studio 的唯一上游参考；Outline 需要去短剧模板化，声音和 H3 Prompt 必须继续服从 H3Storyboard 自己的协议。</section>
+
+  <h2>试跑结果</h2>
+  <div class="grid">
+    <div class="card"><b>Script · 通过</b><span class="pass">10 / 10 质量门</span><br>1 集、1 场、4 句对白；预估 151.3 秒 / 目标 176.5 秒。</div>
+    <div class="card"><b>Art · 通过</b><span class="pass">1 个场景合法</span><br>空间锚点、光照状态、空景提示词与禁人约束通过。</div>
+    <div class="card"><b>Outline · 部分</b><span class="pass">skeleton 通过</span><br><span class="fail">full 失败</span>：单集无法满足 major 爽点必须早于末集出现。</div>
+  </div>
+
+  <h2>10 道 Script 质量门</h2>
+  <table><thead><tr><th>门禁</th><th>结果</th><th>对 H3 的价值</th></tr></thead><tbody>
+    <tr><td>目标时长 ±15%</td><td class="pass">通过</td><td>避免剧本与生成预算完全脱节；H3 后续应改用逐 beat 估时与镜头实测校准。</td></tr>
+    <tr><td>单句对白 ≤35 字</td><td class="pass">通过</td><td>保护 H3 原生中文对白的可说性。</td></tr>
+    <tr><td>说话人属于场景角色</td><td class="pass">通过</td><td>可直接映射 Character ID，避免错人说话。</td></tr>
+    <tr><td>钩子/收束与前三拍认领</td><td class="pass">通过</td><td>可保留为可选内容模式，不做所有影片的全局硬门。</td></tr>
+    <tr><td>每场至少一个动作</td><td class="pass">通过</td><td>避免只能听不能拍的“广播剧”。</td></tr>
+    <tr><td>动作与对白分离</td><td class="pass">通过</td><td>正是 H3Storyboard 需要的 ScriptBeat discriminated union。</td></tr>
+    <tr><td>故事 beat 认领</td><td class="pass">通过</td><td>可改名为 story obligation，不绑定“爽点”。</td></tr>
+    <tr><td>角色/场景/光照/道具对账</td><td class="pass">通过</td><td>能编译到现有 Character、Asset、Scene reference。</td></tr>
+  </tbody></table>
+
+  <h2>为什么不能原样安装</h2>
+  <ol>
+    <li><b>单集/电影不兼容：</b>其完整 Outline 强制至少一个 major 爽点，而且首次 major 不能在最后一集；一集项目逻辑上无法通过。</li>
+    <li><b>状态粒度不够：</b>action beat 没有稳定 ID，也没有服装、人物位置、持物等 opening/ending state。上海雨夜最关键的服装连续性不会被原校验器发现。</li>
+    <li><b>时长只是粗估：</b>所有动作默认 2.5 秒，151.3 秒仍被允许对应 176.5 秒目标。H3 应让每个 beat 有预算并用实际 Take 反校准。</li>
+    <li><b>声音边界冲突：</b>上游报告和后续 skill 面向 TTS、soundscape 与 BGM；H3Storyboard 永远只允许 H3 原生声音或静音。</li>
+    <li><b>缺少持久版本链：</b>JSON 文件没有 ScriptVersion 的 draft/locked/superseded 事务、diff 和生成历史隔离。</li>
+  </ol>
+
+  <h2>唯一采用方案</h2>
+  <table><thead><tr><th>采用</th><th>改造成 H3 原生能力</th></tr></thead><tbody>
+    <tr><td><code>episode → scene → flow</code></td><td><code>ScriptVersion → ScriptScene → ScriptBeat</code>；episode 对电影可为空，对短剧可启用。</td></tr>
+    <tr><td>action / dialogue 二选一</td><td>带 UUID 的 discriminated union；对白保存 character_id、line、delivery。</td></tr>
+    <tr><td>确定性 checkup</td><td>保留通用门；钩子/爽点变成可选 Genre Recipe，不写死协议。</td></tr>
+    <tr><td>角色/场景/道具对账</td><td>直接绑定 H3Storyboard Character、Asset、Scene 与版本化状态。</td></tr>
+    <tr><td>粗时长估算</td><td>每 beat 显式预算 + ShotPlan 编译后校验 + Take 实测回写评估。</td></tr>
+  </tbody></table>
+
+  <p class="note">第一版只做“导入/写作 draft → Scene/Beat → 10 道通用门 → 锁定 ScriptVersion → 生成草稿 ShotPlan”。不装其他仓库，不接外部音频，不直接提交 4090。</p>
+
+  <h2>可复核产物</h2>
+  <ul>
+    <li><code>rain-night-outline.json</code>：单集故事骨架和角色/场景引用。</li>
+    <li><code>rain-night-art.json</code>：唯一厢房的场景锚点和光照。</li>
+    <li><code>rain-night-script.json</code>：结构化 Scene/Beat 与 4 句原始对白。</li>
+  </ul>
+
+  <footer>H3Storyboard · shuohao single-upstream trial</footer>
+</main></body></html>
