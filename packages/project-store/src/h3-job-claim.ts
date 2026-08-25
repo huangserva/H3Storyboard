@@ -20,32 +20,54 @@ export function claimNextH3Job(db: Database.Database,
   leaseDurationMs = 60_000): H3Job | null {
   requireLeaseDuration(leaseDurationMs);
   return runWriteTransaction(db, () => {
-    const rows = db.prepare(`SELECT id, status, attempt, updated_at, error_code
-      FROM h3_jobs
-      WHERE provider = 'local_comfyui' AND (
-        status = 'draft' OR (status = 'timed_out' AND attempt < ?)
-      )
-      ORDER BY CASE status WHEN 'draft' THEN 0 ELSE 1 END, created_at, id`)
-      .all(H3_MAX_AUTO_ATTEMPTS) as Array<{
+    const now = new Date().toISOString();
+    const row = db.prepare(`SELECT j.id, j.status, j.attempt, j.updated_at,
+        j.error_code, bi.batch_id
+      FROM h3_jobs j
+      LEFT JOIN h3_job_batch_items bi ON bi.current_job_id = j.id
+      LEFT JOIN h3_job_batches b ON b.id = bi.batch_id
+      WHERE j.provider = 'local_comfyui' AND NOT EXISTS (
+        SELECT 1 FROM h3_jobs retry WHERE retry.retry_of_job_id = j.id
+      ) AND (j.status = 'draft' OR (
+        j.status = 'timed_out' AND j.attempt < ? AND (
+          j.error_code IN ('LEASE_EXPIRED', 'H3_RETRY_PROVIDER_RECOVERY') OR
+          (julianday(?) - julianday(j.updated_at)) * 86400000 >=
+            CASE
+              WHEN j.attempt <= 1 THEN 2000
+              WHEN j.attempt = 2 THEN 4000
+              WHEN j.attempt = 3 THEN 8000
+              WHEN j.attempt = 4 THEN 16000
+              WHEN j.attempt = 5 THEN 32000
+              ELSE 60000
+            END
+        )
+      ))
+      ORDER BY COALESCE(b.last_claimed_at, b.created_at, j.created_at),
+        COALESCE(b.claimed_count, 0),
+        CASE WHEN b.last_claimed_at IS NULL THEN 0 ELSE 1 END,
+        COALESCE(b.rowid, j.rowid), COALESCE(bi.ordinal, 0), j.id
+      LIMIT 1`).get(H3_MAX_AUTO_ATTEMPTS, now) as {
         id: string; status: string; attempt: number; updated_at: string;
-        error_code: string | null;
-      }>;
-    const now = Date.now();
-    const row = rows.find((candidate) => candidate.status === 'draft' ||
-      candidate.error_code === 'LEASE_EXPIRED' ||
-      now - Date.parse(candidate.updated_at) >= h3RetryBackoffMs(
-        candidate.attempt));
-    return row ? claimJob(db, row.id, leaseDurationMs) : null;
+        error_code: string | null; batch_id: string | null;
+      } | undefined;
+    if (!row) return null;
+    const claimed = claimJob(db, row.id, leaseDurationMs);
+    if (row.batch_id) db.prepare(`UPDATE h3_job_batches
+      SET claimed_count = claimed_count + 1, last_claimed_at = ?, updated_at = ?
+      WHERE id = ?`).run(claimed.updated_at, claimed.updated_at, row.batch_id);
+    return claimed;
   });
-}
-
-function h3RetryBackoffMs(attempt: number): number {
-  return Math.min(60_000, 2_000 * 2 ** Math.max(0, attempt - 1));
 }
 
 function claimJob(db: Database.Database, jobId: string,
   leaseDurationMs: number): H3Job {
   const job = getJob(db, jobId);
+  const successor = db.prepare(`SELECT id FROM h3_jobs
+    WHERE retry_of_job_id = ? LIMIT 1`).get(jobId) as
+    { id: string } | undefined;
+  if (successor) throw new StoreError('H3_JOB_RETRY_INVALID',
+    'An immutable retry has replaced this H3 job',
+    { job_id: jobId, retry_job_id: successor.id });
   requireJobTransition(job, 'submitting');
   const nowDate = new Date();
   if (job.lease_expires_at !== null &&

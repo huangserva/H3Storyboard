@@ -1,0 +1,76 @@
+.batch-progress-dock {
+  backdrop-filter: blur(18px);
+  background: rgba(13, 16, 15, .96);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 20px 58px rgba(0, 0, 0, .48);
+  max-height: calc(100% - 102px);
+  overflow: auto;
+  position: absolute;
+  right: 326px;
+  top: 78px;
+  width: min(430px, calc(100% - 590px));
+  z-index: 24;
+}
+
+.batch-progress-dock > header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 11px 13px;
+}
+.batch-progress-dock > header strong { display: block; font-size: 12px; margin-top: 4px; }
+.batch-progress-dock > header small { color: var(--faint); font: 600 8px/1 var(--mono); }
+.batch-progress-error { color: var(--danger); font-size: 9px; margin: 0; padding: 10px 13px; }
+.batch-progress-list { display: grid; }
+.batch-progress-list article { border-bottom: 1px solid var(--line); padding: 9px 11px; }
+.batch-progress-list article:last-child { border-bottom: 0; }
+.batch-progress-summary {
+  align-items: center;
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(110px, 1fr) auto 35px 12px;
+  padding: 1px 0;
+  text-align: left;
+  width: 100%;
+}
+.batch-progress-summary b,
+.batch-progress-summary > span { font: 650 8px/1 var(--mono); }
+.batch-progress-summary > span { color: var(--faint); text-align: right; }
+.batch-progress-summary em { color: var(--muted); font: normal 13px/1 var(--mono); }
+.batch-progress-state { align-items: center; color: var(--muted) !important; display: flex; gap: 6px; text-align: left !important; }
+.batch-progress-state i { background: var(--planned); border-radius: 50%; height: 6px; width: 6px; }
+article[data-status="attention"] .batch-progress-state i { background: var(--danger); }
+article[data-status="completed"] .batch-progress-state i { background: var(--teal); }
+.batch-progress-track { background: var(--ink-4); border-radius: 3px; height: 3px; margin-top: 9px; overflow: hidden; }
+.batch-progress-track i { background: var(--acid); display: block; height: 100%; transition: width 220ms ease; }
+.batch-progress-counts { display: flex; gap: 10px; margin-top: 7px; }
+.batch-progress-counts span { color: var(--faint); font: 600 7px/1 var(--mono); }
+.batch-progress-counts [data-tone="attention"] { color: var(--danger); }
+.batch-progress-items { border-top: 1px solid var(--line); display: grid; margin-top: 9px; padding-top: 4px; }
+.batch-progress-items > div { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto auto; min-height: 34px; }
+.batch-progress-items > div > span { align-items: center; display: flex; min-width: 0; }
+.batch-progress-items > div > span b { color: var(--faint); font: 600 7px/1 var(--mono); margin-right: 7px; }
+.batch-progress-items > div > span span { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-progress-items small { color: var(--faint); font: 600 7px/1 var(--mono); text-transform: uppercase; }
+.batch-progress-items > div[data-status="failed"] small,
+.batch-progress-items > div[data-status="canceled"] small,
+.batch-progress-items > div[data-status="timed_out"] small { color: var(--danger); }
+.batch-progress-items button { background: rgba(255, 121, 109, .08); border: 1px solid rgba(255, 121, 109, .35); border-radius: 4px; color: var(--danger); cursor: pointer; font: 650 7px/1 var(--mono); padding: 6px 8px; }
+.batch-progress-items button:disabled { cursor: wait; opacity: .5; }
+
+.canvas-layout { position: relative; }
+.canvas-layout[data-focus="true"] .batch-progress-dock { right: 16px; width: 430px; }
+.canvas-layout[data-focus="true"][data-inspector-drawer-open="true"] .batch-progress-dock { right: 412px; }
+
+@media (max-width: 1180px) {
+  .batch-progress-dock { right: 276px; width: min(390px, calc(100% - 500px)); }
+}
+@media (max-width: 900px) {
+  .batch-progress-dock,
+  .canvas-layout[data-focus="true"] .batch-progress-dock { left: 92px; right: 12px; width: auto; }
+}

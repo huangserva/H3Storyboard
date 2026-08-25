@@ -46,6 +46,9 @@ protocol (single JSON contract)
 20. Character-image generation has its own durable job and event stream; it never masquerades as an H3 video job or writes directly over an approved reference.
 21. H3 video and character-image workers acquire the same durable GPU-host lease and inspect every configured queue before any new submission or explicitly managed memory release.
 22. A generated character image becomes a candidate Asset and CharacterReference in one transaction. Director approval, manifest freeze, and H3 binding remain separate later decisions.
+23. A durable H3 batch owns ordered original/current job membership; derived progress never rewrites an original failed attempt.
+24. Explicit H3 retry creates one immutable successor. If a timed-out attempt already owns provider identity, the successor recovers that task instead of resubmitting.
+25. Worker claims rotate across durable batches before advancing to the next item in the same batch.
 
 ## Production-policy boundary
 
@@ -55,7 +58,7 @@ Provider-specific facts remain below that boundary. Model names, current schemas
 
 `director` calls a generated multi-shot clip a segment, while H3Storyboard M0 uses `ShotPlan` as its generation target. The protocol preserves an unambiguous mapping: individual camera shots remain storyboard records; any future multi-shot generation segment groups them explicitly instead of silently changing `ShotPlan` semantics.
 
-## Protocol 1.8 module ownership
+## Protocol 1.9 module ownership
 
 ```text
 packages/protocol
@@ -74,14 +77,14 @@ packages/task-engine
 apps/api
   small domain route dispatchers + independently switchable H3/image workers
 apps/studio
-  director UI consuming only Protocol 1.8 API shapes
+  director UI consuming only Protocol 1.9 API shapes
 ```
 
 Database writes and invariant checks live in project-store transactions. The API parses protocol input and maps stable errors to HTTP status; it does not infer modes, resolve characters, or mutate related rows itself. The binding compiler is deliberately pure: project-store assembles an immutable brief/manifest/character snapshot, the compiler returns ordered inputs, and job creation persists that result without consulting mutable state afterward.
 
 ## Storyboard canvas projection
 
-The Studio uses React Flow as a read/write projection over protocol truth. Script, scene, reference asset, character, `ShotPlan`, H3 job, generated output asset, and `ShotActual`/QC nodes are derived from each `ProjectSnapshot`; they never create a second business-state store. Generation lineage is rendered as `ShotPlan -> H3Job -> output Asset -> ShotActual`, while continuity points back to the exact source take and boundary-frame asset. Only authored shot and character coordinates use the existing `canvas_nodes` persistence contract. Dragging one of those anchor nodes PATCHes SQLite through a per-node serial queue; failed writes roll back immediately, while derived nodes remain read-only and are deterministically rebuilt after polling or restart. Initial layout is one idempotent batch PUT that preserves existing coordinates, and all per-shot generation preflights are returned by one project-level GET per polling interval. This keeps a 100-shot canvas at a fixed two-request bootstrap budget and makes concurrent tabs converge on the same SQLite rows.
+The Studio uses React Flow as a read/write projection over protocol truth. Script, scene, reference asset, character, `ShotPlan`, H3 job, generated output asset, and `ShotActual`/QC nodes are derived from each `ProjectSnapshot`; they never create a second business-state store. Generation lineage is rendered as `ShotPlan -> H3Job -> output Asset -> ShotActual`, while continuity points back to the exact source take and boundary-frame asset. Only authored shot and character coordinates use the existing `canvas_nodes` persistence contract. Dragging one of those anchor nodes PATCHes SQLite through a per-node serial queue; failed writes roll back immediately, while derived nodes remain read-only and are deterministically rebuilt after polling or restart. Initial layout is one idempotent batch PUT that preserves existing coordinates, all per-shot generation preflights come from one project-level GET, and M3 batch progress comes from one project-level GET per polling interval. This keeps a 100-shot canvas at a fixed three-request bootstrap budget and makes concurrent tabs converge on the same SQLite rows.
 
 The four-zone desktop layout keeps project navigation, the asset palette, the media graph, and node inspection separate. The graph exposes Script → Scene → Shot → H3 Job → Take/QC, semantic asset/character references, continuity edges, media previews, controls, and a minimap. Provider `completed` and creative `approved` remain visually and structurally distinct.
 
@@ -93,7 +96,7 @@ rejects an audio handler or a missing video handler. `pnpm demo:canvas` always
 sets `H3_WORKER=0`, so opening the test canvas cannot submit to ComfyUI or wake
 the 4090. Demo state is not a fallback in the API or Studio runtime.
 
-Migrations v7–v21 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path until M3 defines those semantics. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`. V17 adds idempotent character-reference upload receipts, V18 records asset-level character angle derivations, and V19 repairs legacy duplicate/derived primary slots before enforcing one root primary per character. V20 adds durable character-image jobs/events, the shared GPU-host lease, image-output lineage, and retry ancestry. V21 enforces one immutable retry per original image job.
+Migrations v7–v23 are additive. V13 repairs pre-semantic image shots by translating legacy image binding roles to semantic purposes. It deliberately does not invent video/audio purposes: v2v/rv2v keep their validated legacy binding path. V14 adds the nullable job cancellation reason. V15 adds nullable `provider_client_id`, the pre-submit intent used to recover ComfyUI prompts accepted inside the former submit/persist crash window; historical jobs remain valid with null. V16 adds immutable `audio_mode`; historical jobs backfill to `h3_native`. V17 adds idempotent character-reference upload receipts, V18 records asset-level character angle derivations, and V19 repairs legacy duplicate/derived primary slots before enforcing one root primary per character. V20 adds durable character-image jobs/events, the shared GPU-host lease, image-output lineage, and retry ancestry. V21 enforces one immutable retry per original image job. V22 adds durable H3 batches and one-successor H3 retry lineage. V23 adds the batch fairness cursor used by the bounded SQL scheduler.
 
 ## Initial deployment
 

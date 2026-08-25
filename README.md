@@ -12,8 +12,9 @@ Planned shots describe intent. Actual shots record generated evidence. They are 
 
 ## Current milestone
 
-The local Studio now creates immutable H3 jobs, shows worker progress, and reveals
-the candidate video and pending Take when generation completes. Planned shots and
+The local Studio now creates durable H3 batches, rotates worker execution across
+batches, aggregates cross-shot progress, and retries a failed shot through a new
+immutable job. The canvas exposes this state directly while planned shots and
 generated results remain separate records until explicit QC.
 
 ## Workspace

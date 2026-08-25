@@ -1,5 +1,7 @@
 import { CreateH3JobBatchInputSchema, CreateH3JobBatchResultSchema,
   CreateH3JobInputSchema, GenerationPreflightBatchSchema,
+  H3JobBatchListSchema, H3JobBatchSchema, RetryH3JobInputSchema,
+  RetryH3JobResultSchema,
   type GenerationPreflight,
   type GenerationPreflightBatch, type ProjectSnapshot } from '@h3storyboard/protocol';
 import { StoreError, type BindingCompilationOutcome,
@@ -14,11 +16,37 @@ const JOBS = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs$/;
 const PREFLIGHT = /^\/api\/projects\/([^/]+)\/shots\/([^/]+)\/jobs\/preflight$/;
 const BATCH_PREFLIGHT = /^\/api\/projects\/([^/]+)\/jobs\/preflights$/;
 const BATCH_JOBS = /^\/api\/projects\/([^/]+)\/jobs\/batch$/;
+const BATCH_LIST = /^\/api\/projects\/([^/]+)\/job_batches$/;
+const BATCH_DETAIL = /^\/api\/projects\/([^/]+)\/job_batches\/([^/]+)$/;
+const RETRY_JOB = /^\/api\/projects\/([^/]+)\/h3_jobs\/([^/]+)\/retry$/;
 
 export async function dispatchJobRoute(request: IncomingMessage,
   store: ProjectStore, method: string,
   pathname: string): Promise<JobRouteResult | null> {
   const batchPreflight = BATCH_PREFLIGHT.exec(pathname);
+  const batchDetail = BATCH_DETAIL.exec(pathname);
+  if (batchDetail && method === 'GET') {
+    const projectId = decode(batchDetail[1] ?? '', 'project_id');
+    const batchId = decode(batchDetail[2] ?? '', 'batch_id');
+    return { status: 200, body: parseResponseContract(H3JobBatchSchema,
+      store.getH3JobBatch(projectId, batchId)) };
+  }
+  const batchList = BATCH_LIST.exec(pathname);
+  if (batchList && method === 'GET') {
+    const projectId = decode(batchList[1] ?? '', 'project_id');
+    return { status: 200, body: parseResponseContract(H3JobBatchListSchema,
+      store.listH3JobBatches(projectId)) };
+  }
+  const retryJob = RETRY_JOB.exec(pathname);
+  if (retryJob && method === 'POST') {
+    const projectId = decode(retryJob[1] ?? '', 'project_id');
+    const jobId = decode(retryJob[2] ?? '', 'job_id');
+    const parsed = RetryH3JobInputSchema.safeParse(await readJson(request));
+    if (!parsed.success) throw new ApiError(422, 'H3_RETRY_INPUT_INVALID',
+      'H3 retry input does not satisfy the contract', parsed.error.issues);
+    return { status: 201, body: parseResponseContract(RetryH3JobResultSchema,
+      store.retryH3Job(projectId, jobId, parsed.data)) };
+  }
   if (batchPreflight && method === 'GET') {
     const projectId = decode(batchPreflight[1] ?? '', 'project_id');
     const read = store.production.readPreflightBatch(projectId);

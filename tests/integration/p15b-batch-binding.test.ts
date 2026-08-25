@@ -282,6 +282,51 @@ describe('P1.5B batch jobs and drag binding HTTP contracts', () => {
       })],
     } });
   });
+
+  it('rejects a boundary derived from a rejected Take', async () => {
+    const api = await startApi();
+    const fixture = await readyFixture(api.origin, 2);
+    const created = await post(
+      `${api.origin}/api/projects/${fixture.project}/jobs/batch`,
+      batchBody(fixture.preflights, [fixture.shots[0]!]));
+    const job = CreateH3JobBatchResultSchema.parse(
+      ((await created.json()) as { data: unknown }).data).items[0]!.job;
+    await put(`${api.origin}/api/projects/${fixture.project}/generation_lock`, {
+      engaged: false,
+    });
+    const store = openProjectStore(api.databasePath);
+    let takeId = '';
+    let boundaryId = '';
+    try {
+      const claimed = store.claimH3Job(job.id);
+      store.markH3JobQueued(job.id, claimed.lease_token!,
+        'p15b-rejected-provider');
+      store.markH3JobRunning(job.id, claimed.lease_token!);
+      const completed = store.finalizeWorkerOutput(job.id, claimed.lease_token!, {
+        name: 'rejected.mp4', relative_path: 'outputs/rejected.mp4',
+        content_hash: `sha256:${'7'.repeat(64)}`,
+        observed_description: 'Rejected source Take.',
+      });
+      takeId = store.reviewShotActual(completed.actual.id, {
+        qc_verdict: 'rejected',
+      }).id;
+      const boundary = store.createAsset(fixture.project, { kind: 'image',
+        name: 'rejected-last.png', relative_path: 'outputs/rejected-last.png',
+        content_hash: `sha256:${'8'.repeat(64)}`,
+        derived_from_asset_id: completed.asset.id,
+        derivation_kind: 'last_frame' });
+      boundaryId = store.updateAsset(fixture.project, {
+        asset_id: boundary.id, status: 'approved',
+      }).id;
+    } finally { store.close(); }
+
+    const response = await post(`${api.origin}/api/projects/${fixture.project}` +
+      `/shots/${fixture.shots[1]}/bindings`, { binding_type: 'continuity',
+      purpose: 'first_frame', source_shot_plan_id: fixture.shots[0],
+      source_take_id: takeId, reference_asset_id: boundaryId,
+      boundary: 'last_frame' });
+    await expectError(response, 422, 'CONTINUITY_DEPENDENCY_INVALID');
+  });
 });
 
 async function startApi() {

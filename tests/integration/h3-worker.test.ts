@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ComfyUIClient } from '../../packages/h3-provider/src/index.js';
-import { ProjectStore } from '../../packages/project-store/src/index.js';
+import { ProjectStore, StoreError } from
+  '../../packages/project-store/src/index.js';
 import { H3LeaseWorker, workerFailure } from '../../packages/task-engine/src/index.js';
 
 const outputBytes = Buffer.from('stub-h3-video-with-audio');
@@ -24,6 +25,25 @@ afterEach(async () => {
 });
 
 describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
+  it('round-robins complete worker executions across durable batches',
+    async () => {
+      const fixture = seedBatchedWorkerJobs();
+      const stub = await startComfyStub('success');
+      const worker = createWorker(fixture.store, fixture.directory, stub.endpoint);
+
+      const first = await worker.runOnce();
+      const second = await worker.runOnce();
+      const third = await worker.runOnce();
+
+      expect(first.outcome).toBe('completed');
+      expect(second.outcome).toBe('completed');
+      expect(third.outcome).toBe('completed');
+      expect(fixture.firstBatchIds).toContain(resultJobId(first));
+      expect(fixture.secondBatchIds).toContain(resultJobId(second));
+      expect(fixture.firstBatchIds).toContain(resultJobId(third));
+      expect(stub.counts.prompt).toBe(3);
+    });
+
   it('submits once and atomically registers a hashed candidate asset and pending take', async () => {
     const fixture = seedWorkerJob();
     const stub = await startComfyStub('success');
@@ -88,6 +108,47 @@ describe('H3 lease worker with real SQLite and stub ComfyUI HTTP', () => {
     expect(reopened.getProjectSnapshot(fixture.projectId).h3_jobs
       .find(({ id }) => id === fixture.jobId)?.provider_job_id).toBe('prompt-1');
   });
+
+  it('runs an immutable timed-out retry against the persisted provider task',
+    async () => {
+      const fixture = seedWorkerJob();
+      const claimed = fixture.store.claimH3Job(fixture.jobId);
+      fixture.store.markH3SubmitIntent(
+        fixture.jobId, claimed.lease_token!, 'm3-provider-client');
+      fixture.store.markH3JobQueued(
+        fixture.jobId, claimed.lease_token!, 'prompt-1');
+      fixture.store.markH3JobRunning(fixture.jobId, claimed.lease_token!);
+      const raw = new Database(fixture.databasePath);
+      raw.prepare('UPDATE h3_jobs SET lease_expires_at = ? WHERE id = ?')
+        .run('2000-01-01T00:00:00.000Z', fixture.jobId);
+      raw.close();
+      expect(fixture.store.recoverExpiredH3Jobs()).toBe(1);
+      const retried = fixture.store.retryH3Job(
+        fixture.projectId, fixture.jobId, {
+          idempotency_key: 'm3-worker-provider-retry-0001',
+        }).job;
+      expect(retried).toMatchObject({ status: 'timed_out',
+        retry_of_job_id: fixture.jobId, provider_job_id: 'prompt-1',
+        provider_client_id: 'm3-provider-client',
+        error_code: 'H3_RETRY_PROVIDER_RECOVERY' });
+      expectStoreError(() => fixture.store.claimH3Job(fixture.jobId),
+        'H3_JOB_RETRY_INVALID');
+      expectStoreError(() => fixture.store.cancelH3Job(
+        fixture.jobId, 'must not mutate immutable ancestor'),
+      'H3_JOB_RETRY_INVALID');
+      const stub = await startComfyStub('success');
+
+      const result = await createWorker(fixture.store, fixture.directory,
+        stub.endpoint).runOnce();
+
+      expect(result).toMatchObject({ outcome: 'completed', job_id: retried.id });
+      expect(stub.counts).toMatchObject({ free: 0, upload: 0, prompt: 0,
+        history: 2, view: 1 });
+      expect(fixture.store.getH3Job(fixture.jobId).status).toBe('timed_out');
+      expect(fixture.store.getH3Job(retried.id)).toMatchObject({
+        status: 'completed', provider_job_id: 'prompt-1',
+      });
+    });
 
   it('never frees memory, uploads, or submits while an external queue is occupied', async () => {
     const fixture = seedWorkerJob();
@@ -403,6 +464,71 @@ function seedWorkerJob(audioMode: 'h3_native' | 'silent' = 'h3_native') {
       role: 'first_frame', ordinal: 0 }] });
   return { directory, databasePath, store, projectId: project.id,
     jobId: job.id };
+}
+
+function seedBatchedWorkerJobs() {
+  const directory = mkdtempSync(join(tmpdir(), 'h3-batch-worker-'));
+  directories.push(directory);
+  const store = track(new ProjectStore(join(directory, 'storyboard.db')));
+  const project = store.createProject({ title: 'Batch worker integration',
+    script_title: 'Batch worker', script_content:
+      'Four shots prove that the real worker rotates across durable batches.' });
+  const imagePath = `projects/${project.id}/inputs/start.png`;
+  mkdirSync(dirname(join(directory, imagePath)), { recursive: true });
+  writeFileSync(join(directory, imagePath), Buffer.from('batch-worker-image'));
+  const image = store.createAsset(project.id, { kind: 'image', name: 'Start',
+    relative_path: imagePath, content_hash: 'sha256:batch-worker-input',
+    status: 'candidate' });
+  store.updateAsset(project.id, { asset_id: image.id, status: 'approved' });
+  const modeKey = `batch-worker-${project.id.slice(0, 8)}`;
+  store.modes.create({ key: modeKey, title: 'Batch Worker I2V',
+    description: 'M3 batch scheduling worker integration mode.',
+    capability_declaration: { generation_modes: ['i2v'],
+      duration_seconds: { min: 2, max: 15 }, resolution: { min_width: 32,
+        max_width: 2048, min_height: 32, max_height: 2048 },
+      lora_profile_requirements: [], provider_requirements: ['local_comfyui'],
+      extensions: {} } });
+  const shots = Array.from({ length: 4 }, (_, index) => store.createShotPlan(
+    project.id, { title: `Batch worker shot ${index + 1}`, scene_id: 'SC-B',
+      duration_seconds: 5, shot_size: 'medium', camera_movement: 'locked',
+      action: `Worker batch action ${index + 1}.`, semantic_references: [{
+        purpose: 'first_frame', target: { type: 'asset', asset_id: image.id },
+      }], opening_state: null, ending_state: null }));
+  store.freezeCurrentAssetsManifest(project.id);
+  store.production.createBrief(project.id, { mode_key: modeKey, body: {
+    logline: 'A worker rotates across two batches.', style_notes: 'Cinematic.',
+    text_style_lock: null, hard_rules: ['H3 native audio or silence only'] } });
+  store.production.updateLock(project.id, { engaged: true,
+    reason: 'M3 batch worker integration fixture' });
+  const createBatch = (selected: typeof shots, label: string) =>
+    store.createH3JobBatch(project.id, { items: selected.map((shot, index) => ({
+      shot_plan_id: shot.id, job: { mode: 'i2v', provider: 'local_comfyui',
+        model: 'H3-local', prompt: `${label} shot ${index + 1}.`,
+        duration_seconds: 5, seed: 20260825, steps: 4,
+        audio_mode: 'silent', idempotency_key: `${label}-${shot.id}`,
+        input_bindings: [{ asset_id: image.id, asset_kind: 'image',
+          role: 'first_frame', ordinal: 0 }] } })) });
+  const first = createBatch(shots.slice(0, 2), 'm3-worker-a');
+  const second = createBatch(shots.slice(2), 'm3-worker-b');
+  return { directory, store,
+    firstBatchIds: first.items.map(({ job }) => job.id),
+    secondBatchIds: second.items.map(({ job }) => job.id) };
+}
+
+function resultJobId(result: Awaited<ReturnType<H3LeaseWorker['runOnce']>>) {
+  if (result.outcome === 'idle') throw new Error('Expected a claimed worker job');
+  return result.job_id;
+}
+
+function expectStoreError(operation: () => unknown,
+  code: StoreError['code']): void {
+  try { operation(); }
+  catch (error) {
+    expect(error).toBeInstanceOf(StoreError);
+    expect((error as StoreError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected StoreError ${code}`);
 }
 
 function seedR2VWorkerJob(audioMode: 'h3_native' | 'silent' = 'h3_native') {

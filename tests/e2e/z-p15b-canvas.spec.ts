@@ -54,6 +54,46 @@ test.describe.serial('P1.5B canvas batch and semantic drag binding', () => {
       await expect(bar).toBeHidden();
       await page.unrouteAll({ behavior: 'wait' });
 
+      const batchDock = page.getByRole('complementary', { name: 'H3 批次进度' });
+      await expect(batchDock).toContainText('0/2 镜');
+      await expect(batchDock).toContainText('等待 2');
+      failDraftJob(batchJobIds[1]!);
+      await expect(batchDock).toContainText('需要处理');
+      await expect(batchDock).toContainText('处理 1');
+      const retryKeys: string[] = [];
+      let forceRetryFailure = true;
+      const retryUrl = `**/api/projects/${projectId}/h3_jobs/` +
+        `${batchJobIds[1]}/retry`;
+      await page.route(retryUrl, async (route) => {
+        const body = route.request().postDataJSON() as {
+          idempotency_key: string };
+        retryKeys.push(body.idempotency_key);
+        if (forceRetryFailure) {
+          forceRetryFailure = false;
+          await route.fulfill({ status: 500, contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'INTERNAL_ERROR',
+              message: 'Forced retry failure for browser recovery' } }) });
+          return;
+        }
+        await route.continue();
+      });
+      const retryButton = batchDock.getByRole('button', {
+        name: '重试 P1.5B 镜头 2',
+      });
+      await retryButton.click();
+      await expect(batchDock.getByRole('alert')).toContainText(
+        'Forced retry failure');
+      await expect(retryButton).toBeEnabled();
+      await retryButton.click();
+      await expect.poll(async () => (await projectSnapshot(request)).h3_jobs
+        .filter(({ retry_of_job_id }) => retry_of_job_id === batchJobIds[1]).length)
+        .toBe(1);
+      expect(retryKeys).toHaveLength(2);
+      expect(retryKeys[1]).toBe(retryKeys[0]);
+      await expect(batchDock).toContainText('RETRY 1');
+      await expect(batchDock).toContainText('等待 2');
+      await page.unroute(retryUrl);
+
       const snapshot = await projectSnapshot(request);
       expect(snapshot.h3_jobs.filter(({ id }) => batchJobIds.includes(id)))
         .toHaveLength(2);
@@ -177,6 +217,17 @@ function prepareContinuitySource(jobId: string) {
   } finally { store.close(); }
 }
 
+function failDraftJob(jobId: string): void {
+  const databasePath = process.env.H3_E2E_DB;
+  if (!databasePath) throw new Error('H3_E2E_DB is required');
+  const store = openProjectStore(databasePath);
+  try {
+    const claimed = store.claimH3Job(jobId);
+    store.failH3Job(jobId, claimed.lease_token!,
+      'M3_BROWSER_FAILURE', 'Failed for per-shot retry browser coverage');
+  } finally { store.close(); }
+}
+
 async function openProject(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: new RegExp(title) }).click();
@@ -214,7 +265,7 @@ async function projectSnapshot(request: APIRequestContext) {
   const response = await request.get(`${API_ORIGIN}/api/projects/${projectId}`);
   expect(response.status()).toBe(200);
   return ((await response.json()) as { data: {
-    h3_jobs: Array<{ id: string }>;
+    h3_jobs: Array<{ id: string; retry_of_job_id?: string | null }>;
     shot_plans: Array<{ id: string; continuity_mode: string;
       continuity_dependencies: Array<Record<string, string>>;
       semantic_references: Array<{ purpose: string;

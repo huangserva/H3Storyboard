@@ -1,5 +1,6 @@
 export * from './errors.js';
 export * from './project-store.js';
+export * from './h3-job-store.js';
 export * from './canvas-store.js';
 export * from './mode-store.js';
 export * from './production-store.js';

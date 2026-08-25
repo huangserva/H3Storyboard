@@ -11,6 +11,7 @@ import { useCharacters } from '../lib/use-characters.js';
 import { useBrowserFullscreen } from '../lib/use-browser-fullscreen.js';
 import { AssetLibraryPanel } from './AssetLibraryPanel.js';
 import { CanvasInspectorPanel } from './CanvasInspectorPanel.js';
+import { BatchProgressDock } from './BatchProgressDock.js';
 import { CharacterLibraryPanel } from './CharacterLibraryPanel.js';
 import { MediaLightbox } from './MediaLightbox.js';
 import { StoryboardFlow } from './StoryboardFlow.js';
@@ -179,6 +180,7 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
       onSelect={(node) => { setSelectedNodeId(node?.id ?? null);
         if (node) setAssetDrawerOpen(false);
         if (node?.shot_id) onSelectShot(node.shot_id); }} />
+    <BatchProgressDock snapshot={snapshot} />
     <div className="canvas-right-rail">
       <CanvasInspectorPanel node={selectedNode} snapshot={graphSnapshot} assets={assets}
         busy={busy}

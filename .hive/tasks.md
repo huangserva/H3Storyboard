@@ -19,6 +19,12 @@
 - [x] **全栈工程师2** dispatch `ef22abdf` — 任务：Studio 生成按钮全链路（重派——上一 worker 中途退出，git log 确认零提交落地，从头开始，不要假设有半成品）。
 ## Done
 
+### 2026-08-25 · M3A worker 批量编排（done）
+- [x] 持久 batch、全部未完成批次进度、最近完成历史与 Protocol 1.9 / schema v23。
+- [x] 真 SQL 单 Job claim：batch↔batch、recovery↔draft、unbatched↔batch 公平调度，同毫秒计数兜底。
+- [x] immutable per-shot retry、provider task 身份转移、旧 ancestor 禁止 claim/cancel、Chrome 失败后同 key 重试。
+- [x] 43 个 Vitest 文件（268 passed / 1 skipped）与 24 个 Chrome E2E；四路最终复审均 ≥ B-。
+
 ### 2026-08-24 · M2 P1.2 可直接测试画布（done）
 - [x] 真实 approved Character reference 与静音 MP4 fixture；幂等独立 seed，强制 `H3_WORKER=0`，零 4090 请求。
 - [x] Job→output Asset→Take 精确血缘、Inspector/lightbox、Take/QC/代表片与刷新持久化。

@@ -13,6 +13,9 @@ import { randomUUID } from 'node:crypto';
 import { compileShotBindings } from './binding-operations.js';
 import { StoreError } from './errors.js';
 import { buildJobLockSnapshot } from './generation-locks.js';
+import { createH3BatchRecord, findH3BatchIdByFingerprint,
+  getH3JobBatch, h3BatchFingerprint } from
+  './h3-batch-operations.js';
 import { parseInput } from './input.js';
 import { appendJobEvent, getJob } from './job-support.js';
 import { mapH3Job } from './row-mappers.js';
@@ -41,6 +44,11 @@ export function createH3JobBatch(db: Database.Database, projectId: string,
           project_id: projectId, shot_id: item.shot_plan_id,
         });
     }
+    const fingerprint = h3BatchFingerprint(projectId, input);
+    const replayBatchId = findH3BatchIdByFingerprint(
+      db, projectId, fingerprint);
+    if (replayBatchId) return replayH3JobBatch(
+      db, projectId, replayBatchId, input);
     for (const item of input.items) {
       const active = db.prepare(`SELECT id FROM h3_jobs
         WHERE shot_plan_id = ? AND idempotency_key <> ?
@@ -52,10 +60,39 @@ export function createH3JobBatch(db: Database.Database, projectId: string,
           shot_plan_id: item.shot_plan_id, active_job_id: active.id,
         });
     }
-    return { project_id: projectId,
-      items: input.items.map((item) => ({ shot_plan_id: item.shot_plan_id,
-        job: createH3JobRecord(db, item.shot_plan_id, item.job) })) };
+    const items = input.items.map((item) => ({
+      shot_plan_id: item.shot_plan_id,
+      job: createH3JobRecord(db, item.shot_plan_id, item.job),
+    }));
+    const batch = createH3BatchRecord(db, projectId, fingerprint, items);
+    return { project_id: projectId, batch, items };
   });
+}
+
+function replayH3JobBatch(db: Database.Database, projectId: string,
+  batchId: string, input: CreateH3JobBatchInput): CreateH3JobBatchResult {
+  const items = input.items.map((item) => {
+    const row = db.prepare(`SELECT j.* FROM h3_job_batch_items bi
+      JOIN h3_jobs j ON j.id = bi.original_job_id
+      WHERE bi.batch_id = ? AND bi.shot_plan_id = ?
+        AND j.idempotency_key = ?`).get(
+      batchId, item.shot_plan_id, item.job.idempotency_key);
+    if (!row) throw new StoreError('DATABASE_RECORD_INVALID',
+      'Durable H3 batch replay is missing its original job', {
+        batch_id: batchId, shot_plan_id: item.shot_plan_id,
+      });
+    const job = mapH3Job(row);
+    if (jobInputFingerprint(job) !== jobInputFingerprint(item.job)) {
+      throw new StoreError('IDEMPOTENCY_KEY_REUSED',
+        'Idempotency key was already used with different H3 job input', {
+          shot_plan_id: item.shot_plan_id,
+          idempotency_key: item.job.idempotency_key,
+        });
+    }
+    return { shot_plan_id: item.shot_plan_id, job };
+  });
+  return { project_id: projectId,
+    batch: getH3JobBatch(db, projectId, batchId), items };
 }
 
 function createH3JobRecord(db: Database.Database, shotPlanId: string,
@@ -116,7 +153,7 @@ function createH3JobRecord(db: Database.Database, shotPlanId: string,
   return getJob(db, id);
 }
 
-function jobInputFingerprint(input: CreateH3JobInput | H3Job): string {
+export function jobInputFingerprint(input: CreateH3JobInput | H3Job): string {
   return JSON.stringify({ mode: input.mode, provider: input.provider,
     model: input.model, prompt: input.prompt,
     duration_seconds: input.duration_seconds, seed: input.seed,

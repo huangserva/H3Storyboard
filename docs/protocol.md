@@ -1,6 +1,6 @@
-# Protocol 1.8
+# Protocol 1.9
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.8 keeps the Protocol 1.7 character-image jobs, GPU-host lease, and H3-only final-audio policy, and adds atomic multi-shot H3 job creation plus semantic Plan reference binding.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.9 keeps the Protocol 1.8 atomic multi-shot creation and semantic Plan bindings, and adds durable H3 batches, cross-job progress, fair batch scheduling, and immutable per-shot retry lineage.
 
 ## Project lineage
 
@@ -68,7 +68,7 @@ draft -> submitting -> queued -> running -> completed
 - Heartbeats renew active leases. On restart, expired active leases move once to `timed_out` and can be explicitly reclaimed.
 - `provider_client_id` is a durable submit intent written before provider I/O. If the process exits after ComfyUI accepts the prompt but before `provider_job_id` is stored, recovery searches queue and history by this client id and claims the existing prompt.
 - `provider_job_id` is the durable ComfyUI prompt id. Reclaiming `timed_out` work verifies and polls that same task. Only after repeated history misses and an absent queue entry may recovery clear both provider ids and resubmit.
-- Cancel records a non-empty `cancel_reason`; a rerun is a new job/idempotency key and never reuses the provider task.
+- Cancel records a non-empty `cancel_reason`; an explicit rerun is a new immutable job with a new idempotency key and `retry_of_job_id`.
 - Poll attempts renew the lease. The maximum frame-scaled poll window must be shorter than the lease; a poll timeout interrupts/removes the exact provider task and records recoverable `timed_out`, not permanent failure.
 - A worker output becomes visible atomically as a candidate video `Asset` with a real `sha256:<64 hex>` hash, the completed job output, and a pending `ShotActual`. Any database failure rolls back all three.
 
@@ -126,6 +126,10 @@ canonical root or an approved derived angle.
 H3 video jobs use the same bounded eight-attempt exponential auto-recovery rule.
 Fresh drafts remain eligible while an older timed-out job is cooling down, so a
 busy shared GPU cannot make the oldest H3 job starve the rest of the queue.
+An explicit retry of a timed-out H3 job preserves an existing
+`provider_job_id` or `provider_client_id` on the successor. The worker therefore
+recovers the already submitted ComfyUI task instead of producing a duplicate
+4090 submission.
 
 If the API is intentionally separated from the provider-owning worker, it must be
 given an explicit cancellation callback. Without that owner channel, canceling a
@@ -198,7 +202,7 @@ The pure compiler returns `{generation_mode, bindings[]}` where every `CompiledB
 - An ending input without `first_frame`, duplicate/ambiguous endings, or mixing interpolation endings with general references returns `BINDING_INVALID_COMBINATION`.
 - Missing/unapproved/non-manifest inputs return `BINDING_MISSING_INPUT`; non-image semantic assets return `BINDING_KIND_MISMATCH`; unsupported Mode capability returns `MODE_CAPABILITY_MISMATCH`.
 - Submitted i2v/fl2v/r2v assets must equal the compiled list in asset, role, and ordinal: omissions return `BINDING_MISSING_INPUT`, extras/reordering return `BINDING_UNRELATED_INPUT`.
-- v2v/rv2v remain on the original validated `AssetBinding` path until M3 defines video semantic purposes; their jobs store `compiled_bindings = null`.
+- v2v/rv2v remain on the original validated `AssetBinding` path; Protocol 1.9 does not add video semantic purposes, and their jobs store `compiled_bindings = null`.
 - Migration v13 backfills legacy image `reference_bindings` into equivalent semantic references. Video/audio bindings remain on the original path because Protocol 1.1 has no truthful video/audio semantic purpose.
 
 Routes: `PATCH /api/shots/:shot_plan_id`; `POST /api/shots/:shot_plan_id/compile_bindings`.
@@ -237,8 +241,37 @@ Every shot must belong to the path project and pass the same locked brief,
 manifest, binding, representative, provider, and H3-native-audio validation as
 single-job creation. Validation and inserts run in one immediate SQLite
 transaction: any invalid item or database failure rolls back the whole batch.
-Exact idempotency-key retries return the existing jobs in request order;
-different keys cannot create a second active job for the same shot.
+Exact idempotency-key retries return the existing jobs and the same durable
+batch in request order; different keys cannot create a second active job for
+the same shot. Each batch stores ordered original/current job membership and a
+request fingerprint in the same transaction.
+
+## M3 batch scheduling, progress, and per-shot retry
+
+`GET /api/projects/:project_id/job_batches` lists every durable batch that is
+not yet completed, plus the three most recent completed batches, newest first;
+`GET /api/projects/:project_id/job_batches/:batch_id` reads one scoped batch.
+Progress is derived from each item's current job and classifies every shot as
+exactly one of `pending`, `active`, `recovering`, `completed`, or `attention`.
+`progress_percent` is completed shots divided by total shots; a failed,
+canceled, or exhausted timed-out shot leaves the batch below 100% and sets the
+batch status to `attention`.
+
+The worker scheduler rotates runnable shots across batches by the durable
+`last_claimed_at` cursor, then preserves item order within each batch. A batch
+that has never been claimed uses its creation time; `claimed_count` breaks
+same-millisecond cursor ties. Two batches with two jobs each therefore claim
+A1, B1, A2, B2 instead of draining A before B. Unbatched single jobs share the
+same chronological ordering and remain eligible.
+
+`POST /api/projects/:project_id/h3_jobs/:job_id/retry` accepts a new
+`idempotency_key` for a failed, canceled, or timed-out job. It creates one
+immutable successor, leaves the original unchanged, and atomically advances
+the containing batch's `current_job_id`. A partial unique index permits at most
+one direct successor, so concurrent retry clicks converge rather than fan out.
+To retry again after the successor fails, clients retry that successor, forming
+a traceable chain. A timed-out job with provider identity transfers that
+identity to the successor for recovery; it never submits a second provider task.
 
 `POST /api/projects/:project_id/shots/:shot_plan_id/bindings` mutates only an
 unlocked Plan. A semantic binding accepts a non-archived project image or a
@@ -294,6 +327,9 @@ Error envelope:
 | `GET` | `/api/projects/:project_id/shots/:shot_plan_id/jobs/preflight` | read one shot generation preflight |
 | `GET` | `/api/projects/:project_id/jobs/preflights` | read all project shot preflights in one ordered response |
 | `POST` | `/api/projects/:project_id/jobs/batch` | atomically and idempotently create 1–100 validated H3-native jobs |
+| `GET` | `/api/projects/:project_id/job_batches` | list durable H3 batches with derived cross-shot progress |
+| `GET` | `/api/projects/:project_id/job_batches/:batch_id` | read one project-scoped H3 batch |
+| `POST` | `/api/projects/:project_id/h3_jobs/:job_id/retry` | create one immutable per-shot retry and advance batch lineage |
 | `POST` | `/api/projects/:project_id/shots/:shot_plan_id/bindings` | bind a semantic image/character or approved Take boundary to an unlocked Plan |
 | `POST` | `/api/shots/:shot_plan_id/actuals` | append a pending generated take |
 | `POST` | `/api/actuals/:actual_id/review` | approve or reject a pending take once |

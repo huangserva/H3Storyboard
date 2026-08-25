@@ -6,6 +6,7 @@ export * from './character.js';
 export * from './character-image-job.js';
 export * from './gpu-lease.js';
 export * from './h3-job.js';
+export * from './h3-batch.js';
 export * from './mode.js';
 export * from './production-brief.js';
 export * from './production-error.js';

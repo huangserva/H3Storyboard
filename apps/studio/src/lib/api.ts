@@ -1,5 +1,5 @@
-import { CreateH3JobBatchResultSchema, GenerationPreflightBatchSchema } from
-  '@h3storyboard/protocol';
+import { CreateH3JobBatchResultSchema, GenerationPreflightBatchSchema,
+  H3JobBatchListSchema, RetryH3JobResultSchema } from '@h3storyboard/protocol';
 import type {
   BindShotReferenceInput,
   CreateProjectInput,
@@ -23,6 +23,8 @@ import type {
   CreateH3JobBatchInput,
   CreateH3JobBatchResult,
   ShotPlan,
+  H3JobBatchList,
+  RetryH3JobResult,
 } from '@h3storyboard/protocol';
 
 interface ApiEnvelope<T> {
@@ -168,6 +170,21 @@ export async function createH3JobBatch(projectId: string,
       method: 'POST', body: JSON.stringify(input),
     });
   return CreateH3JobBatchResultSchema.parse(result);
+}
+
+export async function listH3JobBatches(
+  projectId: string): Promise<H3JobBatchList> {
+  const result = await request<unknown>(`/api/projects/` +
+    `${encodeURIComponent(projectId)}/job_batches`);
+  return H3JobBatchListSchema.parse(result);
+}
+
+export async function retryH3Job(projectId: string, jobId: string,
+  idempotencyKey: string): Promise<RetryH3JobResult> {
+  const result = await request<unknown>(`/api/projects/` +
+    `${encodeURIComponent(projectId)}/h3_jobs/${encodeURIComponent(jobId)}/retry`,
+  { method: 'POST', body: JSON.stringify({ idempotency_key: idempotencyKey }) });
+  return RetryH3JobResultSchema.parse(result);
 }
 
 export async function bindShotReference(projectId: string, shotId: string,

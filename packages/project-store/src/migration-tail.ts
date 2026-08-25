@@ -7,6 +7,8 @@ import { createCharacterAssetDerivations } from './migration-v18.js';
 import { enforceCharacterPrimaryReferences } from './migration-v19.js';
 import { createCharacterImageJobsAndGpuLeases } from './migration-v20.js';
 import { enforceSingleCharacterImageRetry } from './migration-v21.js';
+import { createH3BatchOrchestration } from './migration-v22.js';
+import { addH3BatchFairnessCursor } from './migration-v23.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -18,6 +20,8 @@ const tailMigrations: Array<readonly [number,
   [19, enforceCharacterPrimaryReferences],
   [20, createCharacterImageJobsAndGpuLeases],
   [21, enforceSingleCharacterImageRetry],
+  [22, createH3BatchOrchestration],
+  [23, addH3BatchFairnessCursor],
 ];
 
 export function applyTailMigrations(

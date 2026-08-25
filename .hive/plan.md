@@ -1,9 +1,9 @@
 ---
 title: H3Storyboard
 started: 2026-08-11
-current_phase: M2
+current_phase: M3
 status: active
-last_review: 2026-08-24
+last_review: 2026-08-25
 ---
 
 ## 目标
@@ -54,8 +54,9 @@ last_review: 2026-08-24
   8188/8190 共享 GPU lease、恢复/取消/重试、像素解码、candidate 血缘、
   manifest CTA；真实 4090 三路径与浏览器 E2E 均通过
 
-### M3 · 多模态 H3 · open
-- [ ] v2v / rv2v、视频音频引用槽、绑定审计、批量队列
+### M3 · 多模态 H3 · in progress
+- [x] M3A：持久批次、worker 跨批公平调度、跨镜进度、不可变逐镜重试与 Studio 重试入口
+- [ ] M3B：v2v / rv2v、视频引用槽与绑定审计
 
 ## 参考源（已评估，见 .hive/research/）
 - `director`（本地私有仓库，检视 commit cb7358b）— 生产政策参考：Mode 验证状态、资产生命周期、生成锁、opening/ending state、代表性 take 门禁 → 已吸收进 M1A
@@ -73,10 +74,17 @@ last_review: 2026-08-24
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M2 — P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
+M3 — M3A 批量编排已完成；P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
 P1.3B 已完成最终全量门禁与四路 review（B+ / B- / B- / B）。默认制片墙可直接本地体验，角色图完成后只进入
 candidate，仍需导演人工批准。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v
 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+
+## 2026-08-25 M3A 批量编排交付状态
+- Protocol 1.9 / schema v23：持久 H3 batch、原始/当前 Job 血缘、跨镜聚合进度与不可变逐镜 retry。
+- Worker 通过 SQL 单行 claim 在 batch、恢复任务和 unbatched Job 之间公平轮转；同毫秒由 `claimed_count` 裁决，旧 retry ancestor 永不再领取或取消。
+- Studio 展示全部未完成批次和最近 3 个已完成批次；失败镜头可原位重试，500 后保留同一幂等键。
+- `pnpm check && pnpm build && pnpm test` 全绿：43 个 Vitest 文件，268 passed / 1 既有 skip；24 个 Chrome E2E passed。
+- 四路最终复审：架构 B-、真实 bug A-、测试 A、spec B+。报告：`reports/2026-08-25-m3-batch-orchestration.html`。
 
 ## 2026-08-11 M1A 角色交付状态
 - commit `8174da0`：migration v7、Character/Reference API、归档纪律、角色库与 character canvas node；38 tests 通过。

@@ -149,6 +149,12 @@ export function cancelH3Job(
   return runWriteTransaction(db, () => {
     const job = getJob(db, jobId);
     if (job.status === 'canceled') return job;
+    const successor = db.prepare(`SELECT id FROM h3_jobs
+      WHERE retry_of_job_id = ? LIMIT 1`).get(jobId) as
+      { id: string } | undefined;
+    if (successor) throw new StoreError('H3_JOB_RETRY_INVALID',
+      'An immutable retry has replaced this H3 job',
+      { job_id: jobId, retry_job_id: successor.id });
     requireJobTransition(job, 'canceled');
     const now = new Date().toISOString();
     const result = db.prepare(
