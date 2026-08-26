@@ -68,8 +68,22 @@ tests; the single skipped test remains the explicit opt-in live ComfyUI probe.
 
 ## M3 — multimodal H3
 
+- [x] Worker-side batch scheduling, cross-task progress policy, and immutable
+  per-shot retry (M3A, Protocol 1.9 / schema v23).
 - [ ] `v2v` and `rv2v`.
 - [ ] Video and audio reference slots.
 - [ ] Prompt-to-upload binding audit.
-- [ ] Worker-side batch scheduling, progress policy, and per-shot retry (P1.5B
-  creates the selected immutable jobs atomically; execution remains per job).
+
+## P2 — Script Studio
+
+- [x] P2.1 structured foundation: plain-text and selected Shuohao import,
+  durable Scene/Beat editing, deterministic validation, immutable script locking,
+  and idempotent compilation to provenance-linked draft ShotPlans.
+- [x] Real HTTP + SQLite integration and real Chromium user-flow coverage.
+- [x] Draft Plan execution gate: compilation never submits to ComfyUI, and both
+  single and batch H3 creation reject non-approved plans.
+- [x] Four independent reviews after remediation: architecture B-, bugs B,
+  tests B+, protocol A-. Final gate: 272 Vitest passed / 1 explicit live skip,
+  25 Chromium E2E passed.
+- [ ] Director review/approval and draft Plan editing/diff before H3 execution.
+- [ ] Optional AI story/script generation behind the same draft and lock gates.

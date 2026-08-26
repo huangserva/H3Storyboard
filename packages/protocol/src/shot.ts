@@ -71,6 +71,8 @@ const shotPlanFields = {
   continuity_mode: ContinuityModeSchema.default('independent'),
   continuity_dependencies: z.array(ContinuityDependencySchema).default([]),
   costume_state: z.record(z.string(), z.string()).default({}),
+  position_state: z.record(z.string(), z.string()).default({}),
+  prop_state: z.record(z.string(), z.string()).default({}),
   reference_bindings: z.array(AssetBindingSchema).default([]),
   semantic_references: z.array(SemanticReferenceSchema).default([]),
   opening_state: ShotStateSchema.nullable().default(null),
@@ -132,7 +134,7 @@ function addShotPlanIssues(
 export const CreateShotPlanInputSchema = z
   .object(shotPlanFields)
   .superRefine((value, context) => addShotPlanIssues(value, context, true));
-export type CreateShotPlanInput = z.infer<typeof CreateShotPlanInputSchema>;
+export type CreateShotPlanInput = z.input<typeof CreateShotPlanInputSchema>;
 
 export const UpdateShotPlanInputSchema = z.object({
   shot_plan_id: IdSchema,
@@ -173,6 +175,10 @@ export const ShotPlanSchema = z
     project_id: IdSchema,
     script_version_id: IdSchema,
     ordinal: z.number().int().positive(),
+    planning_status: z.enum(['draft', 'approved', 'superseded']),
+    source_script_scene_id: IdSchema.nullable(),
+    source_script_beat_ids: z.array(IdSchema),
+    source_compilation_id: IdSchema.nullable(),
     created_at: TimestampSchema,
     updated_at: TimestampSchema,
   })

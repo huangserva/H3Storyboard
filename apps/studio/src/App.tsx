@@ -54,6 +54,7 @@ export function App() {
           onGenerate={studio.generate}
           onGenerateBatch={studio.generateBatch}
           onBindReference={studio.bindReference}
+          onRefreshProject={studio.refreshCurrentProject}
           selectedShot={studio.selectedShot}
           shotFocusRevision={shotFocusRevision}
           snapshot={studio.snapshot}

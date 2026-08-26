@@ -128,6 +128,7 @@ function scopedShot(store: ProjectStore, rawProjectId: string,
 interface PreflightContext {
   readonly lock_engaged: boolean;
   readonly has_brief: boolean;
+  readonly unavailable_shots: ReadonlyMap<string, string>;
   readonly jobs_by_shot: ReadonlySet<string>;
   readonly approved_representatives_by_shot: ReadonlySet<string>;
   readonly assets_by_id: ReadonlyMap<string, ProjectSnapshot['assets'][number]>;
@@ -138,6 +139,9 @@ function preflightContext(snapshot: ProjectSnapshot, lockEngaged: boolean,
   return {
     lock_engaged: lockEngaged,
     has_brief: hasBrief,
+    unavailable_shots: new Map(snapshot.shot_plans
+      .filter(({ planning_status }) => planning_status !== 'approved')
+      .map(({ id, planning_status }) => [id, planning_status])),
     jobs_by_shot: new Set(snapshot.h3_jobs.map(({ shot_plan_id }) => shot_plan_id)),
     approved_representatives_by_shot: new Set(snapshot.shot_actuals
       .filter(({ is_representative, representative_status }) =>
@@ -150,6 +154,11 @@ function preflightContext(snapshot: ProjectSnapshot, lockEngaged: boolean,
 function generationPreflight(store: ProjectStore, shotId: string,
   context: PreflightContext,
   compilation?: BindingCompilationOutcome): GenerationPreflight {
+  const planningStatus = context.unavailable_shots.get(shotId);
+  if (planningStatus) return blocked('SHOT_PLAN_DRAFT',
+    planningStatus === 'draft'
+      ? '剧本编译镜头仍为草稿，需导演批准后才能生成'
+      : '该计划镜头已被后续版本取代');
   if (!context.lock_engaged) return blocked('LOCK_REQUIRED',
     !context.has_brief
       ? '请先建立 Production Brief 并锁定生成上下文'

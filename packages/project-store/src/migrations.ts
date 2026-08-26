@@ -16,7 +16,7 @@ import { addRepresentativeTakeGate } from './migration-v12.js';
 import { backfillSemanticReferences } from './migration-v13.js';
 import { applyTailMigrations } from './migration-tail.js';
 
-const CURRENT_SCHEMA_VERSION = 23;
+const CURRENT_SCHEMA_VERSION = 24;
 
 const MIGRATION_V1 = `
   CREATE TABLE projects (

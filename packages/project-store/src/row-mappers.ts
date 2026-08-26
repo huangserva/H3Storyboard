@@ -11,6 +11,9 @@ import {
   ProductionBriefSchema,
   ProjectGenerationLockSchema,
   ProjectSchema,
+  ScriptBeatSchema,
+  ScriptCompilationSchema,
+  ScriptSceneSchema,
   ScriptVersionSchema,
   ShotActualSchema,
   ShotPlanSchema,
@@ -26,6 +29,9 @@ import {
   type ProductionBrief,
   type ProjectGenerationLock,
   type Project,
+  type ScriptBeat,
+  type ScriptCompilation,
+  type ScriptScene,
   type ScriptVersion,
   type ShotActual,
   type ShotPlan,
@@ -82,8 +88,34 @@ function jsonColumn(row: Record<string, unknown>, column: string): unknown {
 export const mapProject = (row: unknown): Project =>
   decode(ProjectSchema, objectRow(row));
 
-export const mapScriptVersion = (row: unknown): ScriptVersion =>
-  decode(ScriptVersionSchema, objectRow(row));
+export function mapScriptVersion(row: unknown): ScriptVersion {
+  const record = objectRow(row);
+  return decode(ScriptVersionSchema, {
+    ...record,
+    source_format: record.source_format ?? 'legacy_text',
+    parent_version_id: record.parent_version_id ?? null,
+    revision: record.revision ?? 0,
+    updated_at: record.updated_at ?? record.created_at,
+  });
+}
+
+export function mapScriptBeat(row: unknown): ScriptBeat {
+  const record = objectRow(row);
+  return decode(ScriptBeatSchema, {
+    ...record,
+    character_refs: jsonColumn(record, 'character_refs_json'),
+    costume_state: jsonColumn(record, 'costume_state_json'),
+    position_state: jsonColumn(record, 'position_state_json'),
+    prop_state: jsonColumn(record, 'prop_state_json'),
+  });
+}
+
+export function mapScriptScene(row: unknown, beats: ScriptBeat[]): ScriptScene {
+  return decode(ScriptSceneSchema, { ...objectRow(row), beats });
+}
+
+export const mapScriptCompilation = (row: unknown): ScriptCompilation =>
+  decode(ScriptCompilationSchema, objectRow(row));
 
 export function mapAsset(row: unknown): Asset {
   const record = objectRow(row);
@@ -131,11 +163,20 @@ export function mapShotPlan(row: unknown): ShotPlan {
   const record = objectRow(row);
   return decode(ShotPlanSchema, {
     ...record,
+    planning_status: record.planning_status ?? 'approved',
+    source_script_scene_id: record.source_script_scene_id ?? null,
+    source_script_beat_ids: record.source_script_beat_ids_json == null ? [] :
+      jsonColumn(record, 'source_script_beat_ids_json'),
+    source_compilation_id: record.source_compilation_id ?? null,
     continuity_dependencies: jsonColumn(
       record,
       'continuity_dependencies_json',
     ),
     costume_state: jsonColumn(record, 'costume_state_json'),
+    position_state: record.position_state_json == null ? {} :
+      jsonColumn(record, 'position_state_json'),
+    prop_state: record.prop_state_json == null ? {} :
+      jsonColumn(record, 'prop_state_json'),
     reference_bindings: jsonColumn(record, 'reference_bindings_json'),
     semantic_references: record.semantic_references_json == null ? [] :
       jsonColumn(record, 'semantic_references_json'),

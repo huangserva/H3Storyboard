@@ -30,7 +30,9 @@ export function PlannedShotPanel({ shot, busy, job, preflight,
           <span className="panel-index">A</span>
           <span className="eyebrow">PLANNED / 计划分镜</span>
         </div>
-        <span className="record-state planned">已锁定</span>
+        <span className="record-state planned">{shot.planning_status === 'draft'
+          ? '剧本编译草稿' : shot.planning_status === 'superseded'
+            ? '已被取代' : '已批准'}</span>
       </header>
       <div className="shot-title-row">
         <span>{String(shot.ordinal).padStart(2, '0')}</span>

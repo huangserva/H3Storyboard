@@ -2,6 +2,11 @@
 
 ## In progress
 
+### P2 后续
+
+- [ ] P2.2：导演审阅/修改编译后的草稿 Plan，显示 ScriptScene/Beat diff，显式批准后解锁 H3。
+- [ ] P2.3：可选 AI 剧本生成；不得越过 draft、校验和人工锁定，不得引入任何外部声音。
+
 ### （M1B 已完成，归档见 Done）
 
 - [x] **全栈工程师** dispatch `478c3bf6` — 任务：M1B-1——ComfyUI H3 adapter（TypeScript，contract 级）+ 只读能力发现。蓝本：h3-film-studio 的 scripts/local_providers.py
@@ -18,6 +23,13 @@
 - [x] **全栈工程师2** dispatch `bfcba78a` — 任务：【调研，不写实现代码】深挖 xyz 的 OiiOii 画布交互模型，产出 H3Storyboard 画布'直接操作化'改造方案。user 拍板：现画布不如 OiiOii 好用，核心差距是'能在画布上直接操作'。完整任务书见 .hiv…
 - [x] **全栈工程师2** dispatch `ef22abdf` — 任务：Studio 生成按钮全链路（重派——上一 worker 中途退出，git log 确认零提交落地，从头开始，不要假设有半成品）。
 ## Done
+
+### 2026-08-26 · P2.1 Script Studio（done）
+- [x] plain text / shuohao JSON 导入；Scene/Beat UUID、状态与时长持久化。
+- [x] draft-only 编辑、确定性校验、锁定/supersede、幂等编译和来源血缘。
+- [x] 草稿 ShotPlan 不可创建单镜或批量 H3 Job；全链零 4090、零外部音频。
+- [x] 真 HTTP + SQLite 集成测试和真实 Chromium 完整用户链。
+- [x] 最终门禁 272 passed / 1 live skip + 25 Chrome；四路复审 B- / B / B+ / A-。
 
 ### 2026-08-25 · M3A worker 批量编排（done）
 - [x] 持久 batch、全部未完成批次进度、最近完成历史与 Protocol 1.9 / schema v23。

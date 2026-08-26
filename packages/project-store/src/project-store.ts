@@ -33,6 +33,7 @@ import { recoverExpiredH3Jobs } from './job-lifecycle.js';
 import { migrateDatabase } from './migrations.js';
 import { ModeStore } from './mode-store.js';
 import { ProductionStore } from './production-store.js';
+import { ScriptStore } from './script-store.js';
 import { TakeStore } from './take-store.js';
 import {
   freezeCurrentAssetsManifest,
@@ -56,6 +57,7 @@ export class ProjectStore extends H3JobStore {
   readonly #database: Database.Database;
   readonly modes: ModeStore;
   readonly production: ProductionStore;
+  readonly scripts: ScriptStore;
   readonly takes: TakeStore;
   readonly characters: CharacterStore;
   readonly characterMedia: CharacterMediaStore;
@@ -72,6 +74,7 @@ export class ProjectStore extends H3JobStore {
     this.#database = database;
     this.modes = new ModeStore(this.#database);
     this.production = new ProductionStore(this.#database);
+    this.scripts = new ScriptStore(this.#database);
     this.takes = new TakeStore(this.#database);
     this.characters = new CharacterStore(this.#database);
     this.characterMedia = new CharacterMediaStore(this.#database);

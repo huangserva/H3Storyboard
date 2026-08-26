@@ -1,7 +1,7 @@
 ---
 title: H3Storyboard
 started: 2026-08-11
-current_phase: M3
+current_phase: P2.1
 status: active
 last_review: 2026-08-25
 ---
@@ -58,6 +58,12 @@ last_review: 2026-08-25
 - [x] M3A：持久批次、worker 跨批公平调度、跨镜进度、不可变逐镜重试与 Studio 重试入口
 - [ ] M3B：v2v / rv2v、视频引用槽与绑定审计
 
+### P2 · Script Studio · in progress
+- [x] P2.1：plain text / shuohao 单上游导入、Scene/Beat 持久编辑、确定性校验、不可变锁定、带 Scene/Beat 来源的草稿 ShotPlan 编译
+- [x] 草稿 Plan 单镜/批量 H3 双重门禁；剧本链路不访问 4090，不引入 TTS/BGM/环境音
+- [ ] P2.2：导演审阅、逐镜编辑/diff、显式批准后才进入现有 H3 生产链
+- [ ] P2.3：可选 AI 剧本生成，继续服从 draft → validate → lock 边界
+
 ## 参考源（已评估，见 .hive/research/）
 - `director`（本地私有仓库，检视 commit cb7358b）— 生产政策参考：Mode 验证状态、资产生命周期、生成锁、opening/ending state、代表性 take 门禁 → 已吸收进 M1A
 - `luojiang419/filmstoryboard`（检视 commit d7572b1）— 桌面工作台信息架构、项目/素材管理 → 借鉴思路，不复用代码（无 LICENSE）
@@ -74,10 +80,18 @@ last_review: 2026-08-25
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-M3 — M3A 批量编排已完成；P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
+P2.1 — 已补齐结构化剧本入口到草稿分镜的第一条可测试链；M3A 批量编排已完成；P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
 P1.3B 已完成最终全量门禁与四路 review（B+ / B- / B- / B）。默认制片墙可直接本地体验，角色图完成后只进入
 candidate，仍需导演人工批准。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v
 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+
+## 2026-08-26 P2.1 Script Studio 交付状态
+- Protocol 2.0 / schema v24：ScriptVersion draft/locked/superseded + revision 并发保护、ScriptScene/ScriptBeat、ScriptCompilation 与 ShotPlan 来源/服装/位置/道具血缘。
+- Studio 支持 plain text 和唯一采用的 shuohao `novel-script` JSON；人工编辑角色、服装、位置、道具和时长，确定性校验后锁定并编译草稿 Plan。
+- 编译幂等且每个锁定版本只允许一次；旧剧本、旧 Plan、Job、Take 不被改写。草稿 Plan 禁止单镜/批量 H3 创建。
+- 不调用 4090；不添加 TTS、配音、音乐、环境音、雨声或音效。草稿 Plan 的 `sound` 恒为空。
+- 最终门禁：45 个 Vitest 文件，272 passed / 1 个显式 live-ComfyUI skip；25 个真实 Chromium E2E 全过。
+- 四路最终复审：架构 B-、真实 bug B、测试 B+、协议 A-；首轮 C+ 项已整改并复审过线。
 
 ## 2026-08-25 M3A 批量编排交付状态
 - Protocol 1.9 / schema v23：持久 H3 batch、原始/当前 Job 血缘、跨镜聚合进度与不可变逐镜 retry。

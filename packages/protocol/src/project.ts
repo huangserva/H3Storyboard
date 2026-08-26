@@ -15,7 +15,11 @@ export const ScriptVersionSchema = z.object({
   title: NonEmptyTextSchema,
   content: NonEmptyTextSchema,
   status: ScriptVersionStatusSchema,
+  source_format: z.enum(['legacy_text', 'plain_text', 'shuohao_novel_script']),
+  parent_version_id: IdSchema.nullable(),
+  revision: z.number().int().nonnegative(),
   created_at: TimestampSchema,
+  updated_at: TimestampSchema,
   locked_at: TimestampSchema.nullable(),
 });
 export type ScriptVersion = z.infer<typeof ScriptVersionSchema>;

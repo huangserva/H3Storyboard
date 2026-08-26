@@ -63,6 +63,15 @@ export function useStudio() {
     }
   }, []);
 
+  const refreshCurrentProject = useCallback(async () => {
+    if (!snapshot) return;
+    const next = await api.getProject(snapshot.project.id);
+    setSnapshot(next);
+    setSelectedShotId((current) => current &&
+      next.shot_plans.some(({ id }) => id === current)
+      ? current : next.shot_plans[0]?.id ?? null);
+  }, [snapshot]);
+
   const addProject = useCallback(
     async (input: CreateProjectInput) => {
       setBusy(true);
@@ -162,6 +171,7 @@ export function useStudio() {
     busy,
     notice,
     selectProject,
+    refreshCurrentProject,
     selectShot: setSelectedShotId,
     addProject,
     addShot,

@@ -21,6 +21,7 @@ import { dispatchRepresentativeRoute } from './representative-routes.js';
 import { dispatchJobRoute } from './job-routes.js';
 import { dispatchCharacterImageJobRoute,
   type CharacterImageJobRouteOptions } from './character-image-job-routes.js';
+import { dispatchScriptRoute } from './script-routes.js';
 
 interface RouteResult {
   status: number;
@@ -145,6 +146,8 @@ export async function dispatchRoute(
     pathname,
   );
   if (canvasResult) return canvasResult;
+  const scriptResult = await dispatchScriptRoute(request, store, method, pathname);
+  if (scriptResult) return scriptResult;
   const characterResult = await dispatchCharacterRoute(
     request, store, method, pathname,
   );

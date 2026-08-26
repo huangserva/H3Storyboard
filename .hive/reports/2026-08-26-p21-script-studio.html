@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard · P2.1 Script Studio</title>
+<style>:root{color-scheme:dark;--bg:#0a0d0b;--panel:#111713;--line:#2b352d;--text:#edf3e9;--muted:#9da99f;--acid:#c6ff52;--cyan:#6be4d2;--warn:#efc267}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1100px,calc(100% - 36px));margin:46px auto 80px}h1{font-size:42px;line-height:1.08;letter-spacing:-.04em;margin:6px 0 12px}h2{margin-top:38px;color:var(--acid)}.eyebrow{color:var(--acid);font-weight:800;letter-spacing:.14em}.lead{max-width:900px;color:#d3ddd5;font-size:19px}.verdict,.card{border:1px solid var(--line);border-radius:15px;background:var(--panel)}.verdict{padding:22px;border-color:#506c34}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:17px}.card b{display:block;color:var(--cyan);font-size:17px}.flow{padding:18px;border:1px solid var(--line);border-radius:14px;background:#0e1410;color:var(--acid);font:700 14px/1.8 ui-monospace,monospace}table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line)}th,td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted)}code{color:#dfff9e}.ok{color:var(--acid)}.defer{color:var(--warn)}@media(max-width:760px){.grid{grid-template-columns:1fr}h1{font-size:34px}}</style></head>
+<body><main><div class="eyebrow">P2.1 DELIVERY · 2026-08-26</div><h1>Script Studio 已形成第一条可测试生产入口</h1>
+<p class="lead">H3Storyboard 现在能把普通剧本文本或唯一选定的 shuohao novel-script JSON，变成可编辑、可校验、可锁定、可追溯的 Scene/Beat 文档，并编译成画布里的草稿 ShotPlan。到此为止不会触碰 4090。</p>
+<section class="verdict"><b>结论：P2.1 完成，可以进入人工画布测试。</b><br>它不是 AI 自动写作，也不会自动出片；它先补齐可信的剧本数据、版本和审核边界，为 P2.2 导演审阅/批准打底。</section>
+
+<h2>交付能力</h2><div class="flow">plain text / shuohao JSON → draft ScriptVersion → Scene / Beat 编辑 → validate → human lock → deterministic compile → DRAFT ShotPlan → canvas</div>
+<div class="grid"><div class="card"><b>结构化剧本</b>动作/对白分型；角色、语气、时长、服装、位置、道具均为持久字段。</div><div class="card"><b>版本与并发</b>draft/locked/superseded；revision + expected_revision 阻止双标签静默覆盖，历史版本可点选。</div><div class="card"><b>安全编译</b>4–15 秒确定性分组；每个 Plan 保存 Scene/Beat/Compilation 来源，sound 恒空。</div></div>
+
+<h2>协议与数据</h2><table><thead><tr><th>层</th><th>结果</th></tr></thead><tbody>
+<tr><td>Protocol 2.0</td><td>新增 ScriptDocument、Scene、Beat、Validation、Lock、Compilation；ShotPlan 新增 planning_status 与来源/状态字段。</td></tr>
+<tr><td>SQLite v24</td><td>新增 script_scenes、script_beats、script_compilations；版本 revision、唯一 draft/compilation、Plan provenance。</td></tr>
+<tr><td>API</td><td>7 个 script endpoints：list/import/get/update/validate/lock/compile，全部 snake_case、稳定错误码。</td></tr>
+<tr><td>Studio</td><td>版本栏可选择历史和建立后继；Scene/Beat 编辑、校验结果、锁定、编译后自动回画布。</td></tr>
+</tbody></table>
+
+<h2>硬门禁</h2><ul><li>编译 Plan 一律为 <code>planning_status=draft</code>。</li><li>真实 HTTP 已验证单镜 POST jobs 和 batch POST 都返回 <code>SHOT_PLAN_DRAFT</code>，数据库保持零 Job。</li><li>旧 Script/Plan/Job/Take 不被覆盖；superseded Script 使用原 key 仍可回读原 Compilation。</li><li>Script Studio 不调用 ComfyUI；不创建 TTS、配音、音乐、雨声、环境声、SFX；Plan <code>sound=""</code>。</li></ul>
+
+<h2>验证结果</h2><table><tbody><tr><td><code>pnpm check</code></td><td class="ok">通过</td></tr><tr><td><code>pnpm build</code></td><td class="ok">通过</td></tr><tr><td>Vitest</td><td class="ok">45 files · 272 passed · 1 个显式 live-ComfyUI skip</td></tr><tr><td>Playwright</td><td class="ok">25 个真实 Chromium 用例全部通过</td></tr></tbody></table>
+
+<h2>原始任务逐条 verdict</h2><table><thead><tr><th>任务</th><th>结论</th><th>证据</th></tr></thead><tbody>
+<tr><td>唯一采用优先级 A 上游</td><td class="ok">完成</td><td>只实现 shuohao novel-script import adapter；无外部运行时依赖。</td></tr>
+<tr><td>补剧本产品入口</td><td class="ok">完成</td><td>版本、Scene/Beat、编辑、校验、锁定、编译、画布完整链。</td></tr>
+<tr><td>保护连续性</td><td class="ok">完成</td><td>服装、位置、道具与 ordered Beat IDs 均持久进入 Plan。</td></tr>
+<tr><td>不验证也继续开发</td><td class="ok">完成</td><td>用户人工验收未作为阻塞；自动门禁和独立审查已完成。</td></tr>
+<tr><td>AI 写作/Plan 批准</td><td class="defer">明确延期</td><td>P2.2 做 Plan review/edit/diff/approve；P2.3 才做可选 AI 写作。</td></tr>
+</tbody></table>
+
+<h2>Self-Review</h2><table><thead><tr><th>维度</th><th>最终评分</th><th>关键问题与 verdict</th></tr></thead><tbody>
+<tr><td>A 架构</td><td>B-</td><td>Plan-set 边界留到 P2.2；裁决：当前不 supersede 旧 approved Plan，避免锁新剧本立即中断生产。文件/路由行数均合规。</td></tr>
+<tr><td>B bug</td><td>B</td><td>首轮旧版回放、position/prop 丢失、覆盖/异步竞态均已修；二轮普通 Plan 状态、lock revision、迟到 refresh 均已修；末项 defaultValue 重载显示也已修。</td></tr>
+<tr><td>C 测试</td><td>B+</td><td>首轮 C+ 后补真单/批 POST 门禁、零 Job、历史不变、编译边界/顺序/确定性、重复 ID、stale write/lock 回读。</td></tr>
+<tr><td>D 协议</td><td>A-</td><td>首轮中间态 C+ 的 revision/状态问题已修；Protocol 2.0、schema v24、幂等、声音与 draft 门禁对齐。</td></tr>
+</tbody></table>
+<p><b>严重项处理：</b>所有严重项均已修复并有测试证据；没有跳过的严重项。综合评分 <b>B</b>。第二轮前后变化：B/C/D 从 C+ 提升到 B/B+/A-。</p>
+
+<h2>现有代码与测试处理</h2><ul><li>修改：Protocol/schema 版本断言升级到 2.0/v24；ShotPlan 普通创建路径同步持久化 position/prop；单镜与批量生成入口增加 draft 状态门禁；画布卡增加 DRAFT/SUPERSEDED 标记。</li><li>新增：Script API/Store/Studio、migration v24、真 HTTP+SQLite、编译器边界单测和 Chromium 用户链。</li><li>删除：没有删除现有生产代码或测试。</li><li>跳过：仅保留仓库原有的 1 个显式 live-ComfyUI 测试；P2.2/P2.3 是已列明的后续范围，不伪装成本阶段完成。</li></ul>
+
+<h2>已知但未做</h2><ul><li>P2.2：draft Plan 编辑、Scene/Beat diff、导演批准、plan-set 原子 supersede。</li><li>P2.3：一句话/小说/大纲的可选 AI 写作；仍必须经过 draft、校验和人工锁定。</li><li>编译记录独立 list/get UI；目前通过 compile 幂等回放和 ProjectSnapshot 查看 Plan 来源。</li></ul>
+</main></body></html>

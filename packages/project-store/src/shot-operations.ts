@@ -50,9 +50,10 @@ export function createShotPlan(
        (id, project_id, script_version_id, ordinal, title, scene_id,
         duration_seconds, shot_size, camera_movement, action, dialogue, sound,
         prompt, continuity_mode, continuity_dependencies_json,
-        costume_state_json, reference_bindings_json, semantic_references_json,
+        costume_state_json, position_state_json, prop_state_json,
+        reference_bindings_json, semantic_references_json,
         opening_state_json, ending_state_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       projectId,
@@ -70,6 +71,8 @@ export function createShotPlan(
       input.continuity_mode,
       JSON.stringify(input.continuity_dependencies),
       JSON.stringify(input.costume_state),
+      JSON.stringify(input.position_state),
+      JSON.stringify(input.prop_state),
       JSON.stringify(input.reference_bindings),
       JSON.stringify(input.semantic_references),
       input.opening_state === null ? null : JSON.stringify(input.opening_state),

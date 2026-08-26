@@ -18,6 +18,12 @@ const InfiniteCanvas = lazy(async () => {
   const module = await import('./InfiniteCanvas.js');
   return { default: module.InfiniteCanvas };
 });
+const ScriptStudio = lazy(async () => {
+  const module = await import('./ScriptStudio.js');
+  return { default: module.ScriptStudio };
+});
+
+type WorkspaceView = 'script' | 'board' | 'flow' | 'director';
 
 interface DirectorWorkspaceProps {
   snapshot: ProjectSnapshot | null;
@@ -41,6 +47,7 @@ interface DirectorWorkspaceProps {
     gateOverrideReason: string | null) => Promise<boolean>;
   onBindReference: (shotId: string,
     input: BindShotReferenceInput) => Promise<boolean>;
+  onRefreshProject: () => Promise<void>;
 }
 
 export function DirectorWorkspace({
@@ -59,8 +66,9 @@ export function DirectorWorkspace({
   onGenerate,
   onGenerateBatch,
   onBindReference,
+  onRefreshProject,
 }: DirectorWorkspaceProps) {
-  const [view, setView] = useState<'board' | 'flow' | 'director'>('board');
+  const [view, setView] = useState<WorkspaceView>('board');
   const [productionOpen, setProductionOpen] = useState(false);
   const [shotProductionOpen, setShotProductionOpen] = useState(false);
   const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
@@ -84,7 +92,7 @@ export function DirectorWorkspace({
   const outputAsset = snapshot?.assets.find(
     ({ id }) => id === displayedActual?.output_asset_id) ?? null;
 
-  const changeView = (next: 'board' | 'flow' | 'director') => {
+  const changeView = (next: WorkspaceView) => {
     setView(next);
     if (next !== 'flow') onCanvasFocusModeChange(false);
   };
@@ -115,6 +123,8 @@ export function DirectorWorkspace({
         </div>
         <div className="legend">
           <div className="view-switcher" aria-label="工作区视图">
+            <button data-active={view === 'script'} onClick={() => changeView('script')}
+              type="button">剧本</button>
             <button data-active={view === 'board'} onClick={() => changeView('board')}
               type="button">制片墙</button>
             <button data-active={view === 'flow'} onClick={() => changeView('flow')}
@@ -130,7 +140,12 @@ export function DirectorWorkspace({
         </div>
       </header>
 
-      {view === 'board' ? <ProductionBoardView snapshot={snapshot}
+      {view === 'script' ? <Suspense fallback={<div className="progress-bar" />}>
+        <ScriptStudio projectId={snapshot.project.id} onCompiled={async () => {
+          await onRefreshProject();
+          setView('flow');
+        }} />
+      </Suspense> : view === 'board' ? <ProductionBoardView snapshot={snapshot}
         selectedShotId={selectedShot?.id ?? null} busy={busy}
         preflights={preflights} onSelectShot={onSelectShot}
         onGenerate={onGenerate} onSetup={() => setProductionOpen(true)} />

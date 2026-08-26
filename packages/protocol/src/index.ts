@@ -11,6 +11,7 @@ export * from './mode.js';
 export * from './production-brief.js';
 export * from './production-error.js';
 export * from './project.js';
+export * from './script.js';
 export * from './shot.js';
 export * from './snapshot.js';
 export * from './version.js';

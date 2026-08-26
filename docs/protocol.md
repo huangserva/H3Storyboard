@@ -1,25 +1,67 @@
-# Protocol 1.9
+# Protocol 2.0
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 1.9 keeps the Protocol 1.8 atomic multi-shot creation and semantic Plan bindings, and adds durable H3 batches, cross-job progress, fair batch scheduling, and immutable per-shot retry lineage.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 2.0 keeps Protocol 1.9 batch/retry behavior and adds the versioned Script Studio contract, deterministic Script-to-Plan compilation, and immutable Scene/Beat provenance on draft ShotPlans.
 
 ## Project lineage
 
 ```text
 Project
-  └─ locked ScriptVersion
-       └─ ShotPlan (director intent)
+  └─ ScriptVersion (draft -> locked -> superseded)
+       ├─ ScriptScene
+       │    └─ ScriptBeat (action | dialogue)
+       └─ ScriptCompilation
+            └─ ShotPlan (draft -> approved -> superseded)
             ├─ H3Job (immutable generation input + lifecycle)
             │    └─ Asset (generated video)
             └─ ShotActual / Take (observed result + QC verdict)
 ```
 
-- Creating a project atomically creates and locks script version 1.
+- Creating a legacy project atomically creates and locks script version 1.
+- Script Studio imports a new draft successor without rewriting the locked
+  version. A project may have at most one draft script version.
 - Plans and takes are different records. A take never mutates its plan.
 - Reruns append takes with increasing `attempt_number`.
 - A take is pending until a separate QC decision approves or rejects it.
 - Continuity dependencies point to an approved source take. Frame continuity uses an image explicitly derived from that take's video; full-video continuity references the video itself.
 - Every continuity dependency must also appear in the plan binding list and in each submitted H3 job with the same kind, role, and ordinal. A continued shot cannot silently fall back to `t2v`.
 - Migration v4 preserves legacy video continuity as `full_video + motion`. If a historical job omitted that upload, migration stops with `DATABASE_RECORD_INVALID` rather than rewriting immutable generation history.
+
+## Script Studio lifecycle
+
+`ScriptSourceFormat` is `legacy_text | plain_text | shuohao_novel_script`.
+`legacy_text` is read-only historical data; imports accept only the latter two.
+A `ScriptVersion` carries a monotonically increasing `revision`; every whole-
+document PUT must send `expected_revision`, and a stale editor receives
+`SCRIPT_VERSION_CONFLICT` instead of overwriting a newer save. A `ScriptScene`
+has a stable UUID, ordered `scene_key`, heading, location,
+time-of-day, lighting, summary, and ordered beats. Each `ScriptBeat` is either an
+action or dialogue with a stable UUID, explicit duration, character references,
+and costume/position/prop state. Dialogue additionally stores speaker and
+delivery; it is script text for H3, never a TTS request.
+
+```text
+import -> draft edit -> validate -> lock -> compile -> draft ShotPlans
+```
+
+- Draft edits replace the document transactionally after duplicate UUID,
+  scene-key, and ordinal checks. Locked and superseded versions are immutable.
+- Validation is deterministic. It reports stable issue codes and duration/
+  scene/beat statistics; a script with errors cannot lock or compile.
+- Locking also requires `expected_revision`; it supersedes the previous locked
+  version and advances the project's active script version in one transaction.
+- Compilation is deterministic and idempotent. Beats remain in order and are
+  grouped into 4–15 second generation units. One locked script version may have
+  exactly one compilation; replaying its request key returns the same plans and
+  a different key returns `SCRIPT_COMPILATION_CONFLICT`.
+- Every compiled plan stores `source_script_scene_id`, ordered
+  `source_script_beat_ids`, and `source_compilation_id`. It begins with
+  `planning_status=draft`; direct or batch H3 job creation returns
+  `SHOT_PLAN_DRAFT` until a later explicit director approval workflow.
+- Beat costume, position, and prop maps are merged in beat order into the draft
+  Plan's `costume_state`, `position_state`, and `prop_state`; later beats win for
+  the same key. They are not silently coerced into character-ID ShotState fields.
+- The compiler always writes `sound=""`. Script import, validation, lock, and
+  compilation do not contact ComfyUI and cannot add external audio.
 
 ## H3 input binding
 
@@ -307,6 +349,12 @@ Error envelope:
 | `GET` | `/api/projects` | project summaries |
 | `POST` | `/api/projects` | project + locked full script v1 |
 | `GET` | `/api/projects/:project_id` | durable project snapshot |
+| `GET` | `/api/projects/:project_id/scripts` | list immutable script versions |
+| `POST` | `/api/projects/:project_id/scripts/import` | import one new structured draft |
+| `GET/PUT` | `/api/projects/:project_id/scripts/:script_version_id` | read or replace a draft document |
+| `POST` | `/api/projects/:project_id/scripts/:script_version_id/validate` | deterministic Scene/Beat validation |
+| `POST` | `/api/projects/:project_id/scripts/:script_version_id/lock` | lock valid draft and supersede prior locked version |
+| `POST` | `/api/projects/:project_id/scripts/:script_version_id/compile` | idempotently create provenance-linked draft ShotPlans |
 | `POST` | `/api/projects/:project_id/shots` | append a plan |
 | `POST` | `/api/projects/:project_id/assets` | register project-relative asset metadata |
 | `GET/PATCH` | `/api/projects/:project_id/assets` | list or update asset lifecycle metadata |
@@ -338,4 +386,4 @@ Error envelope:
 
 The API binds to `127.0.0.1`. JSON bodies are limited to 1 MB. Asset paths are relative and reject absolute paths plus `.` or `..` traversal segments. Media reads resolve the stored path again beneath the configured data directory before opening a file; missing metadata, missing files, invalid paths, and invalid ranges use stable `ASSET_*` codes.
 
-Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text.
+Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Script Studio adds `SCRIPT_*` and `SHOT_PLAN_DRAFT`. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text.

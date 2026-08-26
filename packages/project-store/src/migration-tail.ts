@@ -9,6 +9,7 @@ import { createCharacterImageJobsAndGpuLeases } from './migration-v20.js';
 import { enforceSingleCharacterImageRetry } from './migration-v21.js';
 import { createH3BatchOrchestration } from './migration-v22.js';
 import { addH3BatchFairnessCursor } from './migration-v23.js';
+import { createScriptStudio } from './migration-v24.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -22,6 +23,7 @@ const tailMigrations: Array<readonly [number,
   [21, enforceSingleCharacterImageRetry],
   [22, createH3BatchOrchestration],
   [23, addH3BatchFairnessCursor],
+  [24, createScriptStudio],
 ];
 
 export function applyTailMigrations(

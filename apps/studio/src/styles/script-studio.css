@@ -1,0 +1,84 @@
+.script-studio {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  height: calc(100vh - 150px);
+  min-height: 0;
+  background: #090d0b;
+}
+
+.script-version-rail {
+  padding: 22px 16px;
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+
+.script-version-rail h2 { margin: 8px 0 18px; }
+.script-version-rail > button:not(.button) {
+  display: grid;
+  width: 100%;
+  text-align: left;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .025);
+  color: inherit;
+}
+.script-version-rail > button:not(.button)[data-active="true"] {
+  border-color: var(--acid);
+  background: rgba(195, 255, 79, .06);
+}
+.script-version-rail > button:not(.button) span { color: var(--acid); font: 700 10px var(--mono); }
+.script-version-rail > button:not(.button) small { color: var(--muted); }
+
+.script-editor-shell { min-width: 0; overflow: auto; padding: 24px 28px 80px; }
+.script-import-panel { width: min(760px, 100%); margin: 24px auto; display: grid; gap: 16px; }
+.script-import-panel h1 { margin: 0; font-size: clamp(28px, 4vw, 54px); }
+.script-import-panel p { color: var(--muted); max-width: 640px; }
+.script-import-panel label, .script-scene-meta label {
+  display: grid; gap: 7px; color: var(--muted); font: 700 10px var(--mono);
+  letter-spacing: .08em;
+}
+.script-import-panel textarea { min-height: 360px; }
+
+.script-editor-header {
+  position: sticky; top: -24px; z-index: 4;
+  display: flex; justify-content: space-between; gap: 20px; align-items: center;
+  margin: -24px -28px 20px; padding: 18px 28px;
+  border-bottom: 1px solid var(--line); background: rgba(9, 13, 11, .96);
+  backdrop-filter: blur(16px);
+}
+.script-editor-header input { width: min(520px, 60vw); margin-top: 6px; font-size: 22px; font-weight: 800; }
+.script-editor-header p { margin: 6px 0 0; color: var(--muted); font: 11px var(--mono); }
+.script-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.script-validation { margin-bottom: 18px; padding: 14px 16px; border: 1px solid #c9863c; border-radius: 10px; }
+.script-validation[data-valid="true"] { border-color: var(--acid); }
+.script-validation p { margin: 6px 0 0; color: #f0b36f; font: 11px var(--mono); }
+.script-validation p[data-severity="warning"] { color: #d7c685; }
+
+.script-scenes { display: grid; gap: 18px; }
+.script-scene { border: 1px solid var(--line); border-radius: 14px; background: #0d1210; overflow: hidden; }
+.script-scene > header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.script-scene > header div { display: flex; gap: 12px; align-items: center; }
+.script-scene > header span { color: var(--acid); font: 10px var(--mono); }
+.script-scene-meta { display: grid; grid-template-columns: .7fr 1.5fr 1fr .8fr 1fr; gap: 10px; padding: 14px 16px; }
+.script-scene-meta .script-summary { grid-column: 1 / -1; }
+.script-beat-list { display: grid; gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
+.script-beat { display: grid; grid-template-columns: 58px minmax(0, 1fr); background: #0b100e; }
+.script-beat-index { padding: 16px 10px; color: var(--muted); font: 10px var(--mono); border-right: 1px solid var(--line); }
+.script-beat[data-kind="dialogue"] .script-beat-index { color: #aeb7ff; }
+.script-beat-fields { display: grid; gap: 9px; padding: 12px; }
+.script-beat-primary { display: grid; grid-template-columns: 110px 1fr 84px auto; gap: 8px; }
+.script-state-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.script-scene > footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.script-add-scene { min-height: 90px; border: 1px dashed #465147; border-radius: 14px; color: var(--acid); background: transparent; }
+.script-message { position: fixed; right: 24px; bottom: 24px; z-index: 20; padding: 12px 16px; border: 1px solid var(--acid); background: #101713; border-radius: 9px; }
+
+@media (max-width: 1050px) {
+  .script-studio { grid-template-columns: 1fr; }
+  .script-version-rail { display: none; }
+  .script-editor-header { align-items: flex-start; flex-direction: column; }
+  .script-scene-meta, .script-state-grid { grid-template-columns: 1fr 1fr; }
+}

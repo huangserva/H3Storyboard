@@ -12,16 +12,18 @@ Planned shots describe intent. Actual shots record generated evidence. They are 
 
 ## Current milestone
 
-The local Studio now creates durable H3 batches, rotates worker execution across
-batches, aggregates cross-shot progress, and retries a failed shot through a new
-immutable job. The canvas exposes this state directly while planned shots and
-generated results remain separate records until explicit QC.
+The local Studio now includes a structured Script Studio. It imports plain text
+or the selected Shuohao `novel-script` shape, edits durable Scene/Beat records,
+validates and locks an immutable script version, then compiles review-only draft
+ShotPlans with exact Scene/Beat provenance. Draft plans cannot reach H3 until a
+later explicit director approval step. No script operation contacts ComfyUI or
+adds TTS, ambience, music, or other audio.
 
 ## Workspace
 
 - `apps/studio` — React director workbench.
 - `apps/api` — local-only HTTP API bound to `127.0.0.1`.
-- `packages/protocol` — project, shot, asset, H3 job, and QC contracts.
+- `packages/protocol` — script, project, shot, asset, H3 job, and QC contracts.
 - `packages/project-store` — SQLite migrations and durable project state.
 - `packages/h3-provider` — H3 mode and provider contract.
 - `packages/task-engine` — persistent job lifecycle rules.
@@ -44,6 +46,11 @@ Take switching, QC, and representative-Take review. Set `H3_CANVAS_DEMO_DB`
 only when you intentionally want a different isolated demo database;
 `H3_STORYBOARD_DB` is ignored by the seeder so an inherited production setting
 cannot be polluted.
+
+Switch the workspace to `剧本` to test Script Studio. Import either plain text
+or Shuohao JSON, edit Scene/Beat timing and continuity state, save, validate,
+lock, and compile. The last action returns to the canvas and shows the generated
+plans as `DRAFT`; it does not create H3 jobs or access the 4090.
 
 The initial seed is one SQLite immediate transaction and media files are staged
 with atomic renames. If an older demo database is already incomplete or its

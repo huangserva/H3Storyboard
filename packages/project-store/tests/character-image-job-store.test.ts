@@ -504,7 +504,7 @@ describe('shared GPU host leases', () => {
   });
 });
 
-describe('schema migrations v20-v23', () => {
+describe('schema migrations v20-v24', () => {
   it('records image jobs, GPU leases, and single-retry enforcement', () => {
     const { databasePath, store } = fileStore();
     store.close();
@@ -526,7 +526,7 @@ describe('schema migrations v20-v23', () => {
     ).all() as Array<{ name: string }>).map(({ name }) => name));
     database.close();
 
-    expect(version.version).toBe(23);
+    expect(version.version).toBe(24);
     expect(tables.has('character_image_jobs')).toBe(true);
     expect(tables.has('character_image_job_events')).toBe(true);
     expect(tables.has('gpu_leases')).toBe(true);
