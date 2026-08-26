@@ -24,7 +24,8 @@ export function ProductionShotCard({ projection, preflight, selected, busy,
       <span>SHOT {String(shot.ordinal).padStart(2, '0')} · PLAN</span>
       <i data-ready={preflight?.ready ?? false}>{shot.planning_status === 'draft'
         ? 'DRAFT' : shot.planning_status === 'superseded'
-          ? 'SUPERSEDED' : preflight?.ready ? 'READY' : 'NEEDS INPUT'}</i>
+          ? 'SUPERSEDED' : preflight?.ready
+            ? 'APPROVED · READY' : 'APPROVED · NEEDS INPUT'}</i>
       <h3>{shot.title}</h3>
       <p>{shot.action}</p>
       <small>{shot.shot_size} · {shot.camera_movement} · {shot.duration_seconds}s</small>

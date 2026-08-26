@@ -4,7 +4,6 @@
 
 ### P2 后续
 
-- [ ] P2.2：导演审阅/修改编译后的草稿 Plan，显示 ScriptScene/Beat diff，显式批准后解锁 H3。
 - [ ] P2.3：可选 AI 剧本生成；不得越过 draft、校验和人工锁定，不得引入任何外部声音。
 
 ### （M1B 已完成，归档见 Done）
@@ -23,6 +22,13 @@
 - [x] **全栈工程师2** dispatch `bfcba78a` — 任务：【调研，不写实现代码】深挖 xyz 的 OiiOii 画布交互模型，产出 H3Storyboard 画布'直接操作化'改造方案。user 拍板：现画布不如 OiiOii 好用，核心差距是'能在画布上直接操作'。完整任务书见 .hiv…
 - [x] **全栈工程师2** dispatch `ef22abdf` — 任务：Studio 生成按钮全链路（重派——上一 worker 中途退出，git log 确认零提交落地，从头开始，不要假设有半成品）。
 ## Done
+
+### 2026-08-26 · P2.2 Plan Review（done）
+- [x] compilation 级 draft/approved/superseded plan-set 与项目 active pointer；显式批准原子切换。
+- [x] Scene/Beat 来源、逐镜 diff、严格字段编辑、revision 冲突和未保存修改门禁；声音字段不可编辑。
+- [x] approved Plan 解锁现有 H3；superseded Plan 禁止新 Job/retry，但旧 Job 同 key 回放和历史 Take 不变。
+- [x] 真 HTTP + SQLite 覆盖编辑、回滚、并发、来源损坏、历史与 H3 门禁；真实 Chromium 覆盖完整导演用户链。
+- [x] 最终门禁 279 passed / 1 live skip + 25 Chrome；四路复审 B / B / B- / A-。
 
 ### 2026-08-26 · P2.1 Script Studio（done）
 - [x] plain text / shuohao JSON 导入；Scene/Beat UUID、状态与时长持久化。

@@ -47,7 +47,7 @@ interface DirectorWorkspaceProps {
     gateOverrideReason: string | null) => Promise<boolean>;
   onBindReference: (shotId: string,
     input: BindShotReferenceInput) => Promise<boolean>;
-  onRefreshProject: () => Promise<void>;
+  onRefreshProject: (projectId: string) => Promise<void>;
 }
 
 export function DirectorWorkspace({
@@ -141,10 +141,9 @@ export function DirectorWorkspace({
       </header>
 
       {view === 'script' ? <Suspense fallback={<div className="progress-bar" />}>
-        <ScriptStudio projectId={snapshot.project.id} onCompiled={async () => {
-          await onRefreshProject();
-          setView('flow');
-        }} />
+        <ScriptStudio projectId={snapshot.project.id}
+          onProjectChanged={() => onRefreshProject(snapshot.project.id)}
+          onOpenCanvas={() => setView('flow')} />
       </Suspense> : view === 'board' ? <ProductionBoardView snapshot={snapshot}
         selectedShotId={selectedShot?.id ?? null} busy={busy}
         preflights={preflights} onSelectShot={onSelectShot}

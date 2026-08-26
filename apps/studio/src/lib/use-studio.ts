@@ -18,6 +18,8 @@ export function useStudio() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const selectionRequest = useRef(0);
+  const selectedProjectRef = useRef<string | null>(null);
+  selectedProjectRef.current = snapshot?.project.id ?? null;
   const generation = useGenerationActions({ snapshot, setSnapshot, setBusy,
     setNotice });
 
@@ -63,14 +65,23 @@ export function useStudio() {
     }
   }, []);
 
-  const refreshCurrentProject = useCallback(async () => {
-    if (!snapshot) return;
-    const next = await api.getProject(snapshot.project.id);
-    setSnapshot(next);
-    setSelectedShotId((current) => current &&
-      next.shot_plans.some(({ id }) => id === current)
-      ? current : next.shot_plans[0]?.id ?? null);
-  }, [snapshot]);
+  const refreshCurrentProject = useCallback(async (projectId: string) => {
+    const requestId = selectionRequest.current + 1;
+    selectionRequest.current = requestId;
+    try {
+      const next = await api.getProject(projectId);
+      if (requestId !== selectionRequest.current ||
+        selectedProjectRef.current !== projectId) return;
+      setSnapshot(next);
+      setSelectedShotId((current) => current &&
+        next.shot_plans.some(({ id }) => id === current)
+        ? current : next.shot_plans[0]?.id ?? null);
+    } catch (error) {
+      if (requestId === selectionRequest.current) {
+        setNotice({ tone: 'error', text: describeError(error) });
+      }
+    }
+  }, []);
 
   const addProject = useCallback(
     async (input: CreateProjectInput) => {

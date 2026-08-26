@@ -14,6 +14,7 @@ import {
 import { parseInput } from './input.js';
 import { jobInputFingerprint } from './job-creation.js';
 import { appendJobEvent, getJob } from './job-support.js';
+import { requireShot } from './store-guards.js';
 import { runWriteTransaction } from './transactions.js';
 
 export function retryH3Job(db: Database.Database, projectId: string,
@@ -41,6 +42,11 @@ export function retryH3Job(db: Database.Database, projectId: string,
       }
       return retryResult(db, projectId, existing);
     }
+    const shot = requireShot(db, original.shot_plan_id);
+    if (shot.planning_status !== 'approved') throw new StoreError(
+      'SHOT_PLAN_DRAFT', 'Superseded ShotPlans cannot create retry jobs', {
+        shot_plan_id: shot.id, planning_status: shot.planning_status,
+      });
     const successor = db.prepare(`SELECT id FROM h3_jobs
       WHERE retry_of_job_id = ? LIMIT 1`).get(original.id) as
       { id: string } | undefined;

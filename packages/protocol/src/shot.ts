@@ -176,6 +176,7 @@ export const ShotPlanSchema = z
     script_version_id: IdSchema,
     ordinal: z.number().int().positive(),
     planning_status: z.enum(['draft', 'approved', 'superseded']),
+    planning_revision: z.number().int().nonnegative(),
     source_script_scene_id: IdSchema.nullable(),
     source_script_beat_ids: z.array(IdSchema),
     source_compilation_id: IdSchema.nullable(),

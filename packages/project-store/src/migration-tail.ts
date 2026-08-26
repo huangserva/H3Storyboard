@@ -10,6 +10,7 @@ import { enforceSingleCharacterImageRetry } from './migration-v21.js';
 import { createH3BatchOrchestration } from './migration-v22.js';
 import { addH3BatchFairnessCursor } from './migration-v23.js';
 import { createScriptStudio } from './migration-v24.js';
+import { createPlanReviewWorkflow } from './migration-v25.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -24,6 +25,7 @@ const tailMigrations: Array<readonly [number,
   [22, createH3BatchOrchestration],
   [23, addH3BatchFairnessCursor],
   [24, createScriptStudio],
+  [25, createPlanReviewWorkflow],
 ];
 
 export function applyTailMigrations(

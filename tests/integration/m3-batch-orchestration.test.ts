@@ -147,7 +147,7 @@ describe('M3 H3 batch orchestration', () => {
       try {
         expect(database.prepare(
           'SELECT MAX(version) AS version FROM schema_version').get())
-          .toEqual({ version: 24 });
+          .toEqual({ version: 25 });
         expect(database.prepare(
           'SELECT COUNT(*) AS count FROM h3_jobs WHERE retry_of_job_id = ?')
           .get(original.id)).toEqual({ count: 1 });
@@ -465,7 +465,7 @@ describe('M3 H3 batch orchestration', () => {
     try {
       expect(verified.prepare(
         'SELECT MAX(version) AS version FROM schema_version').get())
-        .toEqual({ version: 24 });
+        .toEqual({ version: 25 });
       expect((verified.pragma('table_info(h3_job_batches)') as
         Array<{ name: string }>).map(({ name }) => name))
         .toContain('last_claimed_at');

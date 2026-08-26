@@ -29,6 +29,7 @@ export const ProjectSchema = z.object({
   title: NonEmptyTextSchema,
   status: ProjectStatusSchema,
   active_script_version_id: IdSchema,
+  active_script_compilation_id: IdSchema.nullable(),
   created_at: TimestampSchema,
   updated_at: TimestampSchema,
 });

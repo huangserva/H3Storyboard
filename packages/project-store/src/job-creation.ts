@@ -98,12 +98,6 @@ function replayH3JobBatch(db: Database.Database, projectId: string,
 function createH3JobRecord(db: Database.Database, shotPlanId: string,
   input: CreateH3JobInput): H3Job {
   const shot = requireShot(db, shotPlanId);
-  if (shot.planning_status !== 'approved') throw new StoreError(
-    'SHOT_PLAN_DRAFT', 'Draft or superseded ShotPlans cannot generate H3 jobs', {
-      shot_plan_id: shotPlanId, planning_status: shot.planning_status,
-    });
-  validateContinuityJobBindings(shot, input.input_bindings);
-  validateJobBindings(db, shot.project_id, input.mode, input.input_bindings);
   const previous = db.prepare(`SELECT * FROM h3_jobs
     WHERE shot_plan_id = ? AND idempotency_key = ?`)
     .get(shotPlanId, input.idempotency_key);
@@ -117,6 +111,12 @@ function createH3JobRecord(db: Database.Database, shotPlanId: string,
     }
     return existing;
   }
+  if (shot.planning_status !== 'approved') throw new StoreError(
+    'SHOT_PLAN_DRAFT', 'Draft or superseded ShotPlans cannot generate H3 jobs', {
+      shot_plan_id: shotPlanId, planning_status: shot.planning_status,
+    });
+  validateContinuityJobBindings(shot, input.input_bindings);
+  validateJobBindings(db, shot.project_id, input.mode, input.input_bindings);
   enforceRepresentativeGate(db, shotPlanId, input.gate_override_reason);
   const lockSnapshot = buildJobLockSnapshot(db, shot.project_id);
   let compiledBindings = null;

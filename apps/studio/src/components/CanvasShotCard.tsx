@@ -55,7 +55,8 @@ export function CanvasShotCard({
         <i data-compile-ready={compileReady}
           data-planning-status={shot.planning_status}>{shot.planning_status === 'draft'
             ? 'DRAFT' : shot.planning_status === 'superseded'
-              ? 'SUPERSEDED' : compileReady ? '可编译' : '缺输入'}</i>
+              ? 'SUPERSEDED' : compileReady
+                ? 'APPROVED · 可编译' : 'APPROVED · 缺输入'}</i>
       </header>
       {directorMode ? <div className="canvas-shot-media-grid">
         {mediaSlots.map((slot) => <ShotMediaSlotView key={slot.key}

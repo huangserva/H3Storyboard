@@ -6,5 +6,6 @@ export * from './mode-store.js';
 export * from './production-store.js';
 export * from './character-image-job-store.js';
 export * from './gpu-lease-store.js';
+export * from './plan-review-store.js';
 export type { BindingCompilationOutcome } from './binding-operations.js';
 export type { WorkerOutputInput, WorkerOutputResult } from './worker-completion.js';

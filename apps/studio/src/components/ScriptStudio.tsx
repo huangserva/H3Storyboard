@@ -5,13 +5,16 @@ import type {
 } from '@h3storyboard/protocol';
 import { useScriptStudio } from '../lib/use-script-studio.js';
 import { ScriptSceneEditor } from './ScriptSceneEditor.js';
+import { PlanReviewPanel } from './PlanReviewPanel.js';
 
 interface ScriptStudioProps {
   projectId: string;
-  onCompiled: () => Promise<void>;
+  onOpenCanvas: () => void;
+  onProjectChanged: () => Promise<void>;
 }
 
-export function ScriptStudio({ projectId, onCompiled }: ScriptStudioProps) {
+export function ScriptStudio({ projectId, onOpenCanvas,
+  onProjectChanged }: ScriptStudioProps) {
   const studio = useScriptStudio(projectId);
   const [importTitle, setImportTitle] = useState('新剧本版本');
   const [importFormat, setImportFormat] = useState<Exclude<ScriptSourceFormat,
@@ -53,7 +56,11 @@ export function ScriptStudio({ projectId, onCompiled }: ScriptStudioProps) {
   };
   const compile = async () => {
     if (!await studio.compile()) return;
-    await onCompiled();
+    await onProjectChanged();
+  };
+  const approve = async () => {
+    if (!await studio.approveReview()) return;
+    await onProjectChanged();
   };
   const updateScene = (index: number, scene: ScriptSceneInput) => setScenes(
     scenes.map((item, sceneIndex) => sceneIndex === index ? scene : item));
@@ -133,6 +140,9 @@ export function ScriptStudio({ projectId, onCompiled }: ScriptStudioProps) {
           {studio.validation.issues.map((issue, index) => <p key={`${issue.code}-${index}`}
             data-severity={issue.severity}>{issue.code} · {issue.message}</p>)}
         </section> : null}
+        {studio.review ? <PlanReviewPanel busy={studio.busy}
+          review={studio.review} onOpenCanvas={onOpenCanvas}
+          onUpdate={studio.updateReviewShot} onApprove={approve} /> :
         <div className="script-scenes">
           {scenes.map((scene, index) => <ScriptSceneEditor key={scene.id}
             scene={scene} disabled={!editable}
@@ -140,7 +150,7 @@ export function ScriptStudio({ projectId, onCompiled }: ScriptStudioProps) {
             onRemove={() => removeScene(index)} />)}
           {editable ? <button className="script-add-scene" onClick={addScene}
             type="button">＋ 新增场景</button> : null}
-        </div>
+        </div>}
       </>}
       {studio.message ? <div className="script-message" role="status">
         {studio.message}</div> : null}

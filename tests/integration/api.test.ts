@@ -56,7 +56,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const health = await fetch(`${first.origin}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({
-      data: { status: 'ok', protocol_version: '2.0' },
+      data: { status: 'ok', protocol_version: '2.1' },
     });
 
     const projectResponse = await postJson(`${first.origin}/api/projects`, {
@@ -685,7 +685,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(24);
+    expect(schemaVersion.version).toBe(25);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -1172,7 +1172,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(24);
+    expect(schemaVersion.version).toBe(25);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {

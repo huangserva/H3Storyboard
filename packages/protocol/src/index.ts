@@ -8,6 +8,7 @@ export * from './gpu-lease.js';
 export * from './h3-job.js';
 export * from './h3-batch.js';
 export * from './mode.js';
+export * from './plan-review.js';
 export * from './production-brief.js';
 export * from './production-error.js';
 export * from './project.js';

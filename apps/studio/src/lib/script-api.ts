@@ -2,11 +2,14 @@ import type {
   CompileScriptInput,
   ImportScriptInput,
   LockScriptInput,
+  ApprovePlanReviewInput,
+  PlanReview,
   ScriptCompilationResult,
   ScriptDocument,
   ScriptValidation,
   ScriptVersion,
   UpdateScriptDocumentInput,
+  UpdateDraftShotPlanInput,
 } from '@h3storyboard/protocol';
 import { request } from './api.js';
 
@@ -57,4 +60,27 @@ export function compileScript(projectId: string, scriptVersionId: string,
     `${root(projectId)}/${scriptVersionId}/compile`, {
       method: 'POST', body: JSON.stringify(input),
     });
+}
+
+const reviewRoot = (projectId: string, scriptVersionId: string) =>
+  `${root(projectId)}/${encodeURIComponent(scriptVersionId)}/plan_review`;
+
+export function getPlanReview(projectId: string,
+  scriptVersionId: string): Promise<PlanReview> {
+  return request<PlanReview>(reviewRoot(projectId, scriptVersionId));
+}
+
+export function updateDraftShotPlan(projectId: string, scriptVersionId: string,
+  shotPlanId: string, input: UpdateDraftShotPlanInput): Promise<PlanReview> {
+  return request<PlanReview>(`${reviewRoot(projectId, scriptVersionId)}/shots/` +
+    encodeURIComponent(shotPlanId), {
+      method: 'PATCH', body: JSON.stringify(input),
+    });
+}
+
+export function approvePlanReview(projectId: string, scriptVersionId: string,
+  input: ApprovePlanReviewInput): Promise<PlanReview> {
+  return request<PlanReview>(`${reviewRoot(projectId, scriptVersionId)}/approve`, {
+    method: 'POST', body: JSON.stringify(input),
+  });
 }

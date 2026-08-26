@@ -1,15 +1,17 @@
-# Protocol 2.0
+# Protocol 2.1
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 2.0 keeps Protocol 1.9 batch/retry behavior and adds the versioned Script Studio contract, deterministic Script-to-Plan compilation, and immutable Scene/Beat provenance on draft ShotPlans.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 2.1 keeps Protocol 2.0 Script Studio behavior and adds director PlanReview, optimistic per-shot editing, cross-version plan-set diff, and one atomic active-compilation approval boundary.
 
 ## Project lineage
 
 ```text
 Project
+  ├─ active_script_version_id
+  ├─ active_script_compilation_id (nullable current execution plan-set)
   └─ ScriptVersion (draft -> locked -> superseded)
        ├─ ScriptScene
        │    └─ ScriptBeat (action | dialogue)
-       └─ ScriptCompilation
+       └─ ScriptCompilation (draft -> approved -> superseded)
             └─ ShotPlan (draft -> approved -> superseded)
             ├─ H3Job (immutable generation input + lifecycle)
             │    └─ Asset (generated video)
@@ -41,6 +43,7 @@ delivery; it is script text for H3, never a TTS request.
 
 ```text
 import -> draft edit -> validate -> lock -> compile -> draft ShotPlans
+  -> director review/edit/diff -> atomic plan-set approval -> H3 production
 ```
 
 - Draft edits replace the document transactionally after duplicate UUID,
@@ -56,12 +59,44 @@ import -> draft edit -> validate -> lock -> compile -> draft ShotPlans
 - Every compiled plan stores `source_script_scene_id`, ordered
   `source_script_beat_ids`, and `source_compilation_id`. It begins with
   `planning_status=draft`; direct or batch H3 job creation returns
-  `SHOT_PLAN_DRAFT` until a later explicit director approval workflow.
+  `SHOT_PLAN_DRAFT` until explicit director approval.
 - Beat costume, position, and prop maps are merged in beat order into the draft
   Plan's `costume_state`, `position_state`, and `prop_state`; later beats win for
   the same key. They are not silently coerced into character-ID ShotState fields.
 - The compiler always writes `sound=""`. Script import, validation, lock, and
   compilation do not contact ComfyUI and cannot add external audio.
+
+## PlanReview and active plan-set lifecycle
+
+Each `ScriptCompilation` carries `status = draft | approved | superseded`, an
+optimistic `revision`, and nullable approval/supersede timestamps. Each
+compiled `ShotPlan` carries its own `planning_revision`. A project has at most
+one approved compilation, named by nullable `active_script_compilation_id`.
+Locking a successor script does not stop the old execution plan; the pointer
+changes only when the successor's complete draft plan-set is explicitly
+approved.
+
+`PlanReview` returns the compilation, active plan-set id, ordered review items,
+removed baseline plans, and `can_approve`. Every item contains the draft Plan,
+its immutable source Scene and ordered source Beats, plus `added | changed |
+unchanged`, the matched baseline Plan id, and changed editable fields. Sequence
+alignment is scoped by `scene_id`, so inserting or deleting a shot does not
+cascade every later shot into a false change.
+
+Director edits are strict and may change only title, duration, shot size,
+camera movement, action, dialogue, H3 prompt, and costume/position/prop maps.
+They must send both compilation and Plan revisions. `sound`, provenance,
+bindings, continuity, and production state are not editable through this
+contract; unknown fields are rejected. Each successful edit increments both
+revisions. Missing or reordered Beat provenance makes `can_approve=false`.
+
+Approval requires the active locked script, an unlocked production context, a
+complete draft plan-set, and the expected compilation revision. One immediate
+SQLite transaction supersedes old approved Plans and compilation, approves the
+new set, and switches `active_script_compilation_id`. Any failure rolls back
+the complete switch. Existing Jobs, Takes, Assets, and Plan content remain
+immutable. Existing Job requests still replay idempotently after supersede,
+but no new Job or retry may be created for a superseded Plan.
 
 ## H3 input binding
 
@@ -314,6 +349,8 @@ one direct successor, so concurrent retry clicks converge rather than fan out.
 To retry again after the successor fails, clients retry that successor, forming
 a traceable chain. A timed-out job with provider identity transfers that
 identity to the successor for recovery; it never submits a second provider task.
+An already-created retry replays by idempotency key, but a new retry is rejected
+with `SHOT_PLAN_DRAFT` after its Plan becomes superseded.
 
 `POST /api/projects/:project_id/shots/:shot_plan_id/bindings` mutates only an
 unlocked Plan. A semantic binding accepts a non-archived project image or a
@@ -355,6 +392,9 @@ Error envelope:
 | `POST` | `/api/projects/:project_id/scripts/:script_version_id/validate` | deterministic Scene/Beat validation |
 | `POST` | `/api/projects/:project_id/scripts/:script_version_id/lock` | lock valid draft and supersede prior locked version |
 | `POST` | `/api/projects/:project_id/scripts/:script_version_id/compile` | idempotently create provenance-linked draft ShotPlans |
+| `GET` | `/api/projects/:project_id/scripts/:script_version_id/plan_review` | read source-linked plan-set diff and approval readiness |
+| `PATCH` | `/api/projects/:project_id/scripts/:script_version_id/plan_review/shots/:shot_plan_id` | optimistically edit one draft Plan |
+| `POST` | `/api/projects/:project_id/scripts/:script_version_id/plan_review/approve` | atomically approve and activate the complete plan-set |
 | `POST` | `/api/projects/:project_id/shots` | append a plan |
 | `POST` | `/api/projects/:project_id/assets` | register project-relative asset metadata |
 | `GET/PATCH` | `/api/projects/:project_id/assets` | list or update asset lifecycle metadata |
@@ -386,4 +426,4 @@ Error envelope:
 
 The API binds to `127.0.0.1`. JSON bodies are limited to 1 MB. Asset paths are relative and reject absolute paths plus `.` or `..` traversal segments. Media reads resolve the stored path again beneath the configured data directory before opening a file; missing metadata, missing files, invalid paths, and invalid ranges use stable `ASSET_*` codes.
 
-Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Script Studio adds `SCRIPT_*` and `SHOT_PLAN_DRAFT`. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text.
+Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Script Studio adds `SCRIPT_*`, `PLAN_REVIEW_*`, and `SHOT_PLAN_DRAFT`. Plan review distinguishes not found, optimistic conflict, immutable, incomplete provenance, stale script, and shot/compilation mismatch. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text. SQLite schema v25 adds the active compilation pointer, compilation lifecycle/revision timestamps, Plan revision, and the single-approved-compilation partial unique index.

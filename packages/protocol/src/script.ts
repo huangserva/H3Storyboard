@@ -125,7 +125,11 @@ export const ScriptCompilationSchema = z.object({
   script_version_id: IdSchema,
   idempotency_key: NonEmptyTextSchema.max(200),
   shot_count: z.number().int().nonnegative(),
+  status: z.enum(['draft', 'approved', 'superseded']),
+  revision: z.number().int().nonnegative(),
   created_at: TimestampSchema,
+  approved_at: TimestampSchema.nullable(),
+  superseded_at: TimestampSchema.nullable(),
 });
 export type ScriptCompilation = z.infer<typeof ScriptCompilationSchema>;
 

@@ -85,8 +85,14 @@ function jsonColumn(row: Record<string, unknown>, column: string): unknown {
   }
 }
 
-export const mapProject = (row: unknown): Project =>
-  decode(ProjectSchema, objectRow(row));
+export function mapProject(row: unknown): Project {
+  const record = objectRow(row);
+  return decode(ProjectSchema, {
+    ...record,
+    active_script_compilation_id:
+      record.active_script_compilation_id ?? null,
+  });
+}
 
 export function mapScriptVersion(row: unknown): ScriptVersion {
   const record = objectRow(row);
@@ -114,8 +120,16 @@ export function mapScriptScene(row: unknown, beats: ScriptBeat[]): ScriptScene {
   return decode(ScriptSceneSchema, { ...objectRow(row), beats });
 }
 
-export const mapScriptCompilation = (row: unknown): ScriptCompilation =>
-  decode(ScriptCompilationSchema, objectRow(row));
+export function mapScriptCompilation(row: unknown): ScriptCompilation {
+  const record = objectRow(row);
+  return decode(ScriptCompilationSchema, {
+    ...record,
+    status: record.status ?? 'draft',
+    revision: record.revision ?? 0,
+    approved_at: record.approved_at ?? null,
+    superseded_at: record.superseded_at ?? null,
+  });
+}
 
 export function mapAsset(row: unknown): Asset {
   const record = objectRow(row);
@@ -164,6 +178,7 @@ export function mapShotPlan(row: unknown): ShotPlan {
   return decode(ShotPlanSchema, {
     ...record,
     planning_status: record.planning_status ?? 'approved',
+    planning_revision: record.planning_revision ?? 0,
     source_script_scene_id: record.source_script_scene_id ?? null,
     source_script_beat_ids: record.source_script_beat_ids_json == null ? [] :
       jsonColumn(record, 'source_script_beat_ids_json'),

@@ -23,6 +23,7 @@ import './styles/scene-director.css';
 import './styles/canvas-binding.css';
 import './styles/canvas-batch-progress.css';
 import './styles/script-studio.css';
+import './styles/plan-review.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root mount point');
