@@ -166,9 +166,10 @@ test.describe.serial('P1.3 production board', () => {
       });
       await openProject(page);
       const projectCalls = calls.filter((path) => path.includes(projectId));
-      expect(projectCalls).toHaveLength(4);
+      expect(projectCalls).toHaveLength(5);
       expect(new Set(projectCalls)).toEqual(new Set([
         `/api/projects/${projectId}`,
+        `/api/projects/${projectId}/scripts`,
         `/api/projects/${projectId}/character_catalog`,
         `/api/projects/${projectId}/character_image_jobs`,
         `/api/projects/${projectId}/jobs/preflights`,

@@ -3,6 +3,7 @@ import type { PlanReview, UpdateDraftShotPlanInput } from '@h3storyboard/protoco
 import { PlanReviewShotCard } from './PlanReviewShotCard.js';
 
 interface PlanReviewPanelProps {
+  archived: boolean;
   busy: boolean;
   review: PlanReview;
   onApprove: () => Promise<unknown>;
@@ -11,9 +12,9 @@ interface PlanReviewPanelProps {
     input: UpdateDraftShotPlanInput) => Promise<unknown>;
 }
 
-export function PlanReviewPanel({ busy, review, onApprove, onOpenCanvas,
-  onUpdate }: PlanReviewPanelProps) {
-  const draft = review.compilation.status === 'draft';
+export function PlanReviewPanel({ archived, busy, review, onApprove,
+  onOpenCanvas, onUpdate }: PlanReviewPanelProps) {
+  const draft = review.compilation.status === 'draft' && !archived;
   const active = review.compilation.status === 'approved' &&
     review.active_compilation_id === review.compilation.id;
   const changed = review.items.filter(({ change }) =>
@@ -38,12 +39,13 @@ export function PlanReviewPanel({ busy, review, onApprove, onOpenCanvas,
       </div>
       <div className="script-actions">
         <button className="button" type="button" onClick={onOpenCanvas}>
-          查看画布</button>
+          {archived ? '查看当前画布' : '查看画布'}</button>
         {draft ? <button className="button button-primary" type="button"
           disabled={busy || !review.can_approve || dirtyShots.size > 0}
           onClick={() => void onApprove()}>批准整套分镜</button> :
-          <span className="plan-review-approved">{active
-            ? 'ACTIVE PLAN SET' : 'SUPERSEDED PLAN SET'}</span>}
+          <span className="plan-review-approved">{archived
+            ? 'ARCHIVED PLAN SET' : active
+              ? 'ACTIVE PLAN SET' : 'SUPERSEDED PLAN SET'}</span>}
       </div>
     </header>
     {dirtyShots.size > 0 ? <p className="plan-review-save-warning" role="status">

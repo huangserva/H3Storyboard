@@ -13,6 +13,9 @@ interface ScriptStudioProps {
   onProjectChanged: () => Promise<void>;
 }
 
+type ScriptWorkflowStage = 'import' | 'edit' | 'compile' | 'review' | 'complete'
+  | 'archived';
+
 export function ScriptStudio({ projectId, onOpenCanvas,
   onProjectChanged }: ScriptStudioProps) {
   const studio = useScriptStudio(projectId);
@@ -28,7 +31,15 @@ export function ScriptStudio({ projectId, onOpenCanvas,
     (studio.document.scenes.length > 0 ||
       studio.document.version.source_format !== 'legacy_text'));
   const hasDraft = studio.versions.some(({ status }) => status === 'draft');
-  const showImport = importing || (!structured && !hasDraft);
+  const archived = studio.document?.version.status === 'superseded';
+  const reviewActive = Boolean(studio.review &&
+    studio.review.active_compilation_id === studio.review.compilation.id);
+  const reviewArchived = Boolean(archived && studio.review && !reviewActive);
+  const showImport = importing || (!archived && !structured && !hasDraft);
+  const workflowStage: ScriptWorkflowStage = archived && !reviewActive ? 'archived'
+    : showImport ? 'import'
+    : editable ? 'edit' : !studio.review ? 'compile'
+      : studio.review.compilation.status === 'draft' ? 'review' : 'complete';
 
   useEffect(() => {
     if (!studio.document) return;
@@ -90,29 +101,43 @@ export function ScriptStudio({ projectId, onOpenCanvas,
         onClick={() => setImporting(true)}>＋ 导入新版本</button> : null}
     </aside>
     <section className="script-editor-shell">
+      <ScriptProgressGuide stage={workflowStage}
+        archived={reviewArchived || studio.review?.compilation.status === 'superseded'}
+        archivedCompletedSteps={!studio.review ? 2
+          : studio.review.compilation.status === 'draft' ? 3 : 4} />
       {showImport ? <section className="script-import-panel">
-        <span className="eyebrow">P2.1 / IMPORT</span>
-        <h1>建立可编译的结构化剧本</h1>
-        <p>粘贴普通剧本，或导入 shuohao novel-script JSON。导入只创建草稿，不改写当前锁定版本。</p>
-        <label>新版本标题<input value={importTitle}
-          onChange={(event) => setImportTitle(event.target.value)} /></label>
-        <label>导入格式<select value={importFormat}
-          onChange={(event) => setImportFormat(event.target.value as typeof importFormat)}>
-          <option value="plain_text">普通剧本文本</option>
-          <option value="shuohao_novel_script">shuohao novel-script JSON</option>
-        </select></label>
-        <label>剧本内容<textarea aria-label="剧本内容" rows={18}
-          value={importContent} onChange={(event) =>
-            setImportContent(event.target.value)} /></label>
-        <div className="script-actions">
-          <button className="button button-primary" disabled={studio.busy ||
-            importContent.trim().length === 0} onClick={() => void (async () => {
-              const result = await studio.importDraft({ format: importFormat,
-                title: importTitle, content: importContent });
-              if (result) setImporting(false);
-            })()} type="button">导入为草稿</button>
-          {structured ? <button className="button" onClick={() =>
-            setImporting(false)} type="button">取消</button> : null}
+        <header className="script-import-intro">
+          <span className="eyebrow">STEP 01 · IMPORT</span>
+          <h1>从剧本开始，画布会自动生成</h1>
+          <p>先粘贴完整剧本。系统会拆成 Scene 和 Beat，经过校验、锁定与导演审核后，再自动建立画布。</p>
+          <div className="script-import-hint"><strong>普通文本格式</strong>
+            <code>SC-01 雨巷 夜<br />苏晚宁：今晚别走。<br />顾承渊收起伞。</code></div>
+        </header>
+        <div className="script-import-form">
+          <div className="script-import-meta">
+            <label>新版本标题<input value={importTitle}
+              onChange={(event) => setImportTitle(event.target.value)} /></label>
+            <label>导入格式<select value={importFormat}
+              onChange={(event) => setImportFormat(
+                event.target.value as typeof importFormat)}>
+              <option value="plain_text">普通剧本文本</option>
+              <option value="shuohao_novel_script">shuohao novel-script JSON</option>
+            </select></label>
+          </div>
+          <label>剧本内容<textarea aria-label="剧本内容" rows={12}
+            placeholder="粘贴包含场景、动作和对白的完整剧本…"
+            value={importContent} onChange={(event) =>
+              setImportContent(event.target.value)} /></label>
+          <div className="script-actions">
+            <button className="button button-primary" disabled={studio.busy ||
+              importContent.trim().length === 0} onClick={() => void (async () => {
+                const result = await studio.importDraft({ format: importFormat,
+                  title: importTitle, content: importContent });
+                if (result) setImporting(false);
+              })()} type="button">导入为草稿</button>
+            {structured ? <button className="button" onClick={() =>
+              setImporting(false)} type="button">取消</button> : null}
+          </div>
         </div>
       </section> : <>
         <header className="script-editor-header">
@@ -140,7 +165,13 @@ export function ScriptStudio({ projectId, onOpenCanvas,
           {studio.validation.issues.map((issue, index) => <p key={`${issue.code}-${index}`}
             data-severity={issue.severity}>{issue.code} · {issue.message}</p>)}
         </section> : null}
-        {studio.review ? <PlanReviewPanel busy={studio.busy}
+        {archived ? <section className="script-archive-notice" role="status">
+          <strong>{reviewActive ? '剧本已有接替版本' : '这是历史剧本版本'}</strong>
+          <p>{reviewActive
+            ? '此版本的分镜仍是当前执行计划；新分镜批准前，生产继续使用这一套。'
+            : '该版本已归档，仅供查看。请选择当前版本，或导入一个新版本继续制作。'}</p>
+        </section> : null}
+        {studio.review ? <PlanReviewPanel archived={reviewArchived} busy={studio.busy}
           review={studio.review} onOpenCanvas={onOpenCanvas}
           onUpdate={studio.updateReviewShot} onApprove={approve} /> :
         <div className="script-scenes">
@@ -160,4 +191,26 @@ export function ScriptStudio({ projectId, onOpenCanvas,
 
 function renumberScenes(scenes: ScriptSceneInput[]): ScriptSceneInput[] {
   return scenes.map((scene, index) => ({ ...scene, ordinal: index + 1 }));
+}
+
+function ScriptProgressGuide({ stage, archived, archivedCompletedSteps }: {
+  stage: ScriptWorkflowStage;
+  archived: boolean;
+  archivedCompletedSteps: number;
+}) {
+  const stages: Array<[ScriptWorkflowStage, string]> = [
+    ['import', '导入剧本'], ['edit', '编辑与校验'], ['compile', '锁定并编译'],
+    ['review', '审核并批准'], ['complete', archived ? '历史已归档' : '进入画布'],
+  ];
+  const activeIndex = stages.findIndex(([key]) => key === stage);
+  return <nav className="script-progress" aria-label="剧本制作进度">
+    <ol>{stages.map(([key, label], index) => <li key={key}
+      data-state={stage === 'archived'
+        ? index < archivedCompletedSteps ? 'done'
+          : index === 4 ? 'current' : 'skipped'
+        : index < activeIndex ? 'done'
+          : index === activeIndex ? 'current' : 'next'}>
+      <span>{String(index + 1).padStart(2, '0')}</span><strong>{label}</strong>
+    </li>)}</ol>
+  </nav>;
 }

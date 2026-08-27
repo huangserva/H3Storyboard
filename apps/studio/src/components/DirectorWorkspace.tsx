@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { BindShotReferenceInput, GenerationPreflight, ProjectSnapshot, ShotPlan,
   UpdateShotPlanInput } from '@h3storyboard/protocol';
 import { ActualShotPanel } from './ActualShotPanel.js';
@@ -8,6 +8,7 @@ import { ReferencePanel } from './ReferencePanel.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { ShotProductionEditor } from './ShotProductionEditor.js';
 import { useGenerationPreflights } from '../lib/use-generation-preflights.js';
+import { useScriptWorkflowPending } from '../lib/use-script-workflow-pending.js';
 import { allowsH3NativeAudio } from '../lib/h3-audio-policy.js';
 
 const ProductionBriefPanel = lazy(async () => {
@@ -68,7 +69,10 @@ export function DirectorWorkspace({
   onBindReference,
   onRefreshProject,
 }: DirectorWorkspaceProps) {
-  const [view, setView] = useState<WorkspaceView>('board');
+  const [view, setView] = useState<WorkspaceView>('script');
+  const openedProjectId = useRef<string | null>(null);
+  const routedProjectId = useRef<string | null>(null);
+  const viewTouchedProjectId = useRef<string | null>(null);
   const [productionOpen, setProductionOpen] = useState(false);
   const [shotProductionOpen, setShotProductionOpen] = useState(false);
   const [selectedActualId, setSelectedActualId] = useState<string | null>(null);
@@ -91,8 +95,35 @@ export function DirectorWorkspace({
     : shotJobs.at(-1) ?? null;
   const outputAsset = snapshot?.assets.find(
     ({ id }) => id === displayedActual?.output_asset_id) ?? null;
+  const scriptWorkflow = useScriptWorkflowPending(snapshot);
+  const scriptActionPending = scriptWorkflow.pending || !scriptWorkflow.resolved;
+
+  useEffect(() => {
+    if (!snapshot) return;
+    const projectChanged = openedProjectId.current !== snapshot.project.id;
+    if (projectChanged) {
+      const preserveCanvas = view === 'flow' &&
+        viewTouchedProjectId.current !== null;
+      openedProjectId.current = snapshot.project.id;
+      setProductionOpen(false);
+      setShotProductionOpen(false);
+      setSelectedActualId(null);
+      onCanvasFocusModeChange(false);
+      viewTouchedProjectId.current = preserveCanvas
+        ? snapshot.project.id : null;
+      if (preserveCanvas) routedProjectId.current = snapshot.project.id;
+    }
+    if (viewTouchedProjectId.current !== snapshot.project.id &&
+      scriptWorkflow.resolved &&
+      routedProjectId.current !== snapshot.project.id) {
+      setView(scriptWorkflow.pending ? 'script' : 'board');
+      routedProjectId.current = snapshot.project.id;
+    }
+  }, [onCanvasFocusModeChange, scriptWorkflow.pending,
+    scriptWorkflow.resolved, snapshot, view]);
 
   const changeView = (next: WorkspaceView) => {
+    viewTouchedProjectId.current = snapshot?.project.id ?? null;
     setView(next);
     if (next !== 'flow') onCanvasFocusModeChange(false);
   };
@@ -136,14 +167,19 @@ export function DirectorWorkspace({
             onClick={() => setProductionOpen(true)}>BRIEF / LOCK</button>
           <button className="button compact" disabled={!selectedShot} type="button"
             onClick={() => setShotProductionOpen(true)}>INPUTS / STATES</button>
-          <button className="button button-primary compact" disabled={busy} onClick={onNewShot} type="button">＋ 新增计划镜头</button>
+          <button className="button button-primary compact" disabled={busy}
+            onClick={scriptActionPending
+              ? () => changeView('script') : onNewShot} type="button">
+            {scriptActionPending ? (snapshot.shot_plans.length === 0
+              ? '从剧本生成分镜' : '继续剧本流程')
+              : '＋ 新增计划镜头'}</button>
         </div>
       </header>
 
       {view === 'script' ? <Suspense fallback={<div className="progress-bar" />}>
-        <ScriptStudio projectId={snapshot.project.id}
+        <ScriptStudio key={snapshot.project.id} projectId={snapshot.project.id}
           onProjectChanged={() => onRefreshProject(snapshot.project.id)}
-          onOpenCanvas={() => setView('flow')} />
+          onOpenCanvas={() => changeView('flow')} />
       </Suspense> : view === 'board' ? <ProductionBoardView snapshot={snapshot}
         selectedShotId={selectedShot?.id ?? null} busy={busy}
         preflights={preflights} onSelectShot={onSelectShot}
@@ -151,6 +187,7 @@ export function DirectorWorkspace({
         : view === 'flow' ? (
         <Suspense fallback={<div className="progress-bar" />}>
           <InfiniteCanvas busy={busy} onNewShot={onNewShot}
+            onOpenScript={() => changeView('script')}
             canvasFocusMode={canvasFocusMode}
             onCanvasFocusModeChange={onCanvasFocusModeChange}
             onSelectShot={onSelectShot}

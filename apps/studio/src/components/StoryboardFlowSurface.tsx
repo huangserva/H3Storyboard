@@ -34,7 +34,6 @@ interface StoryboardFlowSurfaceProps {
   busy: boolean;
   selectedShots: ShotPlan[];
   preflights: Map<string, GenerationPreflight>;
-  onNewShot: () => void;
   onSelectScene: (sceneId: string | null) => void;
   onClearSelection: () => void;
   onGenerateBatch: (shots: ShotPlan[],
@@ -51,10 +50,11 @@ const nodeTypes = { storyboard: CanvasFlowNode };
 export function StoryboardFlowSurface({ flowProps, graph, snapshot, scenes,
   isolatedSceneId, activeSceneId, focusMode, browserFullscreen,
   browserFullscreenBusy, assetDrawerOpen, loading, error, busy, selectedShots,
-  preflights, onNewShot, onSelectScene, onClearSelection, onGenerateBatch,
+  preflights, onSelectScene, onClearSelection, onGenerateBatch,
   onSetup, onToggleAssetDrawer, onToggleFocusMode,
   onToggleBrowserFullscreen }: StoryboardFlowSurfaceProps) {
-  return <div className="storyboard-flow" data-empty={graph.nodes.length <= 1}
+  return <div className="storyboard-flow"
+    data-empty={snapshot.shot_plans.length === 0}
     data-scene-isolated={isolatedSceneId ?? 'all'}>
     <ReactFlow<StoryboardFlowNode, Edge> {...flowProps} nodeTypes={nodeTypes}>
       <Background variant={BackgroundVariant.Dots} gap={24} size={1.1}
@@ -88,10 +88,5 @@ export function StoryboardFlowSurface({ flowProps, graph, snapshot, scenes,
     </ReactFlow>
     {loading ? <div className="canvas-status">正在加载持久化布局…</div> : null}
     {error ? <div className="canvas-status" role="alert">{error}</div> : null}
-    {snapshot.shot_plans.length === 0 ? <div className="canvas-empty">
-      <span>EMPTY STORYBOARD</span><h2>从第一镜开始搭建叙事流程</h2>
-      <p>素材、角色、生成任务和 Take 会围绕计划镜头自动形成可追溯关系。</p>
-      <button className="button button-primary" disabled={busy}
-        onClick={onNewShot} type="button">＋ 新增计划镜头</button></div> : null}
   </div>;
 }

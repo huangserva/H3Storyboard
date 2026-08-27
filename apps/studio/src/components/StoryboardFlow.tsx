@@ -41,7 +41,6 @@ interface StoryboardFlowProps {
   error: string | null;
   preflights: Map<string, GenerationPreflight>;
   characterReferences: Map<string, CharacterReference>;
-  onNewShot: () => void;
   onSelect: (node: StoryboardViewNode | null) => void;
   onGenerate: (shot: ShotPlan, preflight: GenerationPreflight,
     reason: string | null) => Promise<boolean>;
@@ -62,7 +61,7 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
   browserFullscreenBusy, assetDrawerOpen,
   loading, error, preflights, characterReferences, onSelect, onGenerate, onSetup,
   onGenerateBatch, onBindReference,
-  onNewShot, onOpenMedia, onToggleAssetDrawer, onToggleFocusMode,
+  onOpenMedia, onToggleAssetDrawer, onToggleFocusMode,
   onToggleBrowserFullscreen, onPersist }: StoryboardFlowProps) {
   const scenes = useMemo(() => listStoryboardScenes(graph), [graph]);
   const [isolatedSceneId, setIsolatedSceneId] = useState<string | null>(null);
@@ -205,7 +204,7 @@ export function StoryboardFlow({ graph, snapshot, selectedNodeId, busy,
     focusMode={focusMode} browserFullscreen={browserFullscreen}
     browserFullscreenBusy={browserFullscreenBusy} assetDrawerOpen={assetDrawerOpen}
     loading={loading} error={error} busy={busy} selectedShots={selection.selectedShots}
-    preflights={preflights} onNewShot={onNewShot} onSelectScene={selectScene}
+    preflights={preflights} onSelectScene={selectScene}
     onClearSelection={selection.clearSelection}
     onGenerateBatch={onGenerateBatch} onSetup={onSetup}
     onToggleAssetDrawer={onToggleAssetDrawer}

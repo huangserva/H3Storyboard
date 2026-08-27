@@ -12,6 +12,7 @@ import { useBrowserFullscreen } from '../lib/use-browser-fullscreen.js';
 import { AssetLibraryPanel } from './AssetLibraryPanel.js';
 import { CanvasInspectorPanel } from './CanvasInspectorPanel.js';
 import { BatchProgressDock } from './BatchProgressDock.js';
+import { CanvasEmptyGuide } from './CanvasEmptyGuide.js';
 import { CharacterLibraryPanel } from './CharacterLibraryPanel.js';
 import { MediaLightbox } from './MediaLightbox.js';
 import { StoryboardFlow } from './StoryboardFlow.js';
@@ -22,6 +23,7 @@ interface InfiniteCanvasProps {
   shotFocusRevision: number;
   busy: boolean;
   onNewShot: () => void;
+  onOpenScript: () => void;
   canvasFocusMode: boolean;
   onCanvasFocusModeChange: (active: boolean) => void;
   onSelectShot: (id: string) => void;
@@ -43,6 +45,7 @@ interface InfiniteCanvasProps {
 }
 
 export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
+  onOpenScript,
   canvasFocusMode, onCanvasFocusModeChange, shotFocusRevision, onSelectShot,
   preflights, onGenerate, onSetup, onReviewActual, onMarkRepresentative,
   onReviewRepresentative, onGenerateBatch,
@@ -163,23 +166,28 @@ export function InfiniteCanvas({ snapshot, selectedShotId, busy, onNewShot,
       forceOpen={assetDrawerOpen}
       onClose={() => { setAssetDrawerOpen(false);
         focusCanvas('打开资产抽屉'); }} />
-    <StoryboardFlow key={snapshot.project.id} graph={graph} snapshot={graphSnapshot}
-      selectedNodeId={selectedNodeId} busy={busy} loading={loading} error={error}
-      focusRevision={shotFocusRevision} activeSceneId={activeSceneId}
-      focusMode={canvasFocusMode} browserFullscreen={fullscreen.active}
-      browserFullscreenBusy={fullscreen.busy}
-      assetDrawerOpen={assetDrawerOpen}
-      preflights={preflights} characterReferences={characterReferences}
-      onNewShot={onNewShot} onGenerate={onGenerate} onSetup={onSetup}
-      onGenerateBatch={onGenerateBatch} onBindReference={onBindReference}
-      onToggleAssetDrawer={() => { setAssetDrawerOpen(!assetDrawerOpen);
-        if (assetDrawerOpen) focusCanvas('打开资产抽屉'); }}
-      onToggleFocusMode={toggleFocusMode}
-      onToggleBrowserFullscreen={toggleBrowserFullscreen}
-      onOpenMedia={setLightboxAssetId} onPersist={persist}
-      onSelect={(node) => { setSelectedNodeId(node?.id ?? null);
-        if (node) setAssetDrawerOpen(false);
-        if (node?.shot_id) onSelectShot(node.shot_id); }} />
+    <div className="canvas-stage">
+      <StoryboardFlow key={snapshot.project.id} graph={graph}
+        snapshot={graphSnapshot} selectedNodeId={selectedNodeId} busy={busy}
+        loading={loading} error={error} focusRevision={shotFocusRevision}
+        activeSceneId={activeSceneId} focusMode={canvasFocusMode}
+        browserFullscreen={fullscreen.active}
+        browserFullscreenBusy={fullscreen.busy} assetDrawerOpen={assetDrawerOpen}
+        preflights={preflights} characterReferences={characterReferences}
+        onGenerate={onGenerate} onSetup={onSetup}
+        onGenerateBatch={onGenerateBatch} onBindReference={onBindReference}
+        onToggleAssetDrawer={() => { setAssetDrawerOpen(!assetDrawerOpen);
+          if (assetDrawerOpen) focusCanvas('打开资产抽屉'); }}
+        onToggleFocusMode={toggleFocusMode}
+        onToggleBrowserFullscreen={toggleBrowserFullscreen}
+        onOpenMedia={setLightboxAssetId} onPersist={persist}
+        onSelect={(node) => { setSelectedNodeId(node?.id ?? null);
+          if (node) setAssetDrawerOpen(false);
+          if (node?.shot_id) onSelectShot(node.shot_id); }} />
+      {snapshot.shot_plans.length === 0 ? <CanvasEmptyGuide busy={busy}
+        script={snapshot.script_version} onManualShot={onNewShot}
+        onOpenScript={onOpenScript} /> : null}
+    </div>
     <BatchProgressDock snapshot={snapshot} />
     <div className="canvas-right-rail">
       <CanvasInspectorPanel node={selectedNode} snapshot={graphSnapshot} assets={assets}

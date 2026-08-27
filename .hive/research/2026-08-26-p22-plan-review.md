@@ -15,9 +15,11 @@ diff/编辑、revision 并发保护、显式批准，以及 active approved plan
 - Protocol 2.1 / SQLite migration v25。
 - `plan-review-store.ts` 管事务，projection/diff 单独拆分；API 只有 3 个端点。
 - 真 HTTP + SQLite 覆盖错误、并发、回滚、幂等、来源损坏、历史不变与 H3 门禁。
-- 真 Chromium 覆盖多卡脏状态、逐镜保存、批准、进入画布和刷新恢复。
-- 最终门禁：279 passed / 1 live skip；25 Chrome passed。
-- 独立复审：A 架构 B、B bug B、C 测试 B-、D 协议 A-。
+- 真 Chromium 覆盖多卡脏状态、逐镜保存、批准、进入画布和刷新恢复；
+  2026-08-27 补空态无重叠、首屏 CTA、1024/700px、draft/locked/
+  superseded/active 入口与 stale review 只读。
+- 最终门禁：279 passed / 1 live skip；27 Chrome passed。
+- 独立复审：A 架构 A-、B bug A-、C 测试 B、D 协议 A。
 
 ## 决策与下一步
 

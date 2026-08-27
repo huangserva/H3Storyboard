@@ -52,7 +52,15 @@ export function useScriptStudio(projectId: string) {
     }
   }, [projectId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    loadSequence.current += 1;
+    setVersions([]);
+    setDocument(null);
+    setValidation(null);
+    setReview(null);
+    setMessage(null);
+    void load();
+  }, [load]);
 
   const run = useCallback(async <T,>(operation: () => Promise<T>,
     success: string): Promise<T | null> => {

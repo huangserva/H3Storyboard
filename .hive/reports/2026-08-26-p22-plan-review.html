@@ -2,9 +2,16 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>H3Storyboard · P2.2 Plan Review</title>
 <style>:root{color-scheme:dark;--bg:#0a0d0b;--panel:#111713;--line:#2b352d;--text:#edf3e9;--muted:#9da99f;--acid:#c6ff52;--cyan:#6be4d2;--warn:#efc267}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}main{width:min(1100px,calc(100% - 36px));margin:46px auto 80px}h1{font-size:42px;line-height:1.08;letter-spacing:-.04em;margin:6px 0 12px}h2{margin-top:38px;color:var(--acid)}.eyebrow{color:var(--acid);font-weight:800;letter-spacing:.14em}.lead{max-width:900px;color:#d3ddd5;font-size:19px}.verdict,.card{border:1px solid var(--line);border-radius:15px;background:var(--panel)}.verdict{padding:22px;border-color:#506c34}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:17px}.card b{display:block;color:var(--cyan);font-size:17px}.flow{padding:18px;border:1px solid var(--line);border-radius:14px;background:#0e1410;color:var(--acid);font:700 14px/1.8 ui-monospace,monospace}table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line)}th,td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted)}code{color:#dfff9e}.ok{color:var(--acid)}.defer{color:var(--warn)}@media(max-width:760px){.grid{grid-template-columns:1fr}h1{font-size:34px}}</style></head>
-<body><main><div class="eyebrow">P2.2 DELIVERY · 2026-08-26</div><h1>导演审阅已成为 H3 生产的正式门</h1>
+<body><main><div class="eyebrow">P2.2 DELIVERY · 2026-08-27 UI REVISION</div><h1>导演审阅已成为 H3 生产的正式门</h1>
 <p class="lead">草稿分镜现在不再是一次编译后直接可用的数据。导演能看到每镜来自哪个 Scene/Beat、与原文有哪些变化、逐镜修改画面规划，并在整套来源完整且没有未保存修改时显式批准。批准成功才会解锁现有 H3 生产链。</p>
 <section class="verdict"><b>结论：P2.2 完成，可以进入画布前的完整导演测试。</b><br>切换 plan-set 是一次 SQLite 原子事务；旧生产历史保留，新任务只能来自当前 active approved 集合。</section>
+
+<h2>UI 可用性修订</h2><table><thead><tr><th>Before</th><th>After</th><th>Why</th></tr></thead><tbody>
+<tr><td>空画布提示与 Script 节点、工具条重叠。</td><td>独立不透明引导卡，脚本节点在空态隐藏，桌面与 700px 均做几何无重叠验证。</td><td>首次进入必须先看懂下一步，再操作。</td></tr>
+<tr><td>空项目落到无内容画布；主按钮仍写“新增镜头”。</td><td>未完成剧本自动进入 Script Studio；CTA 根据 draft、locked、review、approved 状态显示“从剧本生成分镜 / 继续剧本流程”。</td><td>入口与真实生产状态一致。</td></tr>
+<tr><td>导入表单首屏不可见；1024px 直接隐藏版本链。</td><td>五步进度、紧凑双栏导入、1024px 保留版本栏、700px 改横向版本条。</td><td>不靠说明文档也能完成第一条链路。</td></tr>
+<tr><td>历史 draft review 仍像可编辑审核台；active 旧计划与 archived 混淆。</td><td>stale review 强制只读；旧剧本的 plan-set 若仍 active 则继续显示 ACTIVE，批准接替计划后才归档。</td><td>避免误批准，也不破坏旧 active plan 的生产连续性。</td></tr>
+</tbody></table>
 
 <h2>交付能力</h2><div class="flow">locked Script → DRAFT plan-set → source / diff review → per-shot edit → human approve → ACTIVE APPROVED plan-set → H3</div>
 <div class="grid"><div class="card"><b>导演审阅</b>按 Scene/Beat 显示来源、状态和 diff；逐镜编辑 description、duration、服装、位置、道具，声音保持锁定。</div><div class="card"><b>安全批准</b>revision 防止迟到覆盖；任一卡片脏状态都会禁止批准；来源损坏由服务端再次拒绝。</div><div class="card"><b>原子切换</b>批准新集合、切 active pointer、supersede 旧集合一起成功或一起回滚；Job/Take 历史不重写。</div></div>
@@ -18,7 +25,7 @@
 
 <h2>生产语义</h2><ul><li>新建 H3 Job 只接受当前 active 且 approved 的 ShotPlan。</li><li>旧 approved 集合被 supersede 后不能新建 Job 或 retry；既有 Job 使用原幂等 key 仍可安全回放。</li><li>任意批准步骤失败，数据库回滚到旧 active 集合；并发批准只会收敛到一个结果。</li><li>本阶段不调用 4090，不创建 TTS、配音、音乐、雨声、环境声或 SFX；声音字段不开放修改。</li></ul>
 
-<h2>验证结果</h2><table><tbody><tr><td><code>pnpm check</code></td><td class="ok">通过</td></tr><tr><td><code>pnpm build</code></td><td class="ok">通过</td></tr><tr><td>Vitest</td><td class="ok">47 files · 279 passed · 1 个显式 live-ComfyUI skip</td></tr><tr><td>Playwright</td><td class="ok">25 个真实 Chromium 用例全部通过</td></tr></tbody></table>
+<h2>验证结果</h2><table><tbody><tr><td><code>pnpm check</code></td><td class="ok">通过</td></tr><tr><td><code>pnpm build</code></td><td class="ok">通过</td></tr><tr><td>Vitest</td><td class="ok">47 files · 279 passed · 1 个显式 live-ComfyUI skip</td></tr><tr><td>Playwright</td><td class="ok">27 个真实 Chromium 用例全部通过</td></tr></tbody></table>
 
 <h2>原始任务逐条 verdict</h2><table><thead><tr><th>任务</th><th>结论</th><th>证据</th></tr></thead><tbody>
 <tr><td>draft plan-set 审阅</td><td class="ok">完成</td><td>Compilation 生命周期、项目 active pointer、独立 PlanReview projection。</td></tr>
@@ -27,18 +34,19 @@
 <tr><td>显式批准后解锁 H3</td><td class="ok">完成</td><td>服务端来源就绪复核；真实 HTTP 创建 approved Plan 的 H3 Job。</td></tr>
 <tr><td>原子 supersede 与历史保护</td><td class="ok">完成</td><td>失败回滚、并发批准、旧完整内容/Job/Take 不变、新 retry 门禁均有真 SQLite 测试。</td></tr>
 <tr><td>Studio 完整用户链</td><td class="ok">完成</td><td>真实 Chrome 覆盖多卡编辑、逐卡保存、批准、画布标记与刷新恢复。</td></tr>
+<tr><td>首次进入可用性</td><td class="ok">完成</td><td>真实 Chrome 覆盖空态几何、CTA 命中、1024/700px、draft/locked/superseded/active 路由与刷新恢复。</td></tr>
 <tr><td>P2.3 AI 写作</td><td class="defer">明确延期</td><td>本阶段未实现；现有 draft/validate/lock/review/approve 边界已能安全承接。</td></tr>
 </tbody></table>
 
 <h2>Self-Review</h2><table><thead><tr><th>维度</th><th>首轮 → 最终</th><th>关键问题与 verdict</th></tr></thead><tbody>
-<tr><td>A 架构</td><td>C+ → B</td><td>拆分 projection/store；异步 review 与项目切换竞态、卡片脏状态和迟到 snapshot 均已修。文件尺寸合规。</td></tr>
-<tr><td>B bug</td><td>C → B</td><td>旧 Job 幂等回放、新 retry 门禁、批准 revision 重放和重写镜头 diff 误判均已修并补回归。</td></tr>
-<tr><td>C 测试</td><td>C+ → B-</td><td>补 stale approve/readback、整份旧 Plan 内容、来源损坏回滚、unchanged 分支及真实 approved H3 创建。</td></tr>
-<tr><td>D 协议</td><td>C+ → A-</td><td>active 指针、superseded 标记、文档、provenance gate、snake_case 和声音禁改全部对齐。</td></tr>
+<tr><td>A 架构</td><td>C+ → A-</td><td>默认路由改为项目级状态；只对用户显式 Flow 保留跨项目视图，组件文件尺寸合规。</td></tr>
+<tr><td>B bug</td><td>C → A-</td><td>关闭异步首帧、批准后卸载、active/历史 Plan 混淆、stale draft 污染和只读审核边界。</td></tr>
+<tr><td>C 测试</td><td>C+ → B</td><td>真 Chrome 增加空态几何、CTA hit-test、1024/700px、draft/locked/active/archived 全状态与 V4→V5 刷新链。</td></tr>
+<tr><td>D 协议</td><td>C+ → A</td><td>active plan-set、script supersede、review archive 与 H3/声音约束保持一致。</td></tr>
 </tbody></table>
-<p><b>严重项处理：</b>所有严重项均已修复并有测试证据；没有“下次再处理”或跳过项。综合评分 <b>B+</b>，四个维度全部达到 B- 以上。</p>
+<p><b>严重项处理：</b>所有严重项均已修复并有测试证据；显式 Flow 跨项目保留是既有产品语义，并由真实 E2E 验证，不按“状态泄漏”处理。没有跳过项。综合评分 <b>A-</b>，四个维度全部达到 B- 以上。</p>
 
-<h2>现有代码与测试处理</h2><ul><li>修改：Project/Script/Shot 协议、schema 版本、ProjectStore 装配、Job 创建幂等顺序、retry 门禁、Script Studio 与画布/制片墙状态标签。</li><li>新增：migration v25、PlanReview 协议/store/projection/diff/API/UI、真 HTTP+SQLite 集成、diff 单测和 Chromium 用户链。</li><li>删除：没有删除现有生产代码或测试。</li><li>跳过：仓库原有 1 个显式 live-ComfyUI 测试；P2.3 不属于本阶段。</li></ul>
+<h2>现有代码与测试处理</h2><ul><li>修改：Project/Script/Shot 协议、schema 版本、ProjectStore、Job/retry 门禁、Script Studio 默认路由/进度/响应式、空画布与 PlanReview 只读语义。</li><li>新增：migration v25、PlanReview 协议/store/projection/diff/API/UI、空画布引导、workflow pending 状态解析、真 HTTP+SQLite 与 Chromium 用户链。</li><li>删除：移除旧透明空态文案层及 StoryboardFlow 的无用 onNewShot prop drill；没有删除现有测试。</li><li>跳过：仓库原有 1 个显式 live-ComfyUI 测试；P2.3 不属于本阶段。</li></ul>
 
 <h2>已知但未做</h2><ul><li>P2.3：可选 AI 剧本生成；输出仍必须从 draft 开始，不能自动锁定、批准或出片。</li><li>本阶段只验证 H3 Job 能进入既有生产链，没有对 4090 发起真实生成。</li><li>不支持按 Scene 部分批准；plan-set 是项目级原子切换，这是有意的连续性决策。</li></ul>
 </main></body></html>

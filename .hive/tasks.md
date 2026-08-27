@@ -28,7 +28,8 @@
 - [x] Scene/Beat 来源、逐镜 diff、严格字段编辑、revision 冲突和未保存修改门禁；声音字段不可编辑。
 - [x] approved Plan 解锁现有 H3；superseded Plan 禁止新 Job/retry，但旧 Job 同 key 回放和历史 Take 不变。
 - [x] 真 HTTP + SQLite 覆盖编辑、回滚、并发、来源损坏、历史与 H3 门禁；真实 Chromium 覆盖完整导演用户链。
-- [x] 最终门禁 279 passed / 1 live skip + 25 Chrome；四路复审 B / B / B- / A-。
+- [x] 2026-08-27 可用性修订：空画布无重叠、首次进入引导、状态化 CTA、1024/700px 版本链、stale review 只读和 active plan 连续性。
+- [x] 最终门禁 279 passed / 1 live skip + 27 Chrome；四路复审 A- / A- / B / A。
 
 ### 2026-08-26 · P2.1 Script Studio（done）
 - [x] plain text / shuohao JSON 导入；Scene/Beat UUID、状态与时长持久化。

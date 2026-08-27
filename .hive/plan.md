@@ -90,8 +90,9 @@ candidate，仍需导演人工批准。M1A/M1B 已完成工程实现、真实 i2
 - Studio 支持 Scene/Beat 来源对照、逐镜 diff 与编辑；声音字段不可编辑，存在未保存修改时禁止批准。
 - 批准在一个 SQLite transaction 内批准新集合、切换项目指针并 supersede 旧集合；失败全回滚，旧 Job/Take 历史不变。
 - 新 Job 只允许 active approved Plan；旧 Job 保留同 key 幂等回放，superseded Plan 禁止新建或 retry。
-- 最终门禁：47 个 Vitest 文件，279 passed / 1 个显式 live-ComfyUI skip；25 个真实 Chromium E2E 全过。
-- 四路最终复审：架构 B、真实 bug B、测试 B-、协议 A-；所有严重项均已整改，无跳过项。
+- 2026-08-27 UI 修订：空画布不再重叠；空项目默认进入 Script Studio；增加五步引导、状态化 CTA、1024/700px 版本入口，以及 active/archived review 精确语义。
+- 最终门禁：47 个 Vitest 文件，279 passed / 1 个显式 live-ComfyUI skip；27 个真实 Chromium E2E 全过。
+- 四路最终复审：架构 A-、真实 bug A-、测试 B、协议 A；所有严重项均已整改，无跳过项。
 - 本阶段不调用 4090，不添加 TTS、配音、音乐、环境音、雨声或音效。
 
 ## 2026-08-26 P2.1 Script Studio 交付状态
