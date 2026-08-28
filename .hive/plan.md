@@ -1,9 +1,9 @@
 ---
 title: H3Storyboard
 started: 2026-08-11
-current_phase: P2.2
+current_phase: P2.3
 status: active
-last_review: 2026-08-26
+last_review: 2026-08-28
 ---
 
 ## 目标
@@ -62,7 +62,7 @@ last_review: 2026-08-26
 - [x] P2.1：plain text / shuohao 单上游导入、Scene/Beat 持久编辑、确定性校验、不可变锁定、带 Scene/Beat 来源的草稿 ShotPlan 编译
 - [x] 草稿 Plan 单镜/批量 H3 双重门禁；剧本链路不访问 4090，不引入 TTS/BGM/环境音
 - [x] P2.2：导演审阅、逐镜编辑/diff、显式批准后才进入现有 H3 生产链
-- [ ] P2.3：可选 AI 剧本生成，继续服从 draft → validate → lock 边界
+- [x] P2.3：AI 生成 / 已有剧本导入双入口；shuohao 生成与确定性质量门、fresh-context 独立审阅、creator brief 与不可变生成来源血缘；继续服从 draft → validate → lock 边界
 
 ## 参考源（已评估，见 .hive/research/）
 - `director`（本地私有仓库，检视 commit cb7358b）— 生产政策参考：Mode 验证状态、资产生命周期、生成锁、opening/ending state、代表性 take 门禁 → 已吸收进 M1A
@@ -80,10 +80,19 @@ last_review: 2026-08-26
 - 画布 UI（M2）与 M1 后端闭环并行时的接口漂移
 
 ## 当前 phase
-P2.2 — 已补齐草稿分镜审阅、逐镜编辑、来源 diff、显式批准和 plan-set 原子切换；M3A 批量编排已完成；P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
+P2.3 — 已补齐 AI 生成剧本与导入已有剧本的并列入口；shuohao 结构化生成先过确定性质量门和一次修复，再由 fresh-context reviewer 独立裁决，只有 accepted 结果保存为可编辑 draft。creator brief、原始生成 JSON、provider/model 和审阅证据均持久化，编辑后明确标记审阅已过期；全链不访问 H3/4090，不创建外部音频。P2.2 草稿分镜审阅与 plan-set 原子批准继续作为下游人工门禁；M3A 批量编排已完成；P1/P1.1/P1.2/P1.3/P1.3B 工程实现和真实 4090 三路径均完成；
 P1.3B 已完成最终全量门禁与四路 review（B+ / B- / B- / B）。默认制片墙可直接本地体验，角色图完成后只进入
 candidate，仍需导演人工批准。M1A/M1B 已完成工程实现、真实 i2v/fl2v/r2v
 证据与四路 review 整改；Mode 仍保持 candidate，等待 user 看片后决定是否升 validated。
+
+## 2026-08-28 P2.3 AI Script Generation 交付状态
+- Protocol 2.2 / schema v28：生成 provider/model、独立审阅、creator brief 与不可变原始生成来源均持久化。
+- Script Studio 提供“AI 生成剧本 / 导入已有剧本”两条并列入口；AI 接受创意、原文、题材、人物、时长、场景数和限制。
+- shuohao 严格 JSON 生成后执行场景、动作、说话人、对白长度、时长、前 3 拍钩子和唯一 key 门禁；只允许一次自动修复。
+- fresh-context 独立审阅拒绝或门禁二次失败均不落库；接受后仅写 draft，不能自动锁定、编译、批准或创建 H3 Job。
+- 草稿保留生成与审阅 provenance；修改正文后审阅明确变为 stale，锁定状态变更不会制造假 stale。
+- 全链不访问 4090，不添加 TTS、配音、音乐、环境音、雨声或音效；最终媒体继续只允许 H3 原生音频或静音。
+- 最终门禁：48 个 Vitest 文件，305 passed / 1 个显式 live-ComfyUI skip；28 个真实 Chromium E2E 全过。四路复审 A- / A- / A- / A；详见 `reports/2026-08-28-p23-ai-script-generation.html`。
 
 ## 2026-08-26 P2.2 Plan Review 交付状态
 - Protocol 2.1 / schema v25：PlanReview、compilation/plan revision、active plan-set 指针与 draft/approved/superseded 生命周期。

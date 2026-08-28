@@ -21,7 +21,10 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
 
       const scriptStudio = page.getByRole('main', { name: '剧本工作台' });
       await expect(scriptStudio).toBeVisible();
-      await expect(page.getByLabel('剧本制作进度')).toContainText('导入剧本');
+      await expect(page.getByLabel('剧本制作进度')).toContainText('生成 / 导入');
+      await expect(page.getByRole('tab', { name: 'AI 生成剧本' }))
+        .toHaveAttribute('aria-selected', 'true');
+      await page.getByRole('tab', { name: '导入已有剧本' }).click();
       const importButton = page.getByRole('button', { name: '导入为草稿' });
       await expect(importButton).toBeInViewport({ ratio: 1 });
       await page.getByLabel('剧本内容').fill('SC-01 雨巷 夜\n苏晚宁：今晚别走。');
@@ -50,6 +53,7 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
       await expect(scriptStudio).toBeVisible();
       await expect(page.locator('.app-shell')).toHaveAttribute(
         'data-canvas-focus', 'false');
+      await page.getByRole('tab', { name: '导入已有剧本' }).click();
 
       await page.setViewportSize({ width: 1024, height: 768 });
       await expect(importButton).toBeInViewport({ ratio: 1 });
@@ -75,6 +79,7 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
       await openProject(page);
       await page.getByRole('button', { name: '剧本', exact: true }).click();
       await expect(page.getByRole('main', { name: '剧本工作台' })).toBeVisible();
+      await page.getByRole('tab', { name: '导入已有剧本' }).click();
       await page.getByLabel('新版本标题').fill('上海雨夜 V2');
       await page.getByLabel('剧本内容').fill([
         'SC-01 雨巷 夜',
@@ -167,7 +172,7 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
       await selectProject(page);
       await page.getByRole('button', { name: '剧本', exact: true }).click();
       await page.getByRole('button', { name: /V1 · 上海雨夜 V1/ }).click();
-      await expect(page.getByRole('button', { name: '＋ 导入新版本' }))
+      await expect(page.getByRole('button', { name: '＋ 新建剧本版本' }))
         .toBeVisible();
       await expect(page.locator('.script-archive-notice'))
         .toContainText('这是历史剧本版本');
@@ -177,9 +182,10 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
         .toHaveValue('导演修订 · 雨巷重逢');
 
       await page.setViewportSize({ width: 1024, height: 768 });
-      await expect(page.getByRole('button', { name: '＋ 导入新版本' }))
+      await expect(page.getByRole('button', { name: '＋ 新建剧本版本' }))
         .toBeInViewport({ ratio: 1 });
-      await page.getByRole('button', { name: '＋ 导入新版本' }).click();
+      await page.getByRole('button', { name: '＋ 新建剧本版本' }).click();
+      await page.getByRole('tab', { name: '导入已有剧本' }).click();
       await page.getByLabel('新版本标题').fill('上海雨夜 V3 草稿');
       await page.getByLabel('剧本内容').fill(
         'SC-01 雨巷 夜\n苏晚宁停在雨里，重新考虑下一步。');
@@ -229,7 +235,8 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
   test('keeps a superseded unapproved review read only', async ({ page }) => {
     await openProject(page);
     await page.getByRole('button', { name: '剧本', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 导入新版本' }).click();
+    await page.getByRole('button', { name: '＋ 新建剧本版本' }).click();
+    await page.getByRole('tab', { name: '导入已有剧本' }).click();
     await page.getByLabel('新版本标题').fill('上海雨夜 V4 未批准');
     await page.getByLabel('剧本内容').fill(
       'SC-01 石库门 夜\n苏晚宁推开门，停在灯下。');
@@ -241,7 +248,8 @@ test.describe.serial('P2.1 / P2.2 Script Studio and plan review', () => {
     await expect(page.getByRole('button', { name: '批准整套分镜' }))
       .toBeEnabled();
 
-    await page.getByRole('button', { name: '＋ 导入新版本' }).click();
+    await page.getByRole('button', { name: '＋ 新建剧本版本' }).click();
+    await page.getByRole('tab', { name: '导入已有剧本' }).click();
     await page.getByLabel('新版本标题').fill('上海雨夜 V5 接替版');
     await page.getByLabel('剧本内容').fill(
       'SC-01 石库门 夜\n顾承渊走进门，收起雨伞。');

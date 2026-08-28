@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { IdSchema, NonEmptyTextSchema, TimestampSchema } from './common.js';
-import { ScriptVersionSchema } from './project.js';
+import {
+  ScriptGenerationReviewSchema,
+  ScriptGenerationBriefSchema,
+  ScriptVersionSchema,
+} from './project.js';
 import { ShotPlanSchema } from './shot.js';
 
 export const ScriptSourceFormatSchema = z.enum([
@@ -79,6 +83,69 @@ export const ImportScriptInputSchema = z.object({
 });
 export type ImportScriptInput = z.infer<typeof ImportScriptInputSchema>;
 
+export const GenerateScriptInputSchema = ScriptGenerationBriefSchema;
+export type GenerateScriptInput = z.infer<typeof GenerateScriptInputSchema>;
+
+const GeneratedShuohaoFlowSchema = z.union([
+  z.object({ action: NonEmptyTextSchema.max(4_000) }).strict(),
+  z.object({
+    speaker: NonEmptyTextSchema.max(160),
+    line: NonEmptyTextSchema.max(1_000),
+    delivery: z.string().trim().max(1_000).default(''),
+  }).strict(),
+]);
+
+const GeneratedShuohaoSceneSchema = z.object({
+  sceneId: NonEmptyTextSchema.max(80),
+  heading: NonEmptyTextSchema.max(300),
+  location: NonEmptyTextSchema.max(300),
+  timeOfDay: NonEmptyTextSchema.max(160),
+  lighting: z.string().trim().max(1_000).default(''),
+  summary: z.string().trim().max(2_000).default(''),
+  characters: z.array(NonEmptyTextSchema.max(160)).max(40),
+  props: z.array(NonEmptyTextSchema.max(160)).max(80).default([]),
+  flow: z.array(GeneratedShuohaoFlowSchema).min(1).max(2_000),
+}).strict();
+
+const GeneratedShuohaoEpisodeSchema = z.object({
+  ep: z.number().int().positive(),
+  targetSeconds: z.number().positive().max(7_200),
+  hook: NonEmptyTextSchema.max(1_000),
+  cliff: NonEmptyTextSchema.max(1_000),
+  beatsClaimed: z.array(NonEmptyTextSchema.max(160)).max(40).default([]),
+  hookBeat: z.tuple([z.number().int().positive(), z.number().int().positive()]),
+  scenes: z.array(GeneratedShuohaoSceneSchema).min(1).max(60),
+}).strict();
+
+export const GeneratedShuohaoScriptSchema = z.object({
+  source: NonEmptyTextSchema.max(160),
+  episodes: z.array(GeneratedShuohaoEpisodeSchema).min(1).max(10),
+}).strict();
+export type GeneratedShuohaoScript = z.infer<
+  typeof GeneratedShuohaoScriptSchema
+>;
+
+export const ScriptGenerationCapabilitySchema = z.object({
+  available: z.boolean(),
+  strategy: z.literal('shuohao_v1'),
+  provider: NonEmptyTextSchema.max(160).nullable(),
+  model: NonEmptyTextSchema.max(240).nullable(),
+});
+export type ScriptGenerationCapability = z.infer<
+  typeof ScriptGenerationCapabilitySchema
+>;
+
+export const ScriptGenerationMetadataSchema = z.object({
+  strategy: z.literal('shuohao_v1'),
+  provider: NonEmptyTextSchema.max(160),
+  model: NonEmptyTextSchema.max(240),
+  attempt_count: z.number().int().min(1).max(2),
+  review: ScriptGenerationReviewSchema,
+});
+export type ScriptGenerationMetadata = z.infer<
+  typeof ScriptGenerationMetadataSchema
+>;
+
 export const UpdateScriptDocumentInputSchema = z.object({
   expected_revision: z.number().int().nonnegative(),
   title: NonEmptyTextSchema.max(160),
@@ -108,6 +175,15 @@ export const ScriptValidationSchema = z.object({
   }),
 });
 export type ScriptValidation = z.infer<typeof ScriptValidationSchema>;
+
+export const ScriptGenerationResultSchema = z.object({
+  document: ScriptDocumentSchema,
+  validation: ScriptValidationSchema,
+  generation: ScriptGenerationMetadataSchema,
+});
+export type ScriptGenerationResult = z.infer<
+  typeof ScriptGenerationResultSchema
+>;
 
 export const LockScriptInputSchema = z.object({
   expected_revision: z.number().int().nonnegative(),

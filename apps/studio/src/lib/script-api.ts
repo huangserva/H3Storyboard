@@ -1,11 +1,14 @@
 import type {
   CompileScriptInput,
+  GenerateScriptInput,
   ImportScriptInput,
   LockScriptInput,
   ApprovePlanReviewInput,
   PlanReview,
   ScriptCompilationResult,
   ScriptDocument,
+  ScriptGenerationCapability,
+  ScriptGenerationResult,
   ScriptValidation,
   ScriptVersion,
   UpdateScriptDocumentInput,
@@ -28,6 +31,19 @@ export function getScriptDocument(projectId: string,
 export function importScript(projectId: string,
   input: ImportScriptInput): Promise<ScriptDocument> {
   return request<ScriptDocument>(`${root(projectId)}/import`, {
+    method: 'POST', body: JSON.stringify(input),
+  });
+}
+
+export function getScriptGenerationCapability(
+  projectId: string,
+): Promise<ScriptGenerationCapability> {
+  return request<ScriptGenerationCapability>(`${root(projectId)}/generation`);
+}
+
+export function generateScript(projectId: string,
+  input: GenerateScriptInput): Promise<ScriptGenerationResult> {
+  return request<ScriptGenerationResult>(`${root(projectId)}/generation`, {
     method: 'POST', body: JSON.stringify(input),
   });
 }

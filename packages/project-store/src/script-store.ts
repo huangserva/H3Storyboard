@@ -5,11 +5,14 @@ import {
   UpdateScriptDocumentInputSchema,
   type CompileScriptInput,
   type ImportScriptInput,
+  type GenerateScriptInput,
+  type GeneratedShuohaoScript,
   type LockScriptInput,
   type ScriptCompilationResult,
   type ScriptDocument,
   type ScriptValidation,
   type ScriptVersion,
+  type ScriptGenerationMetadata,
   type ShotPlan,
   type UpdateScriptDocumentInput,
 } from '@h3storyboard/protocol';
@@ -19,7 +22,10 @@ import { compileScriptScenes } from './script-compiler.js';
 import { StoreError } from './errors.js';
 import { requireGenerationUnlocked } from './generation-locks.js';
 import { parseInput } from './input.js';
-import { importScriptScenes } from './script-import.js';
+import {
+  importGeneratedScriptScenes,
+  importScriptScenes,
+} from './script-import.js';
 import { mapScriptCompilation, mapShotPlan } from './row-mappers.js';
 import {
   assertUniqueDocumentIds,
@@ -48,6 +54,39 @@ export class ScriptStore {
     const input = parseInput(ImportScriptInputSchema, rawInput);
     const scenes = importScriptScenes(input);
     assertUniqueDocumentIds(scenes);
+    return this.createDraft(projectId, input, scenes, null);
+  }
+
+  importGenerated(projectId: string, rawInput: ImportScriptInput,
+    script: GeneratedShuohaoScript,
+    generation: Pick<ScriptGenerationMetadata, 'provider' | 'model' | 'review'> &
+    { input: GenerateScriptInput },
+  ): ScriptDocument {
+    const input = parseInput(ImportScriptInputSchema, rawInput);
+    if (input.format !== 'shuohao_novel_script') throw new StoreError(
+      'SCRIPT_IMPORT_INVALID',
+      'AI generated scripts must use the Shuohao novel-script format',
+    );
+    const scenes = importGeneratedScriptScenes(script);
+    assertUniqueDocumentIds(scenes);
+    if (!generation.provider.trim() || !generation.model.trim()) {
+      throw new StoreError('INPUT_INVALID',
+        'AI generation provenance requires provider and model');
+    }
+    return this.createDraft(projectId, input, scenes, {
+      ...generation,
+      source_content: input.content,
+    });
+  }
+
+  private createDraft(projectId: string, input: ImportScriptInput,
+    scenes: ReturnType<typeof importScriptScenes>,
+    generation: Pick<ScriptGenerationMetadata,
+    'provider' | 'model' | 'review'> & {
+      input: GenerateScriptInput;
+      source_content: string;
+    } | null,
+  ): ScriptDocument {
     return this.database.transaction(() => {
       const project = requireProject(this.database, projectId);
       requireGenerationUnlocked(this.database, projectId);
@@ -63,10 +102,16 @@ export class ScriptStore {
       const now = new Date().toISOString();
       this.database.prepare(`INSERT INTO script_versions
         (id, project_id, version, title, content, status, source_format,
-         parent_version_id, created_at, updated_at, locked_at)
-        VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, NULL)`).run(
+         generation_provider, generation_model, parent_version_id,
+         generation_review_json, generation_input_json,
+         generation_source_content, created_at, updated_at, locked_at)
+        VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`).run(
         id, projectId, version, input.title, input.content, input.format,
-        project.active_script_version_id, now, now);
+        generation?.provider ?? null, generation?.model ?? null,
+        project.active_script_version_id,
+        generation ? JSON.stringify(generation.review) : null,
+        generation ? JSON.stringify(generation.input) : null,
+        generation?.source_content ?? null, now, now);
       insertScriptScenes(this.database, id, scenes, now);
       return getScriptDocument(this.database, projectId, id);
     }).immediate();
@@ -82,7 +127,8 @@ export class ScriptStore {
       requireDraft(document);
       const now = new Date().toISOString();
       const claimed = this.database.prepare(`UPDATE script_versions
-        SET title = ?, content = ?, updated_at = ?, revision = revision + 1
+        SET title = ?, content = ?, source_format = 'plain_text', updated_at = ?,
+            revision = revision + 1
         WHERE id = ? AND revision = ?`).run(input.title,
         formatScriptContent(input.scenes), now, scriptVersionId,
         input.expected_revision);
@@ -129,9 +175,16 @@ export class ScriptStore {
         updated_at = ?, revision = revision + 1
         WHERE id = ? AND status = 'locked'`)
         .run(now, project.active_script_version_id);
+      const review = document.version.generation_review;
+      const lockedReview = review &&
+        review.reviewed_revision === document.version.revision
+        ? { ...review, reviewed_revision: document.version.revision + 1 }
+        : review;
       this.database.prepare(`UPDATE script_versions SET status = 'locked',
-        locked_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ?`)
-        .run(now, now, scriptVersionId);
+        locked_at = ?, updated_at = ?, generation_review_json = ?,
+        revision = revision + 1 WHERE id = ?`)
+        .run(now, now, lockedReview ? JSON.stringify(lockedReview) : null,
+          scriptVersionId);
       this.database.prepare(`UPDATE projects SET active_script_version_id = ?,
         updated_at = ? WHERE id = ?`).run(scriptVersionId, now, projectId);
       return getScriptDocument(this.database, projectId, scriptVersionId);

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ImportScriptInput,
+  GenerateScriptInput,
   PlanReview,
   ScriptDocument,
+  ScriptGenerationCapability,
   ScriptValidation,
   ScriptVersion,
   UpdateScriptDocumentInput,
@@ -20,6 +22,8 @@ export function useScriptStudio(projectId: string) {
   const [document, setDocument] = useState<ScriptDocument | null>(null);
   const [validation, setValidation] = useState<ScriptValidation | null>(null);
   const [review, setReview] = useState<PlanReview | null>(null);
+  const [generationCapability, setGenerationCapability] =
+    useState<ScriptGenerationCapability | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -27,9 +31,13 @@ export function useScriptStudio(projectId: string) {
     const sequence = ++loadSequence.current;
     setBusy(true);
     try {
-      const nextVersions = await scriptApi.listScriptVersions(projectId);
+      const [nextVersions, nextCapability] = await Promise.all([
+        scriptApi.listScriptVersions(projectId),
+        scriptApi.getScriptGenerationCapability(projectId),
+      ]);
       if (sequence !== loadSequence.current || projectRef.current !== projectId) return;
       setVersions(nextVersions);
+      setGenerationCapability(nextCapability);
       const current = nextVersions.find(({ status }) => status === 'draft')
         ?? nextVersions.find(({ status }) => status === 'locked') ?? null;
       const nextDocument = current
@@ -58,6 +66,7 @@ export function useScriptStudio(projectId: string) {
     setDocument(null);
     setValidation(null);
     setReview(null);
+    setGenerationCapability(null);
     setMessage(null);
     void load();
   }, [load]);
@@ -83,6 +92,17 @@ export function useScriptStudio(projectId: string) {
     const result = await run(() => scriptApi.importScript(projectId, input),
       '剧本已导入为可编辑草稿');
     if (result) { setDocument(result); setReview(null); await load(); }
+    return result;
+  };
+  const generateDraft = async (input: GenerateScriptInput) => {
+    const result = await run(() => scriptApi.generateScript(projectId, input),
+      'AI 剧本已生成，请先编辑和校验，再人工锁定');
+    if (result) {
+      setDocument(result.document);
+      setReview(null);
+      await load();
+      setValidation(result.validation);
+    }
     return result;
   };
   const selectVersion = async (scriptVersionId: string) => {
@@ -150,8 +170,9 @@ export function useScriptStudio(projectId: string) {
     return result;
   };
 
-  return { versions, document, setDocument, validation, review, busy, message,
-    importDraft, selectVersion, save, validate, lock, compile,
+  return { versions, document, setDocument, validation, review,
+    generationCapability, busy, message,
+    importDraft, generateDraft, selectVersion, save, validate, lock, compile,
     updateReviewShot, approveReview };
 }
 

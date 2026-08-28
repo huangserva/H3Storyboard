@@ -102,6 +102,50 @@ function completeJob(
 }
 
 describe('ProjectStore', () => {
+  it('upgrades a real v25 script schema with nullable AI provenance', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'h3-store-v28-'));
+    directories.push(directory);
+    const databasePath = join(directory, 'project.db');
+    const initial = new ProjectStore(databasePath);
+    const project = createProject(initial, 'v25 AI provenance upgrade');
+    initial.close();
+
+    const legacy = new Database(databasePath);
+    legacy.exec(`
+      ALTER TABLE script_versions DROP COLUMN generation_provider;
+      ALTER TABLE script_versions DROP COLUMN generation_model;
+      ALTER TABLE script_versions DROP COLUMN generation_review_json;
+      ALTER TABLE script_versions DROP COLUMN generation_input_json;
+      ALTER TABLE script_versions DROP COLUMN generation_source_content;
+      DELETE FROM schema_version WHERE version >= 26;
+    `);
+    legacy.close();
+
+    const migrated = new ProjectStore(databasePath);
+    stores.push(migrated);
+    expect(migrated.getProjectSnapshot(project.id).script_version)
+      .toMatchObject({
+        generation_provider: null,
+        generation_model: null,
+        generation_review: null,
+        generation_input: null,
+        generation_source_content: null,
+      });
+    const inspected = new Database(databasePath, { readonly: true });
+    const columns = new Set((inspected.pragma('table_info(script_versions)') as
+      Array<{ name: string }>).map(({ name }) => name));
+    const version = inspected.prepare(
+      'SELECT MAX(version) AS version FROM schema_version',
+    ).get() as { version: number };
+    inspected.close();
+    expect(columns.has('generation_provider')).toBe(true);
+    expect(columns.has('generation_model')).toBe(true);
+    expect(columns.has('generation_review_json')).toBe(true);
+    expect(columns.has('generation_input_json')).toBe(true);
+    expect(columns.has('generation_source_content')).toBe(true);
+    expect(version.version).toBe(28);
+  });
+
   it('applies migrations and rewrites legacy continuity asset ids', () => {
     const directory = mkdtempSync(join(tmpdir(), 'h3-store-'));
     directories.push(directory);
@@ -296,7 +340,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(25);
+    ).toBe(28);
     migratedVersion.close();
   });
 
@@ -362,7 +406,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(25);
+    ).get() as { version: number }).version).toBe(28);
     migrated.close();
   });
 
@@ -413,7 +457,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(25);
+    ).get() as { version: number }).version).toBe(28);
     migrated.close();
   });
 

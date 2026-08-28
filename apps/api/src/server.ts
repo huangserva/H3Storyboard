@@ -7,6 +7,10 @@ import { sendJson } from './http.js';
 import { dispatchRoute } from './routes.js';
 import { serveMediaRoute } from './media-routes.js';
 import { serveCharacterUploadRoute } from './character-upload-routes.js';
+import {
+  createScriptGenerationService,
+  type ScriptGenerationConfig,
+} from './script-generation.js';
 
 export interface ApiServerOptions {
   database_path: string;
@@ -14,6 +18,7 @@ export interface ApiServerOptions {
   port?: number;
   data_directory?: string;
   character_image_lora_allowlist?: readonly string[];
+  script_generation?: ScriptGenerationConfig;
   cancel_character_image_job?: (
     jobId: string,
     reason: string,
@@ -34,9 +39,12 @@ export interface ApiServer {
 export function createApiServer(options: ApiServerOptions): ApiServer {
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 4187;
+  const scriptGeneration = createScriptGenerationService(
+    options.script_generation,
+  );
   const store = openProjectStore(options.database_path);
   const dataDirectory = resolve(options.data_directory ?? dirname(options.database_path));
-  const server = buildHttpServer(store, dataDirectory, {
+  const server = buildHttpServer(store, dataDirectory, scriptGeneration, {
     lora_allowlist: new Set(options.character_image_lora_allowlist ?? []),
     ...(options.cancel_character_image_job ? {
       cancel_character_image_job: options.cancel_character_image_job,
@@ -116,13 +124,19 @@ export function createApiServer(options: ApiServerOptions): ApiServer {
 }
 
 function buildHttpServer(store: ProjectStore, dataDirectory: string,
-  characterImageJobs: Parameters<typeof dispatchRoute>[2]): Server {
+  scriptGeneration: ReturnType<typeof createScriptGenerationService>,
+  characterImageJobs: Parameters<typeof dispatchRoute>[3]): Server {
   return createServer(async (request, response) => {
     try {
       if (await serveCharacterUploadRoute(
         request, response, store, dataDirectory)) return;
       if (await serveMediaRoute(request, response, store, dataDirectory)) return;
-      const result = await dispatchRoute(request, store, characterImageJobs);
+      const result = await dispatchRoute(
+        request,
+        store,
+        scriptGeneration,
+        characterImageJobs,
+      );
       sendJson(response, result.status, { data: result.body });
     } catch (error) {
       if (response.headersSent) {

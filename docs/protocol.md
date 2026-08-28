@@ -1,6 +1,6 @@
-# Protocol 2.1
+# Protocol 2.2
 
-`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 2.1 keeps Protocol 2.0 Script Studio behavior and adds director PlanReview, optimistic per-shot editing, cross-version plan-set diff, and one atomic active-compilation approval boundary.
+`packages/protocol` is the single JSON contract shared by Studio, API, SQLite mappers, task engine, and provider adapters. HTTP fields are `snake_case`. Protocol 2.2 keeps Protocol 2.1 PlanReview behavior and adds optional Shuohao-based AI script generation, explicit model capability discovery, fresh-context independent review, and persistent generation/review provenance.
 
 ## Project lineage
 
@@ -42,7 +42,8 @@ and costume/position/prop state. Dialogue additionally stores speaker and
 delivery; it is script text for H3, never a TTS request.
 
 ```text
-import -> draft edit -> validate -> lock -> compile -> draft ShotPlans
+AI generate -> deterministic gate -> fresh-context review ┐
+import existing ------------------------------------------┴-> draft edit -> validate -> lock -> compile -> draft ShotPlans
   -> director review/edit/diff -> atomic plan-set approval -> H3 production
 ```
 
@@ -65,6 +66,46 @@ import -> draft edit -> validate -> lock -> compile -> draft ShotPlans
   the same key. They are not silently coerced into character-ID ShotState fields.
 - The compiler always writes `sound=""`. Script import, validation, lock, and
   compilation do not contact ComfyUI and cannot add external audio.
+
+### Optional AI script generation
+
+`GET /api/projects/:project_id/scripts/generation` reports whether the server
+has a text model configured. `POST` to the same route accepts a creator brief:
+title, premise/source material, genre, target total seconds, exact scene count,
+optional character constraints, tone, and additional constraints. The server
+uses an OpenAI-compatible `chat/completions` provider configured through
+`H3_SCRIPT_AI_ENDPOINT`, `H3_SCRIPT_AI_MODEL`, optional
+`H3_SCRIPT_AI_API_KEY`, and optional `H3_SCRIPT_AI_PROVIDER`.
+
+The generation strategy is `shuohao_v1`: the model writes episodes, scenes,
+and separate action/dialogue flow items. Deterministic gates require the exact
+scene count, an action in every scene, valid speakers, dialogue no longer than
+35 non-whitespace characters, a concrete hook in the first three beats, and
+estimated total duration within ±15%. Every episode has a concrete hook in its
+own first three beats. Duplicate episode and scene keys are rejected. One failed response receives one bounded
+repair attempt; a second failure returns `SCRIPT_GENERATION_RESPONSE_INVALID`
+and writes no draft.
+
+After deterministic checks pass, the provider receives a separate stateless
+review request containing only the creator brief and generated script. The
+strict reviewer verdict is `approve | approve_with_notes | revise`; `revise`
+returns `SCRIPT_GENERATION_REVIEW_REJECTED` and writes no draft. Accepted review
+provider/model, method, verdict, summary, and findings are persisted with the
+version together with `reviewed_revision`. Later creator edits retain the audit
+record but Studio marks it as applying to the original generated revision, not
+the current text. This is role/context separation, not a claim that
+the configured endpoint uses a different vendor or model.
+
+A successful reviewed result is inserted transactionally as an editable
+`shuohao_novel_script` draft. `generation_provider` and `generation_model` are
+persisted on `ScriptVersion`; the full creator brief and immutable generated
+Shuohao source are stored separately from editable `content`. An editor save
+normalizes only the editable source to `plain_text`; generation evidence is not
+overwritten. The active locked script pointer is unchanged.
+Generation cannot lock, compile, approve, create an H3 Job, contact ComfyUI, or
+add any TTS, dubbing, music, ambience, rain, room tone, Foley, SFX, or external
+audio. A project with an existing draft returns `SCRIPT_DRAFT_EXISTS` before a
+model request is made.
 
 ## PlanReview and active plan-set lifecycle
 
@@ -426,4 +467,4 @@ Error envelope:
 
 The API binds to `127.0.0.1`. JSON bodies are limited to 1 MB. Asset paths are relative and reject absolute paths plus `.` or `..` traversal segments. Media reads resolve the stored path again beneath the configured data directory before opening a file; missing metadata, missing files, invalid paths, and invalid ranges use stable `ASSET_*` codes.
 
-Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Script Studio adds `SCRIPT_*`, `PLAN_REVIEW_*`, and `SHOT_PLAN_DRAFT`. Plan review distinguishes not found, optimistic conflict, immutable, incomplete provenance, stale script, and shot/compilation mismatch. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text. SQLite schema v25 adds the active compilation pointer, compilation lifecycle/revision timestamps, Plan revision, and the single-approved-compilation partial unique index.
+Production-policy errors are stable codes exported by `packages/protocol`: `BINDING_INVALID_COMBINATION`, `BINDING_KIND_MISMATCH`, and `MODE_BLOCKED`. Script Studio adds `SCRIPT_*`, `PLAN_REVIEW_*`, and `SHOT_PLAN_DRAFT`. Plan review distinguishes not found, optimistic conflict, immutable, incomplete provenance, stale script, and shot/compilation mismatch. Other stable families include `CHARACTER_*`, `ASSET_*`, `MANIFEST_*`, `MODE_*`, `BRIEF_*`, `LOCK_*`, `BINDING_*`, `TAKE_*`, `H3_*`, and `QC_VERDICT_INVALID`; clients must branch on `code`, never message text. SQLite schema v26 adds nullable script-generation provider/model provenance; schema v27 adds the accepted independent-review record; schema v28 preserves the creator brief and immutable generated Shuohao source while retaining schema v25 active compilation and PlanReview constraints.

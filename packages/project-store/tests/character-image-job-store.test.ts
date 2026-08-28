@@ -526,7 +526,7 @@ describe('schema migrations v20-v25', () => {
     ).all() as Array<{ name: string }>).map(({ name }) => name));
     database.close();
 
-    expect(version.version).toBe(25);
+    expect(version.version).toBe(28);
     expect(tables.has('character_image_jobs')).toBe(true);
     expect(tables.has('character_image_job_events')).toBe(true);
     expect(tables.has('gpu_leases')).toBe(true);

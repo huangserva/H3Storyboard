@@ -2,10 +2,6 @@
 
 ## In progress
 
-### P2 后续
-
-- [ ] P2.3：可选 AI 剧本生成；不得越过 draft、校验和人工锁定，不得引入任何外部声音。
-
 ### （M1B 已完成，归档见 Done）
 
 - [x] **全栈工程师** dispatch `478c3bf6` — 任务：M1B-1——ComfyUI H3 adapter（TypeScript，contract 级）+ 只读能力发现。蓝本：h3-film-studio 的 scripts/local_providers.py
@@ -22,6 +18,13 @@
 - [x] **全栈工程师2** dispatch `bfcba78a` — 任务：【调研，不写实现代码】深挖 xyz 的 OiiOii 画布交互模型，产出 H3Storyboard 画布'直接操作化'改造方案。user 拍板：现画布不如 OiiOii 好用，核心差距是'能在画布上直接操作'。完整任务书见 .hiv…
 - [x] **全栈工程师2** dispatch `ef22abdf` — 任务：Studio 生成按钮全链路（重派——上一 worker 中途退出，git log 确认零提交落地，从头开始，不要假设有半成品）。
 ## Done
+
+### 2026-08-28 · P2.3 AI Script Generation（done）
+- [x] Script Studio 提供 AI 生成 / 已有剧本导入两条并列入口；creator brief 与原始材料进入生成链。
+- [x] shuohao 严格结构生成、确定性质量门、最多一次修复和 fresh-context 独立审阅；拒绝不落库。
+- [x] accepted 结果只创建 draft；生成/审阅 provider、model、findings、creator brief 与不可变原始来源持久化，修改后审阅显示 stale。
+- [x] 真 HTTP provider + API + SQLite/restart 与真实 Chromium 双入口用户链；全链零 H3/4090、零外部音频。
+- [x] 四路复审 A- / A- / A- / A；无中高严重度遗留。
 
 ### 2026-08-26 · P2.2 Plan Review（done）
 - [x] compilation 级 draft/approved/superseded plan-set 与项目 active pointer；显式批准原子切换。

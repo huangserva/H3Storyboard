@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  ScriptSceneInput,
-  ScriptSourceFormat,
-} from '@h3storyboard/protocol';
+import type { ScriptSceneInput } from '@h3storyboard/protocol';
 import { useScriptStudio } from '../lib/use-script-studio.js';
 import { ScriptSceneEditor } from './ScriptSceneEditor.js';
 import { PlanReviewPanel } from './PlanReviewPanel.js';
+import { ScriptEntryPanel } from './ScriptEntryPanel.js';
 
 interface ScriptStudioProps {
   projectId: string;
@@ -13,17 +11,13 @@ interface ScriptStudioProps {
   onProjectChanged: () => Promise<void>;
 }
 
-type ScriptWorkflowStage = 'import' | 'edit' | 'compile' | 'review' | 'complete'
+type ScriptWorkflowStage = 'entry' | 'edit' | 'compile' | 'review' | 'complete'
   | 'archived';
 
 export function ScriptStudio({ projectId, onOpenCanvas,
   onProjectChanged }: ScriptStudioProps) {
   const studio = useScriptStudio(projectId);
-  const [importTitle, setImportTitle] = useState('新剧本版本');
-  const [importFormat, setImportFormat] = useState<Exclude<ScriptSourceFormat,
-    'legacy_text'>>('plain_text');
-  const [importContent, setImportContent] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [scenes, setScenes] = useState<ScriptSceneInput[]>([]);
   const editable = studio.document?.version.status === 'draft';
@@ -35,9 +29,9 @@ export function ScriptStudio({ projectId, onOpenCanvas,
   const reviewActive = Boolean(studio.review &&
     studio.review.active_compilation_id === studio.review.compilation.id);
   const reviewArchived = Boolean(archived && studio.review && !reviewActive);
-  const showImport = importing || (!archived && !structured && !hasDraft);
+  const showEntry = creating || (!archived && !structured && !hasDraft);
   const workflowStage: ScriptWorkflowStage = archived && !reviewActive ? 'archived'
-    : showImport ? 'import'
+    : showEntry ? 'entry'
     : editable ? 'edit' : !studio.review ? 'compile'
       : studio.review.compilation.status === 'draft' ? 'review' : 'complete';
 
@@ -46,7 +40,7 @@ export function ScriptStudio({ projectId, onOpenCanvas,
     setTitle(studio.document.version.title);
     setScenes(studio.document.scenes);
   }, [studio.document]);
-  useEffect(() => { setImporting(false); }, [projectId]);
+  useEffect(() => { setCreating(false); }, [projectId]);
 
   const duration = useMemo(() => scenes.reduce((sum, scene) =>
     sum + scene.beats.reduce((beatSum, beat) =>
@@ -95,51 +89,36 @@ export function ScriptStudio({ projectId, onOpenCanvas,
         data-active={version.id === studio.document?.version.id}>
         <strong>V{version.version} · {version.title}</strong>
         <span data-status={version.status}>{version.status}</span>
-        <small>{version.source_format}</small>
+        <small>{version.generation_provider
+          ? `AI · ${version.generation_provider} / ${version.generation_model}`
+          : version.source_format}</small>
+        {version.generation_review ? <small>
+          {version.revision === version.generation_review.reviewed_revision
+            ? '独立审阅' : '生成稿审阅 · 当前草稿已修改'} · {
+            version.generation_review.verdict}
+        </small> : null}
       </button>)}
       {!hasDraft ? <button className="button compact" type="button"
-        onClick={() => setImporting(true)}>＋ 导入新版本</button> : null}
+        onClick={() => setCreating(true)}>＋ 新建剧本版本</button> : null}
     </aside>
     <section className="script-editor-shell">
       <ScriptProgressGuide stage={workflowStage}
         archived={reviewArchived || studio.review?.compilation.status === 'superseded'}
         archivedCompletedSteps={!studio.review ? 2
           : studio.review.compilation.status === 'draft' ? 3 : 4} />
-      {showImport ? <section className="script-import-panel">
-        <header className="script-import-intro">
-          <span className="eyebrow">STEP 01 · IMPORT</span>
-          <h1>从剧本开始，画布会自动生成</h1>
-          <p>先粘贴完整剧本。系统会拆成 Scene 和 Beat，经过校验、锁定与导演审核后，再自动建立画布。</p>
-          <div className="script-import-hint"><strong>普通文本格式</strong>
-            <code>SC-01 雨巷 夜<br />苏晚宁：今晚别走。<br />顾承渊收起伞。</code></div>
-        </header>
-        <div className="script-import-form">
-          <div className="script-import-meta">
-            <label>新版本标题<input value={importTitle}
-              onChange={(event) => setImportTitle(event.target.value)} /></label>
-            <label>导入格式<select value={importFormat}
-              onChange={(event) => setImportFormat(
-                event.target.value as typeof importFormat)}>
-              <option value="plain_text">普通剧本文本</option>
-              <option value="shuohao_novel_script">shuohao novel-script JSON</option>
-            </select></label>
-          </div>
-          <label>剧本内容<textarea aria-label="剧本内容" rows={12}
-            placeholder="粘贴包含场景、动作和对白的完整剧本…"
-            value={importContent} onChange={(event) =>
-              setImportContent(event.target.value)} /></label>
-          <div className="script-actions">
-            <button className="button button-primary" disabled={studio.busy ||
-              importContent.trim().length === 0} onClick={() => void (async () => {
-                const result = await studio.importDraft({ format: importFormat,
-                  title: importTitle, content: importContent });
-                if (result) setImporting(false);
-              })()} type="button">导入为草稿</button>
-            {structured ? <button className="button" onClick={() =>
-              setImporting(false)} type="button">取消</button> : null}
-          </div>
-        </div>
-      </section> : <>
+      {showEntry ? <ScriptEntryPanel busy={studio.busy}
+        capability={studio.generationCapability} canCancel={structured}
+        onCancel={() => setCreating(false)}
+        onGenerate={async (input) => {
+          const result = await studio.generateDraft(input);
+          if (result) setCreating(false);
+          return result;
+        }}
+        onImport={async (input) => {
+          const result = await studio.importDraft(input);
+          if (result) setCreating(false);
+          return result;
+        }} /> : <>
         <header className="script-editor-header">
           <div><span className="eyebrow">STRUCTURED SCRIPT</span>
             <input aria-label="剧本版本标题" disabled={!editable} value={title}
@@ -159,6 +138,28 @@ export function ScriptStudio({ projectId, onOpenCanvas,
               onClick={() => void compile()} type="button">编译草稿分镜</button> : null}
           </div>
         </header>
+        {studio.document?.version.generation_review ? <section
+          className="script-generation-review" aria-label="AI 剧本独立审阅"
+          data-stale={studio.document.version.revision !==
+            studio.document.version.generation_review.reviewed_revision}>
+          <strong>{studio.document.version.revision ===
+            studio.document.version.generation_review.reviewed_revision
+            ? '独立审阅' : '生成稿审阅（当前草稿已修改）'} · {
+            studio.document.version.generation_review.verdict
+          }</strong>
+          <p>{studio.document.version.generation_review.summary}</p>
+          {studio.document.version.generation_review.findings.length > 0
+            ? <ul>{studio.document.version.generation_review.findings.map(
+              (finding, index) => <li key={`${finding.severity}-${index}`}>
+                <b>{finding.severity}</b> · {finding.issue}；证据：{
+                  finding.evidence}；建议：{finding.suggestion}
+              </li>)}</ul> : null}
+          <small>{studio.document.version.generation_review.provider} / {
+            studio.document.version.generation_review.model
+          } · fresh context · revision {
+            studio.document.version.generation_review.reviewed_revision
+          }</small>
+        </section> : null}
         {studio.validation ? <section className="script-validation"
           data-valid={studio.validation.valid} aria-label="剧本校验结果">
           <strong>{studio.validation.valid ? '校验通过' : '校验未通过'}</strong>
@@ -199,7 +200,7 @@ function ScriptProgressGuide({ stage, archived, archivedCompletedSteps }: {
   archivedCompletedSteps: number;
 }) {
   const stages: Array<[ScriptWorkflowStage, string]> = [
-    ['import', '导入剧本'], ['edit', '编辑与校验'], ['compile', '锁定并编译'],
+    ['entry', '生成 / 导入'], ['edit', '编辑与校验'], ['compile', '锁定并编译'],
     ['review', '审核并批准'], ['complete', archived ? '历史已归档' : '进入画布'],
   ];
   const activeIndex = stages.findIndex(([key]) => key === stage);

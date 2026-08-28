@@ -25,6 +25,8 @@ export function useGenerationPreflights(snapshot: ProjectSnapshot | null,
     }
     let active = true;
     let running = false;
+    let pollDelay = 5_000;
+    let timer: number | null = null;
     const leases = new Set<SharedRequestLease<GenerationPreflightBatch>>();
     const load = async () => {
       if (running) return;
@@ -57,13 +59,20 @@ export function useGenerationPreflights(snapshot: ProjectSnapshot | null,
         running = false;
       }
     };
-    void load();
-    const timer = window.setInterval(() => void load(), 5_000);
+    const poll = async () => {
+      await load();
+      if (!active) return;
+      timer = window.setTimeout(() => {
+        pollDelay = Math.min(pollDelay * 2, 30_000);
+        void poll();
+      }, pollDelay);
+    };
+    void poll();
     return () => {
       active = false;
       for (const lease of leases) lease.release();
       leases.clear();
-      window.clearInterval(timer);
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [loadKey, revision]);
 

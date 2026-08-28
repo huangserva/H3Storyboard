@@ -23,6 +23,7 @@ import { dispatchCharacterImageJobRoute,
   type CharacterImageJobRouteOptions } from './character-image-job-routes.js';
 import { dispatchScriptRoute } from './script-routes.js';
 import { dispatchPlanReviewRoute } from './plan-review-routes.js';
+import type { ScriptGenerationService } from './script-generation.js';
 
 interface RouteResult {
   status: number;
@@ -134,6 +135,7 @@ const routes: readonly Route[] = [
 export async function dispatchRoute(
   request: IncomingMessage,
   store: ProjectStore,
+  scriptGeneration: ScriptGenerationService,
   characterImageJobs: CharacterImageJobRouteOptions = {
     lora_allowlist: new Set(),
   },
@@ -147,7 +149,8 @@ export async function dispatchRoute(
     pathname,
   );
   if (canvasResult) return canvasResult;
-  const scriptResult = await dispatchScriptRoute(request, store, method, pathname);
+  const scriptResult = await dispatchScriptRoute(
+    request, store, scriptGeneration, method, pathname);
   if (scriptResult) return scriptResult;
   const planReviewResult = await dispatchPlanReviewRoute(
     request, store, method, pathname);

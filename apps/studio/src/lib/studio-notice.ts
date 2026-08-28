@@ -15,6 +15,14 @@ export function describeError(error: unknown): string {
       TAKE_GATE_BLOCKED: '请先批准代表 Take，或填写门禁跳过原因',
       BINDING_MISSING_INPUT: '镜头缺少可用的参考输入',
       MODE_CAPABILITY_MISMATCH: '当前 Mode 不支持该镜头的生成方式',
+      SCRIPT_GENERATION_UNAVAILABLE: 'AI 剧本模型尚未配置，请先配置模型或改用导入',
+      SCRIPT_GENERATION_PROVIDER_FAILED: 'AI 剧本模型调用失败，请检查服务与凭据',
+      SCRIPT_GENERATION_RESPONSE_INVALID: 'AI 返回的剧本未通过结构与质量门',
+      SCRIPT_GENERATION_REVIEW_INVALID: '独立审阅没有返回有效结论，请重试',
+      SCRIPT_GENERATION_REVIEW_REJECTED: '独立审阅发现阻断问题，未创建草稿',
+      SCRIPT_GENERATION_TIMEOUT: 'AI 剧本生成超时，请稍后重试',
+      SCRIPT_GENERATION_ACTIVE: '当前项目已有 AI 剧本正在生成，请等待完成',
+      SCRIPT_DRAFT_EXISTS: '项目已有可编辑草稿，请先处理当前草稿',
     } satisfies Readonly<Record<string, string>>)[error.code] ?? error.message;
     return `${message} · ${error.code}`;
   }

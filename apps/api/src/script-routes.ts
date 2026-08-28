@@ -1,9 +1,12 @@
 import {
   CompileScriptInputSchema,
+  GenerateScriptInputSchema,
   ImportScriptInputSchema,
   LockScriptInputSchema,
   ScriptCompilationResultSchema,
   ScriptDocumentSchema,
+  ScriptGenerationCapabilitySchema,
+  ScriptGenerationResultSchema,
   ScriptValidationSchema,
   ScriptVersionSchema,
   UpdateScriptDocumentInputSchema,
@@ -12,16 +15,18 @@ import type { ProjectStore } from '@h3storyboard/project-store';
 import type { IncomingMessage } from 'node:http';
 import { ApiError, parseResponseContract } from './api-error.js';
 import { readJson } from './http.js';
+import type { ScriptGenerationService } from './script-generation.js';
 
 interface ScriptRouteResult { status: number; body: unknown }
 
 const SCRIPT_LIST = /^\/api\/projects\/([^/]+)\/scripts$/;
 const SCRIPT_IMPORT = /^\/api\/projects\/([^/]+)\/scripts\/import$/;
+const SCRIPT_GENERATION = /^\/api\/projects\/([^/]+)\/scripts\/generation$/;
 const SCRIPT_ACTION = /^\/api\/projects\/([^/]+)\/scripts\/([^/]+)\/(validate|lock|compile)$/;
 const SCRIPT_DOCUMENT = /^\/api\/projects\/([^/]+)\/scripts\/([^/]+)$/;
 
 export async function dispatchScriptRoute(request: IncomingMessage,
-  store: ProjectStore, method: string,
+  store: ProjectStore, generation: ScriptGenerationService, method: string,
   pathname: string): Promise<ScriptRouteResult | null> {
   const list = SCRIPT_LIST.exec(pathname);
   if (list && method === 'GET') {
@@ -35,6 +40,20 @@ export async function dispatchScriptRoute(request: IncomingMessage,
     const input = ImportScriptInputSchema.parse(await readJson(request));
     return { status: 201, body: parseResponseContract(ScriptDocumentSchema,
       store.scripts.import(projectId, input)) };
+  }
+  const generated = SCRIPT_GENERATION.exec(pathname);
+  if (generated) {
+    const projectId = decode(generated[1] ?? '', 'project_id');
+    store.scripts.listVersions(projectId);
+    if (method === 'GET') return { status: 200, body: parseResponseContract(
+      ScriptGenerationCapabilitySchema, generation.capability()) };
+    if (method === 'POST') {
+      const input = GenerateScriptInputSchema.parse(await readJson(request));
+      return { status: 201, body: parseResponseContract(
+        ScriptGenerationResultSchema,
+        await generation.generate(store, projectId, input)) };
+    }
+    return null;
   }
   const action = SCRIPT_ACTION.exec(pathname);
   if (action && method === 'POST') {

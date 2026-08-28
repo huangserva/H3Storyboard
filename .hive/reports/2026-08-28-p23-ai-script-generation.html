@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard · P2.3 AI 剧本生成</title><style>
+:root{color-scheme:dark}body{max-width:980px;margin:42px auto;padding:0 22px;background:#090d0b;color:#edf2ea;font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif}h1,h2{color:#c3ff4f}h3{color:#aeb7ff}a{color:#8ddbd1}code{color:#d9ec9f}section{margin:18px 0;padding:20px 24px;border:1px solid #2a352e;border-radius:14px;background:#0d1210}.flow{padding:16px;border:1px dashed #55614f;border-radius:10px;color:#d9ec9f;font-family:ui-monospace,monospace}.ok{color:#9ce6d8}.warn{color:#efb061}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #283129;text-align:left;vertical-align:top}li+li{margin-top:6px}.verdict{font-size:17px;border-color:#617d2e;background:#10180d}
+</style></head><body>
+<h1>P2.3 · AI 生成剧本基础闭环</h1>
+<p>日期：2026-08-28 · 生成主链：shuohao · 产品边界：drama creator-first + H3 人工批准</p>
+
+<section class="verdict"><b>结论：P2.3 不再只是“导入剧本”。</b><br>Studio 现在提供 <code>AI 生成剧本</code> 与 <code>导入已有剧本</code> 两个并列入口；AI 结果须通过确定性门和 fresh-context 独立审阅，才保存为可编辑草稿，不能自动锁定、出分镜、批准或提交 4090。</section>
+
+<section><h2>上游判断纠正</h2><p><a href="https://github.com/eternityspring/shuohao-skills">shuohao-skills</a> 确实有 AI 生成：宿主模型负责写 outline/script，Node 脚本负责 seed、校验和渲染。此前只接入 JSON 形态与校验，漏掉模型写作阶段，是实现偏差。</p><table><tr><th>来源</th><th>本次吸收</th><th>不吸收</th></tr><tr><td>shuohao-skills</td><td>episode/scene/flow 生成骨架；动作对白分离；时长、对白、钩子等确定性门</td><td>TTS、声音报告、媒体生成链</td></tr><tr><td>drama-skills</td><td>creator brief；写作、独立审阅、创作者接受分权；verdict 与 evidence</td><td>独立 Markdown 项目格式、声音标签</td></tr></table></section>
+
+<section><h2>用户流程</h2><div class="flow">创意 / 小说片段 / 梗概 → AI 生成 shuohao 结构 → 确定性质量门 → 最多一次自动修复 → fresh-context 独立审阅 → accepted draft ScriptVersion → 人工编辑/校验 → 锁定 → 分镜审核/批准 → H3</div><ul><li>AI 输入：标题、故事材料、题材、目标时长、目标场景数、人物、气质、额外限制。</li><li>导入输入：普通剧本文本或 shuohao novel-script JSON。</li><li>审阅为新的无生成上下文请求；<code>revise</code> 不落库，<code>approve(_with_notes)</code> 连同 reviewer provenance 落库。</li><li>两个入口之后共用同一套 Scene/Beat 编辑、版本链和 P2.2 审核。</li></ul></section>
+
+<section><h2>硬门禁</h2><ul><li>精确场景数；每场至少一个动作；对白说话人必须属于本场角色。</li><li>单句对白 ≤35 个非空白字符；目标总时长按动作 2.5 秒/拍、对白 4.5 字/秒估算，容差 ±15%。</li><li>每集开场钩子必须在本集前 3 拍内具象；episode/scene key 唯一；响应为严格 JSON。</li><li>首轮失败仅修复一次；第二次失败或独立审阅拒绝均不产生草稿。</li><li>已有 draft 或同项目已有生成进行中时，在再次调用模型前拒绝。</li></ul></section>
+
+<section><h2>配置与安全</h2><p>文字模型通过 OpenAI-compatible <code>/chat/completions</code> 接入。API 进程读取 <code>H3_SCRIPT_AI_ENDPOINT</code>、<code>H3_SCRIPT_AI_MODEL</code> 和可选 key/provider/timeout；密钥不返回 Studio。同一 endpoint 接收相互独立的生成请求和审阅请求；这里保证的是新请求/新上下文，不伪称是不同供应商。未配置时导入仍可用。</p><p class="warn">当前机器没有运行中的文字模型服务，也没有 OpenRouter/OpenAI/ApiMart 环境密钥；因此产品能力已接通并通过真实 HTTP provider 进程验证，但不能伪称已完成一次真实付费模型生成。</p></section>
+
+<section><h2>声音与生产边界</h2><ul><li>系统提示词禁止 TTS、配音、音乐、环境声、雨声、音效和拟音字段。</li><li>AI 成功只写 draft；当前 locked script 和 active plan-set 不改变。</li><li>不访问 ComfyUI，不创建 H3 Job；后续媒体仍只允许 H3 原生音频或静音。</li></ul></section>
+
+<section><h2>验证</h2><ul><li>真 HTTP provider → H3 API → 真 SQLite → 重启读取生成与审阅来源；P2.3 集成测试 25/25。</li><li>错误路径：未配置、非 JSON、六类质量门、重复 key、多集晚钩子、HTTP/envelope/超大响应/body 超时、并发、已有 draft、独立审阅拒绝。</li><li>真实 Chrome：双入口、模型状态、生成草稿、独立审阅、校验结果、版本来源、零 H3 Job；同时回归批准后审核台驻留与 100 镜请求预算。</li><li><code>pnpm check</code>、<code>pnpm build</code>、<code>pnpm test</code> 全绿：48 个 Vitest 文件，305 passed / 1 个显式 live-ComfyUI skip；28 个 Chromium E2E passed。</li></ul></section>
+
+<section><h2>原始任务逐条 verdict</h2><table><tr><th>要求</th><th>结论</th><th>证据</th></tr><tr><td>AI 生成 / 导入已有剧本并列入口</td><td class="ok">完成</td><td>同一 Script Studio 首屏的两个等权 tab，Chrome 双入口覆盖。</td></tr><tr><td>shuohao 生成链＋质量门</td><td class="ok">完成</td><td>严格 episode/scene/flow 契约、七类确定性门与一次修复。</td></tr><tr><td>drama creator input＋独立审阅</td><td class="ok">完成</td><td>creator brief、fresh-context review、verdict/findings/provenance 持久化。</td></tr><tr><td>不得越过人工生产门</td><td class="ok">完成</td><td>只写 draft；锁定、编译、P2.2 批准与 H3 仍分离。</td></tr><tr><td>真实模型出稿</td><td class="warn">未伪称完成</td><td>本机无文字模型 endpoint/key；已完成真实本地 HTTP adapter 穿透。</td></tr></table></section>
+
+<section><h2>现有代码与测试处理</h2><ul><li>修改：Protocol、SQLite migration/mapper/store、script routes、Script Studio、工作区初始路由、preflight 退避轮询、文档。</li><li>新增：生成契约、OpenAI-compatible provider、生成/修复/独立审阅服务、v26–v28 migrations、真 HTTP+SQLite 与 Chromium 测试。</li><li>删除：没有删除现有生产功能或测试；原有 1 个 live-ComfyUI 测试继续显式 skip。</li><li>额外修复：批准 plan-set 后不再自动跳离审核台；100 镜 preflight 从固定 5 秒轮询改为 5/10/20/30 秒退避。</li></ul></section>
+
+<section><h2>明确未做</h2><ul><li>长篇小说分卷/RAG、多集批量续跑。</li><li>浏览器中的模型/密钥管理页。</li><li>第二个生成上游或多模型路由。</li><li>多 API 实例之间的计费级 provider 调用互斥；当前受支持的本地部署是单 API 进程，SQLite 仍可阻止重复草稿。</li><li>强制第二个供应商/模型；基础版的 reviewer 是同一配置下的新请求与新上下文。最终权威仍是创作者锁定和 P2.2 人工导演批准。</li></ul></section>
+
+<section><h2>Self-Review</h2><table><tr><th>维度</th><th>评分</th><th>最终问题</th></tr><tr><td>A · 架构与可维护性</td><td>A-</td><td>低：script route 已有 9 个 method-route 分支；新增端点前必须改 router table。</td></tr><tr><td>B · 真实 bug 与边界</td><td>A-</td><td>低：多 API 实例可重复调用付费 provider；单进程支持边界内已互斥，DB 防重复草稿。</td></tr><tr><td>C · 测试质量</td><td>A-</td><td>低：连接拒绝、声明 Content-Length 超限、INVALID_MODEL/TIMEOUT 尚无各自直接用例；25 条主链/错误链无 mock 穿透。</td></tr><tr><td>D · spec 对齐</td><td>A</td><td>无剩余问题；active script/plan、revision、声音、secret、H3/4090 门禁未回归。</td></tr></table><h3>严重项处理</h3><ul><li><b>已修：</b>响应先整体读入才判断 1MB、body timeout 错误映射不稳定——改为流式上限与覆盖 body 的 abort timeout，并有真 HTTP 错误测试。</li><li><b>已修：</b>creator brief / 不可变生成源缺失、修改后审阅仍像有效——schema v28 持久化两类来源并以 reviewed revision 显示 stale。</li><li><b>已修：</b>重复 key、晚钩子、独立审阅畸形/拒绝/HTTP/timeout、并发重复调用、无效配置 DB 泄漏等中等项均有实现和错误路径证据。</li><li><b>接受低风险：</b>多实例计费互斥不属于当前单 API 本地部署；路由条件链保持在 9 分支，下一端点前强制拆表。</li></ul><p><b>综合评分：A-。</b>四维均高于交付底线，无中高严重度遗留；第一轮问题已整改并完成第二轮独立复审。</p></section>
+</body></html>

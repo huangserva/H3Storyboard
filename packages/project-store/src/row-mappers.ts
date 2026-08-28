@@ -99,6 +99,15 @@ export function mapScriptVersion(row: unknown): ScriptVersion {
   return decode(ScriptVersionSchema, {
     ...record,
     source_format: record.source_format ?? 'legacy_text',
+    generation_provider: record.generation_provider ?? null,
+    generation_model: record.generation_model ?? null,
+    generation_review: typeof record.generation_review_json === 'string'
+      ? jsonColumn(record, 'generation_review_json') : null,
+    generation_input: typeof record.generation_input_json === 'string'
+      ? jsonColumn(record, 'generation_input_json') : null,
+    generation_source_content:
+      typeof record.generation_source_content === 'string'
+        ? record.generation_source_content : null,
     parent_version_id: record.parent_version_id ?? null,
     revision: record.revision ?? 0,
     updated_at: record.updated_at ?? record.created_at,

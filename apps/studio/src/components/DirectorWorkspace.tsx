@@ -97,6 +97,13 @@ export function DirectorWorkspace({
     ({ id }) => id === displayedActual?.output_asset_id) ?? null;
   const scriptWorkflow = useScriptWorkflowPending(snapshot);
   const scriptActionPending = scriptWorkflow.pending || !scriptWorkflow.resolved;
+  const automaticRoute = snapshot &&
+    routedProjectId.current !== snapshot.project.id;
+  const activeView: WorkspaceView | null = automaticRoute
+    ? scriptWorkflow.resolved
+      ? scriptWorkflow.pending ? 'script' : 'board'
+      : null
+    : view;
 
   useEffect(() => {
     if (!snapshot) return;
@@ -154,13 +161,13 @@ export function DirectorWorkspace({
         </div>
         <div className="legend">
           <div className="view-switcher" aria-label="工作区视图">
-            <button data-active={view === 'script'} onClick={() => changeView('script')}
+            <button data-active={activeView === 'script'} onClick={() => changeView('script')}
               type="button">剧本</button>
-            <button data-active={view === 'board'} onClick={() => changeView('board')}
+            <button data-active={activeView === 'board'} onClick={() => changeView('board')}
               type="button">制片墙</button>
-            <button data-active={view === 'flow'} onClick={() => changeView('flow')}
+            <button data-active={activeView === 'flow'} onClick={() => changeView('flow')}
               type="button">血缘流程</button>
-            <button data-active={view === 'director'}
+            <button data-active={activeView === 'director'}
               onClick={() => changeView('director')} type="button">计划 / 实测</button>
           </div>
           <button className="button compact" type="button"
@@ -176,15 +183,16 @@ export function DirectorWorkspace({
         </div>
       </header>
 
-      {view === 'script' ? <Suspense fallback={<div className="progress-bar" />}>
+      {activeView === null ? <div className="progress-bar" />
+        : activeView === 'script' ? <Suspense fallback={<div className="progress-bar" />}>
         <ScriptStudio key={snapshot.project.id} projectId={snapshot.project.id}
           onProjectChanged={() => onRefreshProject(snapshot.project.id)}
           onOpenCanvas={() => changeView('flow')} />
-      </Suspense> : view === 'board' ? <ProductionBoardView snapshot={snapshot}
+      </Suspense> : activeView === 'board' ? <ProductionBoardView snapshot={snapshot}
         selectedShotId={selectedShot?.id ?? null} busy={busy}
         preflights={preflights} onSelectShot={onSelectShot}
         onGenerate={onGenerate} onSetup={() => setProductionOpen(true)} />
-        : view === 'flow' ? (
+        : activeView === 'flow' ? (
         <Suspense fallback={<div className="progress-bar" />}>
           <InfiniteCanvas busy={busy} onNewShot={onNewShot}
             onOpenScript={() => changeView('script')}
@@ -223,7 +231,7 @@ export function DirectorWorkspace({
         </div>
         <ReferencePanel shot={selectedShot} />
       </div>}
-      {view === 'director' ? <TaskDrawer actual={displayedActual}
+      {activeView === 'director' ? <TaskDrawer actual={displayedActual}
         job={displayedJob} shot={selectedShot} /> : null}
       {productionOpen ? <Suspense fallback={<div className="progress-bar" />}>
         <ProductionBriefPanel projectId={snapshot.project.id}

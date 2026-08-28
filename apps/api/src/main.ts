@@ -10,6 +10,7 @@ import {
   SharedGpuCoordinator,
   quarantineOrphanedCharacterImages,
 } from '@h3storyboard/task-engine';
+import type { ScriptGenerationConfig } from './script-generation.js';
 
 const databasePath = process.env.H3_STORYBOARD_DB
   ? resolve(process.env.H3_STORYBOARD_DB)
@@ -85,6 +86,7 @@ if (workerStore) {
 
 const api = createApiServer({ database_path: databasePath, port,
   data_directory: dataDirectory,
+  ...scriptGenerationOptions(),
   character_image_lora_allowlist: parseList(
     process.env.H3_CHARACTER_IMAGE_LORA_ALLOWLIST),
   ...(imageWorker ? { cancel_character_image_job: (jobId: string,
@@ -152,4 +154,26 @@ function parseList(raw: string | undefined): string[] {
 
 function normalizeEndpoint(value: string): string {
   return value.replace(/\/+$/, '');
+}
+
+function scriptGenerationOptions(): {
+  script_generation?: ScriptGenerationConfig;
+} {
+  const endpoint = process.env.H3_SCRIPT_AI_ENDPOINT?.trim();
+  const model = process.env.H3_SCRIPT_AI_MODEL?.trim();
+  if (!endpoint && !model) return {};
+  if (!endpoint || !model) throw new Error(
+    'H3_SCRIPT_AI_ENDPOINT and H3_SCRIPT_AI_MODEL must be configured together');
+  return { script_generation: {
+    endpoint,
+    model,
+    ...(process.env.H3_SCRIPT_AI_API_KEY?.trim()
+      ? { api_key: process.env.H3_SCRIPT_AI_API_KEY.trim() } : {}),
+    ...(process.env.H3_SCRIPT_AI_PROVIDER?.trim()
+      ? { provider: process.env.H3_SCRIPT_AI_PROVIDER.trim() } : {}),
+    timeout_ms: parsePositiveInt(
+      process.env.H3_SCRIPT_AI_TIMEOUT_MS,
+      120_000,
+    ),
+  } };
 }

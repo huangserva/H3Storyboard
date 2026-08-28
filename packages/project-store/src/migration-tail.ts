@@ -11,6 +11,9 @@ import { createH3BatchOrchestration } from './migration-v22.js';
 import { addH3BatchFairnessCursor } from './migration-v23.js';
 import { createScriptStudio } from './migration-v24.js';
 import { createPlanReviewWorkflow } from './migration-v25.js';
+import { addScriptGenerationProvenance } from './migration-v26.js';
+import { addScriptGenerationReview } from './migration-v27.js';
+import { addScriptGenerationInputs } from './migration-v28.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -26,6 +29,9 @@ const tailMigrations: Array<readonly [number,
   [23, addH3BatchFairnessCursor],
   [24, createScriptStudio],
   [25, createPlanReviewWorkflow],
+  [26, addScriptGenerationProvenance],
+  [27, addScriptGenerationReview],
+  [28, addScriptGenerationInputs],
 ];
 
 export function applyTailMigrations(

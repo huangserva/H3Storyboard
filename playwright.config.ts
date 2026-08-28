@@ -11,6 +11,7 @@ process.env.H3_E2E_DIRECTORY = e2eDirectory;
 process.env.H3_E2E_DB = databasePath;
 const apiPort = readPort(process.env.H3_E2E_API_PORT, 4187);
 const studioPort = readPort(process.env.H3_E2E_STUDIO_PORT, 5174);
+const scriptAiPort = readPort(process.env.H3_E2E_SCRIPT_AI_PORT, 4188);
 const apiOrigin = `http://127.0.0.1:${apiPort}`;
 process.env.H3_E2E_API_ORIGIN = apiOrigin;
 
@@ -32,10 +33,20 @@ export default defineConfig({
   },
   webServer: [
     {
+      command: 'pnpm exec tsx tests/fixtures/script-ai-provider.ts',
+      env: { H3_E2E_SCRIPT_AI_PORT: String(scriptAiPort) },
+      port: scriptAiPort,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
       command: 'pnpm exec tsx apps/api/src/main.ts',
       env: { H3_STORYBOARD_DB: databasePath,
         H3_STORYBOARD_PORT: String(apiPort),
-        H3_WORKER: '0' },
+        H3_WORKER: '0',
+        H3_SCRIPT_AI_ENDPOINT: `http://127.0.0.1:${scriptAiPort}/v1`,
+        H3_SCRIPT_AI_PROVIDER: 'playwright-provider',
+        H3_SCRIPT_AI_MODEL: 'playwright-screenwriter' },
       port: apiPort,
       reuseExistingServer: false,
       timeout: 60_000,

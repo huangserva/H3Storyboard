@@ -85,5 +85,7 @@ tests; the single skipped test remains the explicit opt-in live ComfyUI probe.
 - [x] Four independent reviews after remediation: architecture B-, bugs B,
   tests B+, protocol A-. Final gate: 272 Vitest passed / 1 explicit live skip,
   25 Chromium E2E passed.
-- [ ] Director review/approval and draft Plan editing/diff before H3 execution.
-- [ ] Optional AI story/script generation behind the same draft and lock gates.
+- [x] P2.2 director review/approval and draft Plan editing/diff before H3 execution.
+- [x] P2.3 AI generation and existing-script import as equal entry points; Shuohao
+  structured generation, deterministic quality gates, one repair, fresh-context
+  independent review, provenance, and the same draft/lock/plan-approval gates.

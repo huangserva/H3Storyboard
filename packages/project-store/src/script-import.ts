@@ -1,4 +1,8 @@
-import type { ImportScriptInput, ScriptSceneInput } from '@h3storyboard/protocol';
+import {
+  GeneratedShuohaoScriptSchema,
+  type ImportScriptInput,
+  type ScriptSceneInput,
+} from '@h3storyboard/protocol';
 import { randomUUID } from 'node:crypto';
 import { StoreError } from './errors.js';
 
@@ -6,6 +10,25 @@ export function importScriptScenes(input: ImportScriptInput): ScriptSceneInput[]
   return input.format === 'shuohao_novel_script'
     ? importShuohao(input.content)
     : importPlainText(input.content);
+}
+
+export function importGeneratedScriptScenes(
+  rawScript: unknown,
+): ScriptSceneInput[] {
+  const parsed = GeneratedShuohaoScriptSchema.safeParse(rawScript);
+  if (!parsed.success) throw new StoreError(
+    'SCRIPT_IMPORT_INVALID',
+    'AI generated script does not match the Shuohao contract',
+    { issues: parsed.error.issues },
+  );
+  return importShuohaoRoot(parsed.data).map((scene) => ({
+    ...scene,
+    beats: scene.beats.map((beat) => ({
+      ...beat,
+      duration_seconds: beat.kind === 'action'
+        ? 2.5 : dialogueDuration(beat.text),
+    })),
+  }));
 }
 
 function importPlainText(content: string): ScriptSceneInput[] {
@@ -45,6 +68,10 @@ function importShuohao(content: string): ScriptSceneInput[] {
     throw new StoreError('SCRIPT_IMPORT_INVALID',
       'Shuohao script content is not valid JSON', error);
   }
+  return importShuohaoRoot(parsed);
+}
+
+function importShuohaoRoot(parsed: unknown): ScriptSceneInput[] {
   const root = record(parsed);
   const episodes = array(root.episodes, 'episodes');
   const scenes: ScriptSceneInput[] = [];
@@ -56,7 +83,11 @@ function importShuohao(content: string): ScriptSceneInput[] {
       const sourceKey = text(scene.sceneId) ?? `S${String(sceneIndex + 1).padStart(2, '0')}`;
       const characters = stringArray(scene.characters);
       const key = `E${String(episodeNumber).padStart(2, '0')}-${sourceKey}`;
-      const imported = newScene(scenes.length + 1, key, key);
+      const imported = newScene(scenes.length + 1, key,
+        text(scene.heading) ?? key);
+      imported.location = text(scene.location) ?? '';
+      imported.time_of_day = text(scene.timeOfDay) ??
+        text(scene.time_of_day) ?? '';
       imported.lighting = text(scene.lighting) ?? '';
       imported.summary = text(scene.summary) ?? '';
       for (const rawFlow of array(scene.flow, 'flow')) {
@@ -130,3 +161,8 @@ function integer(value: unknown): number | null {
 }
 
 function unique(values: string[]): string[] { return [...new Set(values)]; }
+
+function dialogueDuration(value: string): number {
+  const seconds = value.replace(/\s/g, '').length / 4.5;
+  return Math.round(Math.min(15, Math.max(0.5, seconds)) * 1_000) / 1_000;
+}
