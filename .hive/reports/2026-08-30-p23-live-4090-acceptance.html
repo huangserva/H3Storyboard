@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H3Storyboard · 4090 真实全链验收</title><style>
+:root{color-scheme:dark}body{max-width:1040px;margin:42px auto;padding:0 22px;background:#090d0b;color:#edf2ea;font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif}h1,h2{color:#c3ff4f}h3{color:#aeb7ff}a{color:#8ddbd1}code{color:#d9ec9f}section{margin:18px 0;padding:20px 24px;border:1px solid #2a352e;border-radius:14px;background:#0d1210}.flow{padding:16px;border:1px dashed #55614f;border-radius:10px;color:#d9ec9f;font-family:ui-monospace,monospace}.ok{color:#9ce6d8}.warn{color:#efb061}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #283129;text-align:left;vertical-align:top}li+li{margin-top:6px}.verdict{font-size:17px;border-color:#617d2e;background:#10180d}
+</style></head><body>
+<h1>4090 真实全链验收 · 画布可测试</h1>
+<p>日期：2026-08-30 · 项目：上海雨夜 · 真实全链验收 2026-08-30</p>
+
+<section class="verdict"><b>结论：线上 H3Storyboard 已具备可实际测试的三镜项目。</b><br>创作者简报经过 AI（人工智能）剧本生成、确定性质量门、独立审阅、人工生产门、角色与首帧参考、NVIDIA RTX 4090 GPU 主机上的 MiniMax H3 视频模型生成、逐镜调度、质量检查和代表成片批准，最终在画布形成三条完整可追溯链路。公网入口：<a href="http://106.14.227.192:9994">http://106.14.227.192:9994</a>（受 Basic Authentication 基础用户名密码认证保护）。</section>
+
+<section><h2>真实链路</h2><div class="flow">创作者简报 → Qwen3.8 27B 本地模型写三场剧本 → 代码质量门 → 全新上下文独立审阅 → 锁定/编译/批准 → 三张角色一致首帧 → 三任务原子批次 → MiniMax H3 静音图生视频 → QC 质量检查 → 代表成片 → 画布</div><ul><li>27B 表示约 270 亿参数规模；Q8 表示 8-bit 权重量化，作用于整套本地文字模型。模型仅使用 CPU 内存，不占 4090 显存。</li><li>AI 首轮即通过：3 场、每场 4 个动作节拍，共 12 拍，估算 30 秒。</li><li>独立审阅结果：<code>approve_with_notes</code>，即通过并附两条非阻断建议；没有阻断问题。</li><li>三镜 H3 任务均一次成功，无重试、失败或取消。</li></ul></section>
+
+<section><h2>人物与媒体验收</h2><table><tr><th>镜头</th><th>已验收动作</th><th>结果</th></tr><tr><td>1 · 雨巷行走</td><td>苏晚撑黑伞走近镜头</td><td class="ok">同一张脸、齐肩黑发、深青色长风衣、黑色内搭与黑鞋保持；代表成片已批准。</td></tr><tr><td>2 · 门口取信</td><td>收伞、拿起空白牛皮信封</td><td class="ok">人物与服装保持，手部/信封动作清楚；代表成片已批准。</td></tr><tr><td>3 · 收信转身</td><td>信封收进风衣并转身离开</td><td class="ok">人物、风衣与黑伞保持，转身背影完成；代表成片已批准。</td></tr></table><p>三条视频均为 480×864、24 fps、3.75 秒的 H.264 视频。FFprobe 媒体探测结果每条都只有 1 条视频流，<b>没有音频流</b>；未调用文字转语音，未加入对白、音乐、环境声、雨声或音效。</p><p class="warn">计划场景各为 10 秒，本轮采用 4 秒/镜的快速真实验收，因此每镜只覆盖一个关键动作，不等同于最终 30 秒剪辑成片；此差异已写入每条实际成片的质量记录。</p></section>
+
+<section><h2>线上状态</h2><ul><li>画布、HTTP（超文本传输协议）接口、公网隧道、H3 视频服务、角色图片服务、本地剧本模型六项服务均为 <code>active</code>。</li><li>公网入口无凭据请求返回 401，证明隧道在线且认证未被绕过。</li><li>项目标识：<code>adcc5bcc-4e3e-4c1a-9c4b-ac48fe86ea57</code>；该长标识只用于定位本次隔离验收项目，不代表用户需要手工输入。</li><li>三条实际成片均为 <code>qc_verdict=approved</code> 且 <code>representative_status=approved</code>，画布可直接显示计划—任务—代表成片关系。</li></ul></section>
+
+<section><h2>关键生产修复</h2><ul><li>本地 Qwen 返回正文前带空的 <code>&lt;think&gt;…&lt;/think&gt;</code> 推理包装；解析层现在只剥离前置包装，仍拒绝尾随解释、非 JSON、缺字段和质量门失败，未放宽严格契约。</li><li>文字模型请求改用原生 Node HTTP 传输，消除全局 fetch 隐藏的约 5 分钟响应头截止时间；业务超时、响应体超时和 1MB 上限仍保留。</li><li>文字模型请求明确要求 JSON object；30 分钟上限在进入 SQLite（嵌入式数据库）前完成合法性校验。</li><li>角色图片执行器接入 4090 主机的 8188 端口，H3 视频执行器继续使用 8190 端口；共享 GPU 调度保证三镜串行执行。</li></ul></section>
+
+<section><h2>验证</h2><ul><li><code>pnpm check</code>、<code>pnpm build</code>、<code>pnpm test</code> 全部通过。</li><li>Vitest：49 个测试文件，312 项通过，1 项明确跳过；包含真实 HTTP provider → H3 API → SQLite 穿透。</li><li>Chromium：28 个真实浏览器场景通过，覆盖画布专注/全屏、大媒体卡、场景聚焦、批量调度、首帧绑定、剧本生成和分镜审核。</li><li>真实生产：本地 27B 模型首稿与独立审阅成功；3 条 H3 视频全部完成；3 条无音轨；3 条质量与代表成片批准。</li></ul></section>
+
+<section><h2>原始任务逐条结论</h2><table><tr><th>要求</th><th>结论</th><th>证据</th></tr><tr><td>恢复 4090 上的 H3 部署</td><td class="ok">完成</td><td>H3、角色图片、接口、画布、隧道与本地剧本模型服务全部在线。</td></tr><tr><td>角色图生成接入 4090</td><td class="ok">完成</td><td>8188 图片工作流真实产出主参考、侧面参考及三张批准首帧。</td></tr><tr><td>AI 直接生成剧本</td><td class="ok">完成</td><td>Qwen3.8 27B 首轮生成三场脚本，质量门与独立审阅通过并持久化来源。</td></tr><tr><td>三镜真实 H3 批次与逐镜调度</td><td class="ok">完成</td><td>一个原子批次包含 3 个任务；共享 4090 串行执行并全部一次成功。</td></tr><tr><td>人物一致、声音正确</td><td class="ok">完成</td><td>抽取每镜开始/中间/末尾帧人工核对；媒体探测证实三条均无音轨。</td></tr><tr><td>达到画布可测试</td><td class="ok">完成</td><td>三条实际成片与代表成片状态已回写，线上入口可访问且认证有效。</td></tr></table></section>
+
+<section><h2>现有代码与测试处理</h2><ul><li>修改：文字模型传输、严格结构解析、超时上限、部署配置、回归测试与本报告。</li><li>新增：真实 Qwen 推理包装回归、HTTP 响应头截止时间回归、三镜生产验收数据。</li><li>删除：没有删除生产功能或测试。</li><li>显式跳过：原有 1 项需要外部实时 ComfyUI 的测试继续明确跳过；本轮另用真实 4090 生产链补充验证。</li><li>曾出现但已处理：项目原本未上锁，解除未上锁状态被 409 正确拒绝；续跑前读取已批准计划并复用，没有重复编译或重复提交批次。汇总脚本把清单响应层级读错只影响打印，不影响已经提交的三任务批次。</li></ul></section>
+
+<section><h2>明确未做</h2><ul><li>没有把三个 4 秒验收镜头剪成最终 30 秒短片；本轮目标是画布和全链真实验收。</li><li>AI 生成仍是同步请求；浏览器断开不会取消本地模型计算，服务重启也不能恢复该次请求。持久化异步生成任务属于下一里程碑。</li><li>当前只验证 llama.cpp 兼容端点；尚未给不支持 <code>response_format</code> 的其他供应商做能力协商。</li><li>钩子质量门验证位置，不验证动作内容是否真正兑现；独立审阅可用普通建议给出 <code>revise</code>。两项均为下一版质量语义增强。</li><li>剧本生成集成测试文件已超过 1000 行，虽不违反当前文件硬上限，但下一次扩展前应拆夹具与场景。</li></ul></section>
+
+<section><h2>Self-Review</h2><p>评分使用 A 至 F：A 最好，F 最差；交付门槛为 B-。</p><table><tr><th>维度</th><th>评分</th><th>最终问题</th></tr><tr><td>架构与可维护性</td><td>B-</td><td>中：同步文字模型调用不可恢复；进程内互斥不覆盖多接口实例。低：推理包装兼容位于通用契约层；集成测试文件过长。</td></tr><tr><td>真实 bug 与边界</td><td>B+</td><td>中：强制 <code>response_format</code> 可能不兼容部分仿 OpenAI 端点。低：只处理首个前置推理包装。</td></tr><tr><td>测试质量</td><td>A-</td><td>低：非空推理包装与审阅来源字段可增加更直接断言；现有真实网络和数据库链路无 mock（模拟替身）绕过。</td></tr><tr><td>设计规范对齐</td><td>B+</td><td>中：钩子内容兑现与“无阻断问题却退回修改”的语义仍可加强；声音、失败不落库和人工批准边界无回归。</td></tr></table><h3>严重项处理结论</h3><ul><li><b>严重偏离：无。</b>四路独立审查均未发现阻断交付的问题。</li><li><b>接受中风险：</b>同步请求和单进程锁符合当前单接口本地部署；风险是断开会浪费计算、重启会丢失请求。若扩展为多实例或云端计费服务，必须先改成持久化任务。</li><li><b>接受中风险：</b>当前唯一生产供应商已验证支持 JSON object；其他供应商接入前必须做能力探测，不能直接复用。</li><li><b>延后质量语义：</b>钩子内容兑现和审阅 <code>revise</code> 规则不影响本次三镜真实生产，但会影响更复杂长篇质量，列入下一里程碑。</li></ul><p><b>综合评分：B。</b>四个维度均不低于 B-，无严重遗留；真实 AI、图片、H3、静音、质量检查与画布链路已经穿透。</p></section>
+</body></html>
