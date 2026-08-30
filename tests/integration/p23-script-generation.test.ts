@@ -210,6 +210,34 @@ describe('P2.3 AI script generation', () => {
     expect(await listVersions(api.origin, projectId)).toHaveLength(2);
   });
 
+  it('accepts the empty reasoning wrapper emitted by local Qwen', async () => {
+    const wrap = (value: unknown) =>
+      `<think>\n\n</think>\n\n${JSON.stringify(value)}`;
+    const provider = await startProvider(async () => ({
+      choices: [{ message: { content: wrap(shuohaoGeneratedScript()) } }],
+    }), async () => ({
+      choices: [{ message: { content: wrap({
+        verdict: 'approve',
+        summary: '本地 Qwen 独立审阅通过。',
+        findings: [],
+      }) } }],
+    }));
+    const api = await startApi({
+      endpoint: provider.origin,
+      model: 'qwen-reasoning-wrapper',
+      timeout_ms: 2_000,
+    });
+    const projectId = await createProject(api.origin, 'Qwen 包装兼容');
+
+    const response = await post(
+      `${api.origin}/api/projects/${projectId}/scripts/generation`,
+      generationInput(),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await listVersions(api.origin, projectId)).toHaveLength(2);
+  });
+
   it('does not create a draft when the model response is not valid JSON',
     async () => {
       const provider = await startProvider(async () => ({

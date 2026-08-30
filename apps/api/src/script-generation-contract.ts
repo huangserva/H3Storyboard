@@ -9,8 +9,9 @@ import {
 export function parseGeneratedScript(content: string):
   | { success: true; data: GeneratedShuohaoScript }
   | { success: false; issues: readonly string[] } {
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(content.trim());
-  const candidate = fenced?.[1] ?? content.trim();
+  const normalized = stripReasoningWrapper(content);
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(normalized);
+  const candidate = fenced?.[1] ?? normalized;
   const decoded = parseJson(candidate);
   if (decoded === null) return { success: false,
     issues: ['响应必须是一个完整 JSON 对象，不能夹带说明文字'] };
@@ -111,8 +112,9 @@ ${JSON.stringify(script)}`;
 export function parseGenerationReview(content: string):
   | { success: true; data: ScriptGenerationReviewDecision }
   | { success: false; issues: readonly string[] } {
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(content.trim());
-  const candidate = fenced?.[1] ?? content.trim();
+  const normalized = stripReasoningWrapper(content);
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(normalized);
+  const candidate = fenced?.[1] ?? normalized;
   const decoded = parseJson(candidate);
   if (decoded === null) return { success: false,
     issues: ['独立审阅必须返回完整 JSON 对象'] };
@@ -157,4 +159,8 @@ ${previousResponse.slice(0, 500_000)}`;
 function parseJson(value: string): unknown | null {
   try { return JSON.parse(value) as unknown; }
   catch { return null; }
+}
+
+function stripReasoningWrapper(value: string): string {
+  return value.trim().replace(/^<think>[\s\S]*?<\/think>\s*/i, '').trim();
 }
