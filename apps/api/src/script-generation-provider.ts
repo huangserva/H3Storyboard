@@ -11,6 +11,10 @@ import {
   REVIEW_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
 } from './script-generation-contract.js';
+import {
+  postJsonWithLimit,
+  ProviderResponseTooLargeError,
+} from './script-generation-http.js';
 
 const MAX_PROVIDER_BODY_BYTES = 1_000_000;
 
@@ -110,26 +114,25 @@ async function callCompletion(config: NormalizedConfig, temperature: number,
   messages: Array<{ role: 'system' | 'user'; content: string }>,
 ): Promise<string> {
   const signal = AbortSignal.timeout(config.timeout_ms);
-  let response: Response;
+  let status: number;
   let text: string;
   try {
-    response = await fetch(`${config.endpoint}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(config.api_key ? { authorization: `Bearer ${config.api_key}` } : {}),
-      },
-      body: JSON.stringify({
+    const response = await postJsonWithLimit(
+      `${config.endpoint}/chat/completions`, {
         model: config.model,
         temperature,
         max_tokens: 12_000,
         messages,
-      }),
-      signal,
-    });
-    text = await readLimitedBody(response);
+      }, {
+        signal,
+        max_body_bytes: MAX_PROVIDER_BODY_BYTES,
+        ...(config.api_key
+          ? { authorization: `Bearer ${config.api_key}` } : {}),
+      });
+    status = response.status;
+    text = response.body;
   } catch (error) {
-    if (error instanceof ApiError) throw error;
+    if (error instanceof ProviderResponseTooLargeError) throw responseTooLarge();
     if (signal.aborted || isTimeoutError(error)) throw new ApiError(
       504,
       'SCRIPT_GENERATION_TIMEOUT',
@@ -138,10 +141,10 @@ async function callCompletion(config: NormalizedConfig, temperature: number,
     throw new ApiError(502, 'SCRIPT_GENERATION_PROVIDER_FAILED',
       'Could not reach the AI script provider');
   }
-  if (!response.ok) throw new ApiError(502,
+  if (status < 200 || status >= 300) throw new ApiError(502,
     'SCRIPT_GENERATION_PROVIDER_FAILED',
     'The AI script provider rejected the request', {
-      provider_status: response.status,
+      provider_status: status,
     });
   const envelope = ProviderResponseSchema.safeParse(parseJson(text));
   if (!envelope.success) throw new ApiError(502,
@@ -150,27 +153,6 @@ async function callCompletion(config: NormalizedConfig, temperature: number,
       issues: envelope.error.issues,
     });
   return envelope.data.choices[0]!.message.content;
-}
-
-async function readLimitedBody(response: Response): Promise<string> {
-  const declaredLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) &&
-    declaredLength > MAX_PROVIDER_BODY_BYTES) throw responseTooLarge();
-  if (!response.body) return '';
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_PROVIDER_BODY_BYTES) {
-      await reader.cancel();
-      throw responseTooLarge();
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
 }
 
 function responseTooLarge(): ApiError {
