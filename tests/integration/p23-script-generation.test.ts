@@ -1,5 +1,6 @@
 import {
   createServer,
+  request as httpRequest,
   type Server,
   type ServerResponse,
 } from 'node:http';
@@ -8,6 +9,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  Agent,
+  getGlobalDispatcher,
+  setGlobalDispatcher,
+} from 'undici';
 import {
   ScriptGenerationCapabilitySchema,
   ScriptGenerationResultSchema,
@@ -132,6 +138,7 @@ describe('P2.3 AI script generation', () => {
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject({
         model: 'screenwriter-test',
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system' },
           { role: 'user' },
@@ -165,6 +172,43 @@ describe('P2.3 AI script generation', () => {
         await versionsResponse.json(),
       )[0]?.generation_provider).toBe('local-test-provider');
     });
+
+  it('does not inherit the global fetch response-header deadline', async () => {
+    const provider = await startRawProvider(async (body, response) => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const payload = providerUserMessage(body).includes('请独立审阅')
+        ? approvedReview()
+        : { choices: [{ message: { content: JSON.stringify(
+          shuohaoGeneratedScript(),
+        ) } }] };
+      const json = JSON.stringify(payload);
+      if (response.destroyed) return;
+      response.writeHead(200, {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(json),
+      }).end(json);
+    });
+    const api = await startApi({
+      endpoint: provider.origin,
+      model: 'slow-header-model',
+      timeout_ms: 500,
+    });
+    const projectId = await createProject(api.origin, '慢响应头回归');
+    const originalDispatcher = getGlobalDispatcher();
+    const shortHeaderDispatcher = new Agent({ headersTimeout: 20 });
+    setGlobalDispatcher(shortHeaderDispatcher);
+    try {
+      const response = await postWithNodeHttp(
+        `${api.origin}/api/projects/${projectId}/scripts/generation`,
+        generationInput(),
+      );
+      expect(response.status).toBe(201);
+    } finally {
+      setGlobalDispatcher(originalDispatcher);
+      await shortHeaderDispatcher.close();
+    }
+    expect(await listVersions(api.origin, projectId)).toHaveLength(2);
+  });
 
   it('does not create a draft when the model response is not valid JSON',
     async () => {
@@ -408,6 +452,29 @@ describe('P2.3 AI script generation', () => {
     expect(captured).toMatchObject({ code: 'INVALID_ENDPOINT' });
     expect(existsSync(databasePath)).toBe(false);
   });
+
+  it('rejects a timeout above the Node timer ceiling before opening SQLite',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'h3-p23-timeout-config-'));
+      directories.add(directory);
+      const databasePath = join(directory, 'must-not-open.db');
+
+      let captured: unknown;
+      try {
+        createApiServer({
+          database_path: databasePath,
+          port: 0,
+          script_generation: {
+            endpoint: 'http://127.0.0.1:8080/v1',
+            model: 'invalid-timeout-provider',
+            timeout_ms: 2_147_483_648,
+          },
+        });
+      } catch (error) { captured = error; }
+      expect(captured).toBeInstanceOf(ScriptGenerationConfigError);
+      expect(captured).toMatchObject({ code: 'INVALID_TIMEOUT' });
+      expect(existsSync(databasePath)).toBe(false);
+    });
 
   it('uses a fresh independent review call and persists its provenance',
     async () => {
@@ -885,6 +952,33 @@ function post(url: string, body: unknown): Promise<Response> {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+  });
+}
+
+function postWithNodeHttp(url: string, body: unknown): Promise<{
+  status: number;
+  body: string;
+}> {
+  const payload = Buffer.from(JSON.stringify(body));
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': payload.byteLength,
+      },
+    }, async (response) => {
+      const chunks: Buffer[] = [];
+      try {
+        for await (const chunk of response) chunks.push(Buffer.from(chunk));
+        resolve({
+          status: response.statusCode ?? 0,
+          body: Buffer.concat(chunks).toString('utf8'),
+        });
+      } catch (error) { reject(error); }
+    });
+    request.once('error', reject);
+    request.end(payload);
   });
 }
 

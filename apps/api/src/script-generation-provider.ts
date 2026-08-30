@@ -17,6 +17,7 @@ import {
 } from './script-generation-http.js';
 
 const MAX_PROVIDER_BODY_BYTES = 1_000_000;
+const MAX_NODE_TIMER_MS = 2_147_483_647;
 
 export class ScriptGenerationConfigError extends Error {
   constructor(readonly code: 'INVALID_ENDPOINT' | 'INVALID_MODEL' |
@@ -86,9 +87,12 @@ function normalizeConfig(raw: ScriptGenerationConfig): NormalizedConfig {
   const timeout = raw.timeout_ms ?? 120_000;
   if (!model) throw new ScriptGenerationConfigError(
     'INVALID_MODEL', 'H3_SCRIPT_AI_MODEL must not be empty');
-  if (!Number.isSafeInteger(timeout) || timeout <= 0) {
+  if (!Number.isSafeInteger(timeout) || timeout <= 0 ||
+    timeout > MAX_NODE_TIMER_MS) {
     throw new ScriptGenerationConfigError(
-      'INVALID_TIMEOUT', 'H3_SCRIPT_AI_TIMEOUT_MS must be a positive integer');
+      'INVALID_TIMEOUT',
+      `H3_SCRIPT_AI_TIMEOUT_MS must be an integer from 1 to ${MAX_NODE_TIMER_MS}`,
+    );
   }
   return {
     endpoint: raw.endpoint.replace(/\/+$/, ''),
@@ -122,6 +126,7 @@ async function callCompletion(config: NormalizedConfig, temperature: number,
         model: config.model,
         temperature,
         max_tokens: 12_000,
+        response_format: { type: 'json_object' },
         messages,
       }, {
         signal,

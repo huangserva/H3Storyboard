@@ -1,6 +1,11 @@
-import { createServer, type Server } from 'node:http';
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { postJsonWithLimit } from
+import { postJsonWithLimit, ProviderResponseTooLargeError } from
   '../../apps/api/src/script-generation-http.js';
 
 const servers = new Set<Server>();
@@ -34,10 +39,43 @@ describe('script provider HTTP transport', () => {
         { signal: AbortSignal.timeout(20), max_body_bytes: 1_000_000 },
       )).rejects.toMatchObject({ name: 'AbortError' });
     });
+
+  it('forwards the configured bearer authorization header', async () => {
+    let authorization: string | undefined;
+    const origin = await startProvider(async (request, response) => {
+      authorization = request.headers.authorization;
+      for await (const _chunk of request) {
+        // Consume the real request before responding.
+      }
+      response.writeHead(200).end('{}');
+    });
+
+    await postJsonWithLimit(`${origin}/v1/chat/completions`, {}, {
+      signal: AbortSignal.timeout(500),
+      max_body_bytes: 1_000_000,
+      authorization: 'Bearer integration-secret',
+    });
+
+    expect(authorization).toBe('Bearer integration-secret');
+  });
+
+  it('rejects a declared response length before reading the body', async () => {
+    const origin = await startProvider(async (request, response) => {
+      for await (const _chunk of request) {
+        // Consume the real request before responding.
+      }
+      response.writeHead(200, { 'content-length': '1000001' }).end('x');
+    });
+
+    await expect(postJsonWithLimit(
+      `${origin}/v1/chat/completions`, {},
+      { signal: AbortSignal.timeout(500), max_body_bytes: 1_000_000 },
+    )).rejects.toBeInstanceOf(ProviderResponseTooLargeError);
+  });
 });
 
 async function startDelayedProvider(delayMs: number): Promise<string> {
-  const server = createServer(async (request, response) => {
+  return startProvider(async (request, response) => {
     for await (const _chunk of request) {
       // Consume the real request body before delaying response headers.
     }
@@ -48,6 +86,13 @@ async function startDelayedProvider(delayMs: number): Promise<string> {
       'content-type': 'application/json',
       'content-length': Buffer.byteLength(body),
     }).end(body);
+  });
+}
+
+async function startProvider(handler: (request: IncomingMessage,
+  response: ServerResponse) => Promise<void>): Promise<string> {
+  const server = createServer((request, response) => {
+    void handler(request, response);
   });
   servers.add(server);
   await new Promise<void>((resolve, reject) => {
