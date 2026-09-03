@@ -7,6 +7,9 @@ export default defineConfig({
       '@h3storyboard/protocol': fileURLToPath(
         new URL('./packages/protocol/src/index.ts', import.meta.url),
       ),
+      '@h3storyboard/film-studio-bridge': fileURLToPath(
+        new URL('./packages/film-studio-bridge/src/index.ts', import.meta.url),
+      ),
       '@h3storyboard/task-engine': fileURLToPath(
         new URL('./packages/task-engine/src/index.ts', import.meta.url),
       ),

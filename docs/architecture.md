@@ -111,3 +111,7 @@ Migrations v7–v24 are additive. V13 repairs pre-semantic image shots by transl
 ## Initial deployment
 
 M0 runs as a local web application on Node 22. The API binds to `127.0.0.1` only and stores data under the user's home directory by default; `H3_STORYBOARD_DB` accepts an explicit path. Desktop packaging is deferred until the workflow and storage contract are stable.
+
+## h3-film-studio as a component (ADR 0003)
+
+`@h3storyboard/film-studio-bridge` resolves the skill checkout, runs `scripts/h3_prompt_compiler.py --json` and `scripts/preflight_continuity.py`, and records `film_studio_revision` on every result. The worker must build the H3 prompt only through `compilePrompt()`.

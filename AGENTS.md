@@ -24,6 +24,8 @@ H3Storyboard is a local-first director workbench. It keeps planned shots and gen
 - A generation job must persist whether it requests H3 native audio or silence. Worker configuration must not change that decision after the job is created.
 - If H3 audio is unusable, the only allowed replacement is silence.
 
+12. H3 prompts and production gates come from the `h3-film-studio` skill through `@h3storyboard/film-studio-bridge` (ADR 0003). Never hand-write an H3 prompt, never re-implement a gate, never copy rule text into this repository. Persist `film_studio_revision` with every job and take.
+
 ## Milestone gate
 
 Before declaring a milestone complete:

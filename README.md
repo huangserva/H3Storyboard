@@ -116,3 +116,7 @@ pnpm test
 ```
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/protocol.md`](docs/protocol.md), [`docs/plan.md`](docs/plan.md), the [M0 self-review](docs/self-review-m0.md), the [source comparison report](.hive/reports/2026-08-11-filmstoryboard-vs-xyz-video-creator.html), and the [director reference assessment](.hive/reports/2026-08-11-director-reference-assessment.html).
+
+## h3-film-studio (ADR 0003)
+
+Production rules, the official-format prompt compiler, and the QC gates are **not** in this repository: they live in the [h3-film-studio](https://github.com/huangserva/h3-film-studio) skill. `packages/film-studio-bridge` is the only door to it; nothing here restates a rule that exists in the skill.

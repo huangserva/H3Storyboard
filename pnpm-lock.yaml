@@ -79,6 +79,8 @@ importers:
         specifier: ^7.2.4
         version: 7.3.6(@types/node@22.20.1)(tsx@4.23.12)
 
+  packages/film-studio-bridge: {}
+
   packages/h3-provider:
     dependencies:
       '@h3storyboard/protocol':
