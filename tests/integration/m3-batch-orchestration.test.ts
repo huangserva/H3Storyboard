@@ -147,7 +147,7 @@ describe('M3 H3 batch orchestration', () => {
       try {
         expect(database.prepare(
           'SELECT MAX(version) AS version FROM schema_version').get())
-          .toEqual({ version: 28 });
+          .toEqual({ version: 29 });
         expect(database.prepare(
           'SELECT COUNT(*) AS count FROM h3_jobs WHERE retry_of_job_id = ?')
           .get(original.id)).toEqual({ count: 1 });
@@ -465,7 +465,7 @@ describe('M3 H3 batch orchestration', () => {
     try {
       expect(verified.prepare(
         'SELECT MAX(version) AS version FROM schema_version').get())
-        .toEqual({ version: 28 });
+        .toEqual({ version: 29 });
       expect((verified.pragma('table_info(h3_job_batches)') as
         Array<{ name: string }>).map(({ name }) => name))
         .toContain('last_claimed_at');
@@ -577,6 +577,11 @@ async function createShot(origin: string, project: string, ordinal: number) {
     shot_size: 'medium', camera_movement: 'locked',
     action: `Shot ${ordinal} crosses frame.`, dialogue: '', sound: '',
     prompt: `Cinematic M3 shot ${ordinal}.`, continuity_mode: 'independent',
+    h3_prompt_spec: { style: 'Live-action, cinematic',
+      anchor: 'a medium shot frames the subject shown in <Picture 1>',
+      beats: ['The subject crosses the frame'], soundscape: 'Quiet room tone.',
+      lines: [], silent_subjects: [], subjects: [],
+      camera: 'The camera holds a static shot', music: 'N/A' },
     continuity_dependencies: [], costume_state: {}, reference_bindings: [],
   });
   expect(response.status).toBe(201);

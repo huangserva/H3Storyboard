@@ -240,6 +240,11 @@ async function createShot(origin: string, project: string): Promise<string> {
     shot_size: 'medium', camera_movement: 'locked',
     action: 'A courier crosses the frame.', dialogue: '', sound: 'Rain.',
     prompt: 'A cinematic courier crosses a rain-soaked frame.',
+    h3_prompt_spec: { style: 'Live-action, cinematic',
+      anchor: 'a medium shot frames the subject shown in <Picture 1>',
+      beats: ['The subject crosses the frame'], soundscape: 'Quiet room tone.',
+      lines: [], silent_subjects: [], subjects: [],
+      camera: 'The camera holds a static shot', music: 'N/A' },
     continuity_mode: 'independent', continuity_dependencies: [],
     costume_state: {}, reference_bindings: [],
   });

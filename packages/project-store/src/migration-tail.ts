@@ -14,6 +14,7 @@ import { createPlanReviewWorkflow } from './migration-v25.js';
 import { addScriptGenerationProvenance } from './migration-v26.js';
 import { addScriptGenerationReview } from './migration-v27.js';
 import { addScriptGenerationInputs } from './migration-v28.js';
+import { addFilmStudioPromptCompilation } from './migration-v29.js';
 
 const tailMigrations: Array<readonly [number,
   (database: Database.Database) => void]> = [
@@ -32,6 +33,7 @@ const tailMigrations: Array<readonly [number,
   [26, addScriptGenerationProvenance],
   [27, addScriptGenerationReview],
   [28, addScriptGenerationInputs],
+  [29, addFilmStudioPromptCompilation],
 ];
 
 export function applyTailMigrations(

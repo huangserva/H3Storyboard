@@ -65,8 +65,16 @@ export interface FilmStudioLine {
   after?: string;
 }
 
+/** One reference picture that defines a <Subject N> in full-reference mode. */
+export interface FilmStudioSubject {
+  picture: number;
+  description: string;
+}
+
 export interface FilmStudioPromptSpec {
-  task: 'i2va' | 'fl2va';
+  task: 'i2va' | 'fl2va' | 'ref2va';
+  /** required for ref2va: one entry per reference picture */
+  subjects?: FilmStudioSubject[];
   frames: number;
   style: string;
   anchor: string;
@@ -79,7 +87,7 @@ export interface FilmStudioPromptSpec {
 }
 
 export interface CompiledPrompt {
-  task: 'i2va' | 'fl2va';
+  task: 'i2va' | 'fl2va' | 'ref2va';
   prompt: string;
   /** characters per second of dialogue; 0 for silent shots */
   density: number;
@@ -176,7 +184,7 @@ export async function compilePrompt(
     );
   }
   const out = parsed as {
-    task: 'i2va' | 'fl2va';
+    task: 'i2va' | 'fl2va' | 'ref2va';
     prompt: string;
     density: number;
   };

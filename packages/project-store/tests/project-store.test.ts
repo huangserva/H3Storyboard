@@ -143,7 +143,7 @@ describe('ProjectStore', () => {
     expect(columns.has('generation_review_json')).toBe(true);
     expect(columns.has('generation_input_json')).toBe(true);
     expect(columns.has('generation_source_content')).toBe(true);
-    expect(version.version).toBe(28);
+    expect(version.version).toBe(29);
   });
 
   it('applies migrations and rewrites legacy continuity asset ids', () => {
@@ -340,7 +340,7 @@ describe('ProjectStore', () => {
       (migratedVersion
         .prepare('SELECT MAX(version) AS version FROM schema_version')
         .get() as { version: number }).version,
-    ).toBe(28);
+    ).toBe(29);
     migratedVersion.close();
   });
 
@@ -406,7 +406,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(28);
+    ).get() as { version: number }).version).toBe(29);
     migrated.close();
   });
 
@@ -457,7 +457,7 @@ describe('ProjectStore', () => {
     const migrated = new Database(databasePath, { readonly: true });
     expect((migrated.prepare(
       'SELECT MAX(version) AS version FROM schema_version',
-    ).get() as { version: number }).version).toBe(28);
+    ).get() as { version: number }).version).toBe(29);
     migrated.close();
   });
 

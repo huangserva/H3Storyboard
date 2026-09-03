@@ -204,6 +204,8 @@ export function mapShotPlan(row: unknown): ShotPlan {
     reference_bindings: jsonColumn(record, 'reference_bindings_json'),
     semantic_references: record.semantic_references_json == null ? [] :
       jsonColumn(record, 'semantic_references_json'),
+    h3_prompt_spec: record.h3_prompt_spec_json == null ? null :
+      jsonColumn(record, 'h3_prompt_spec_json'),
     opening_state: record.opening_state_json == null ? null :
       jsonColumn(record, 'opening_state_json'),
     ending_state: record.ending_state_json == null ? null :
@@ -236,6 +238,7 @@ export function mapH3Job(row: unknown): H3Job {
     provider_client_id: record.provider_client_id ?? null,
     audio_mode: record.audio_mode ?? 'h3_native',
     retry_of_job_id: record.retry_of_job_id ?? null,
+    film_studio_revision: record.film_studio_revision ?? null,
   });
 }
 

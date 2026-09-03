@@ -49,7 +49,8 @@ export function useGenerationPreflights(snapshot: ProjectSnapshot | null,
         const message = error instanceof Error ? error.message : '生成检查失败';
         const failed: GenerationPreflight = { ready: false,
           blocking_error: { code, message }, mode: null,
-          input_bindings: [], gate_override_required: false };
+          input_bindings: [], gate_override_required: false,
+          compiled_prompt: null, film_studio_revision: null };
         if (snapshotRef.current?.project.id === current.project.id) {
           setPreflights(new Map(current.shot_plans.map(({ id }) => [id, failed])));
         }

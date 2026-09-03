@@ -11,6 +11,7 @@
     { "path": "../../packages/protocol" },
     { "path": "../../packages/project-store" },
     { "path": "../../packages/h3-provider" },
-    { "path": "../../packages/task-engine" }
+    { "path": "../../packages/task-engine" },
+    { "path": "../../packages/film-studio-bridge" }
   ]
 }

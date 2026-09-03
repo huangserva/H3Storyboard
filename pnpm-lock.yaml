@@ -35,6 +35,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@h3storyboard/film-studio-bridge':
+        specifier: workspace:*
+        version: link:../../packages/film-studio-bridge
       '@h3storyboard/h3-provider':
         specifier: workspace:*
         version: link:../../packages/h3-provider

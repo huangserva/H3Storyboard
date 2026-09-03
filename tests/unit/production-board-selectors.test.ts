@@ -84,6 +84,7 @@ function fixture(): ProjectSnapshot {
     heartbeat_at: null, created_at: now, updated_at: now, completed_at: now,
     lock_snapshot: null, compiled_bindings: [], gate_override_reason: null,
     cancel_reason: null,
+    film_studio_revision: null,
   });
   const actual = (id: string, jobId: string, output: string, attempt: number,
     verdict: 'approved' | 'rejected') => ({ id, project_id: project,

@@ -56,7 +56,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
     const health = await fetch(`${first.origin}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({
-      data: { status: 'ok', protocol_version: '2.2' },
+      data: { status: 'ok', protocol_version: '2.3' },
     });
 
     const projectResponse = await postJson(`${first.origin}/api/projects`, {
@@ -139,7 +139,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
 
     const conflictingJob = await postJson(
       `${first.origin}/api/shots/${shot.id}/jobs`,
-      { ...jobInput, prompt: 'A conflicting request with the same key.' },
+      { ...jobInput, seed: 43 },
     );
     await expectError(conflictingJob, 409, 'IDEMPOTENCY_KEY_REUSED');
 
@@ -685,7 +685,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       .prepare('SELECT MAX(version) AS version FROM schema_version')
       .get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(28);
+    expect(schemaVersion.version).toBe(29);
   });
 
   test('closes a listener when close overlaps the initial start', async () => {
@@ -1172,7 +1172,7 @@ describe('H3Storyboard HTTP and SQLite integration', () => {
       'SELECT MAX(version) AS version FROM schema_version',
     ).get() as { version: number };
     database.close();
-    expect(schemaVersion.version).toBe(28);
+    expect(schemaVersion.version).toBe(29);
   });
 
   test('versions production briefs and freezes immutable job lock snapshots', async () => {
@@ -1578,6 +1578,11 @@ function validShotInput(): Record<string, unknown> {
     sound: 'Rail rhythm and a distant signal bell.',
     prompt:
       'Medium-wide locked-off camera. The conductor crosses the night carriage.',
+    h3_prompt_spec: { style: 'Live-action, cinematic',
+      anchor: 'a medium shot frames the subject shown in <Picture 1>',
+      beats: ['The subject crosses the frame'], soundscape: 'Quiet room tone.',
+      lines: [], silent_subjects: [], subjects: [],
+      camera: 'The camera holds a static shot', music: 'N/A' },
     continuity_mode: 'independent',
     continuity_dependencies: [],
     costume_state: { conductor: 'navy uniform, brass buttons' },

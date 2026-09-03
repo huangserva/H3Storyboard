@@ -14,6 +14,7 @@ import type {
   ShotActual,
   ShotPlan,
 } from '@h3storyboard/protocol';
+import { requireShot } from './store-guards.js';
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -55,6 +56,11 @@ import {
 import { bindShotReference } from './shot-binding-operations.js';
 
 export class ProjectStore extends H3JobStore {
+  /** Reads one planned shot by id (SHOT_PLAN_NOT_FOUND when absent). */
+  getShotPlan(shotPlanId: string): ShotPlan {
+    return requireShot(this.h3Database, shotPlanId);
+  }
+
   readonly #database: Database.Database;
   readonly modes: ModeStore;
   readonly production: ProductionStore;

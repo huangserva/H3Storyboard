@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import type { CreateShotPlanInput } from '@h3storyboard/protocol';
+import type { CreateShotPlanInput, H3PromptSpec } from '@h3storyboard/protocol';
+import { H3PromptSpecFields } from './H3PromptSpecFields.js';
 
 interface ShotPlanFormProps {
   busy: boolean;
@@ -7,6 +8,13 @@ interface ShotPlanFormProps {
   onClose: () => void;
   onCreate: (input: CreateShotPlanInput) => Promise<boolean>;
 }
+
+const emptyPromptSpec: H3PromptSpec = {
+  subjects: [],
+  style: 'Live-action, cinematic', anchor: '', beats: [], soundscape: '',
+  lines: [], silent_subjects: [], camera: 'The camera holds a static shot',
+  music: 'N/A',
+};
 
 const initialTechnical = {
   duration: 6,
@@ -28,7 +36,7 @@ export function ShotPlanForm({
   const [action, setAction] = useState('');
   const [dialogue, setDialogue] = useState('');
   const [sound, setSound] = useState('');
-  const [prompt, setPrompt] = useState('');
+  const [promptSpec, setPromptSpec] = useState<H3PromptSpec>(emptyPromptSpec);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -41,7 +49,9 @@ export function ShotPlanForm({
       action: action.trim(),
       dialogue: dialogue.trim(),
       sound: sound.trim(),
-      prompt: prompt.trim(),
+      prompt: '',
+      h3_prompt_spec: promptSpec.anchor.trim() && promptSpec.soundscape.trim()
+        ? promptSpec : null,
       continuity_mode: 'independent',
       continuity_dependencies: [],
       costume_state: {},
@@ -113,10 +123,7 @@ export function ShotPlanForm({
               <textarea value={sound} onChange={(event) => setSound(event.target.value)} placeholder="仅作剧本记录；最终只允许 H3 原声或静音" />
             </label>
           </div>
-          <label>
-            <span>H3 生成提示词</span>
-            <textarea className="prompt-textarea" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="此处只写文本意图；参考资产须在右侧绑定后才会进入任务。" />
-          </label>
+          <H3PromptSpecFields value={promptSpec} onChange={setPromptSpec} />
 
           <footer className="composer-footer sticky-footer">
             <span>首版默认独立连续性</span>

@@ -11,6 +11,7 @@ import type { ProjectStore } from '@h3storyboard/project-store';
 import type { IncomingMessage } from 'node:http';
 import { ApiError } from './api-error.js';
 import { readJson } from './http.js';
+import { compileShotPrompt, isCompilableMode } from './prompt-compilation.js';
 import { dispatchCanvasRoute } from './canvas-routes.js';
 import { dispatchCharacterRoute } from './character-routes.js';
 import { dispatchAssetRoute } from './asset-routes.js';
@@ -98,13 +99,21 @@ const routes: readonly Route[] = [
     method: 'POST',
     pattern: /^\/api\/shots\/([^/]+)\/jobs$/,
     param_names: ['shot_plan_id'],
-    handle: async ({ request, params, store }) => ({
-      status: 201,
-      body: store.createH3Job(
-        requiredParam(params, 'shot_plan_id'),
-        await readH3JobInput(request),
-      ),
-    }),
+    handle: async ({ request, params, store }) => {
+      // ADR 0003: the prompt is compiled by h3-film-studio, never taken from
+      // the client. Draft plans still fail in the store with SHOT_PLAN_DRAFT.
+      const shotPlanId = requiredParam(params, 'shot_plan_id');
+      const input = await readH3JobInput(request);
+      const shot = store.getShotPlan(shotPlanId);
+      let revision: string | null = null;
+      if (shot.planning_status === 'approved' && isCompilableMode(input.mode)) {
+        const compiled = await compileShotPrompt(shot, input.mode,
+          input.input_bindings.length);
+        input.prompt = compiled.prompt;
+        revision = compiled.film_studio_revision;
+      }
+      return { status: 201, body: store.createH3Job(shotPlanId, input, revision) };
+    },
   },
   {
     method: 'POST',

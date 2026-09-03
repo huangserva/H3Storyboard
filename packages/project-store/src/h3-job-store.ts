@@ -40,13 +40,15 @@ import {
 export class H3JobStore {
   constructor(protected readonly h3Database: Database.Database) {}
 
-  createH3Job(shotPlanId: string, input: CreateH3JobInput): H3Job {
-    return createH3Job(this.h3Database, shotPlanId, input);
+  createH3Job(shotPlanId: string, input: CreateH3JobInput,
+    filmStudioRevision: string | null = null): H3Job {
+    return createH3Job(this.h3Database, shotPlanId, input, filmStudioRevision);
   }
 
   createH3JobBatch(projectId: string,
-    input: CreateH3JobBatchInput): CreateH3JobBatchResult {
-    return createH3JobBatch(this.h3Database, projectId, input);
+    input: CreateH3JobBatchInput,
+    revisionsByShot: ReadonlyMap<string, string> = new Map()): CreateH3JobBatchResult {
+    return createH3JobBatch(this.h3Database, projectId, input, revisionsByShot);
   }
 
   claimH3Job(jobId: string, leaseDurationMs?: number): H3Job {

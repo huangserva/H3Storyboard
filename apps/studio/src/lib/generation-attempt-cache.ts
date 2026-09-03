@@ -41,7 +41,8 @@ export function generationInput(shot: ShotPlan, preflight: GenerationPreflight,
   if (!preflight.mode) throw new Error('Generation preflight has no mode');
   const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
   return { mode: preflight.mode, provider: 'local_comfyui', model: 'H3-local',
-    prompt: shot.prompt, duration_seconds: shot.duration_seconds, seed, steps: 4,
+    // the API recompiles through h3-film-studio; this mirrors the preflight (ADR 0003)
+    prompt: preflight.compiled_prompt ?? shot.prompt, duration_seconds: shot.duration_seconds, seed, steps: 4,
     audio_mode: 'h3_native', idempotency_key: `studio-${crypto.randomUUID()}`,
     input_bindings: preflight.input_bindings,
     ...(gateOverrideReason ? { gate_override_reason: gateOverrideReason } : {}) };

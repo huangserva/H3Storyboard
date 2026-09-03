@@ -10,7 +10,8 @@ describe('storyboard batch readiness', () => {
       ({ id, ordinal: index + 1 }) as ShotPlan);
     const ready = (gate = false): GenerationPreflight => ({ ready: true,
       mode: 't2v', blocking_error: null, input_bindings: [],
-      gate_override_required: gate });
+      gate_override_required: gate,
+      compiled_prompt: null, film_studio_revision: null });
     const preflights = new Map<string, GenerationPreflight>([
       ['ready', ready()], ['blocked', { ...ready(), ready: false,
         mode: null, blocking_error: { code: 'MISSING', message: 'missing' } }],

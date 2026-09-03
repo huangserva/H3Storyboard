@@ -83,9 +83,9 @@ export function retryH3Job(db: Database.Database, projectId: string,
        output_asset_id, error_code, error_message, lease_token,
        lease_expires_at, heartbeat_at, created_at, updated_at, completed_at,
        lock_snapshot_json, compiled_bindings_json, gate_override_reason,
-       cancel_reason)
+       cancel_reason, film_studio_revision)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?,
-              ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, NULL)`)
+              ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, ?)`)
       .run(id, projectId, original.shot_plan_id, original.id, original.mode,
         original.provider, original.model, original.prompt,
         original.duration_seconds, original.seed, original.steps,
@@ -102,7 +102,8 @@ export function retryH3Job(db: Database.Database, projectId: string,
           JSON.stringify(original.lock_snapshot),
         original.compiled_bindings === null ? null :
           JSON.stringify(original.compiled_bindings),
-        original.gate_override_reason);
+        original.gate_override_reason,
+        original.film_studio_revision);
     appendJobEvent(db, id, null, retryStatus,
       `Immutable retry created for ${original.id}`, now);
     const batch = findH3JobBatchByCurrentJob(db, original.id);

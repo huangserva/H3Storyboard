@@ -23,6 +23,14 @@ Treat `h3-film-studio` as a **component dependency**, in contrast with ADR 0002,
 4. Every persisted H3 job and take stores `film_studio_revision`, so a result can be traced to the exact rule set that produced it.
 5. The skill's QC gates (preflight now; subtitle, voice, and spectrum gates as they land) surface in Studio as QC status, not as reimplemented checks.
 
+## Implementation (2026-08-25)
+
+- `ShotPlan.h3_prompt_spec` (protocol 2.3, migration v29) is the structured source: English style/anchor/beats/soundscape/camera/music, dialogue `lines` in their original language, `silent_subjects`, and for full-reference mode `subjects` (`<Picture N>` → `<Subject N>`).
+- All three job entry points compile through the bridge before the store writes: `POST /api/projects/:p/shots/:s/jobs`, `POST /api/projects/:p/jobs/batch`, and the legacy `POST /api/shots/:s/jobs`. The client's `prompt` field is replaced by the compiled text; `H3Job.film_studio_revision` records the skill revision; the job idempotency fingerprint no longer includes `prompt`.
+- `GET …/jobs/preflight` and the batch preflight return `compiled_prompt` and `film_studio_revision`, so Studio shows the exact official-format prompt before generation; a missing spec blocks with `H3_PROMPT_SPEC_REQUIRED`, Chinese outside `<d>` with `FILM_STUDIO_COMPILER_REJECTED`.
+- Compilation covers the worker modes i2v → I2VA, fl2v → FL2VA, r2v → full-reference (six-section) format. t2v/v2v/rv2v jobs are contract-only (the local worker refuses them) and are left untouched with a null revision.
+- Studio: `H3PromptSpecFields` replaces the free-text prompt textarea in the shot form; `PlannedShotPanel` displays the compiled prompt and revision from the preflight; `generationInput` mirrors `compiled_prompt`.
+
 ## Consequences
 
 - A missing or moved skill checkout fails fast with `FILM_STUDIO_NOT_FOUND`; there is no silent fallback prompt.

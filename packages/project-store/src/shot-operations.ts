@@ -52,8 +52,9 @@ export function createShotPlan(
         prompt, continuity_mode, continuity_dependencies_json,
         costume_state_json, position_state_json, prop_state_json,
         reference_bindings_json, semantic_references_json,
-        opening_state_json, ending_state_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        opening_state_json, ending_state_json, h3_prompt_spec_json,
+        created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       projectId,
@@ -77,6 +78,7 @@ export function createShotPlan(
       JSON.stringify(input.semantic_references),
       input.opening_state === null ? null : JSON.stringify(input.opening_state),
       input.ending_state === null ? null : JSON.stringify(input.ending_state),
+      input.h3_prompt_spec === null ? null : JSON.stringify(input.h3_prompt_spec),
       now,
       now,
     );
@@ -97,11 +99,15 @@ export function updateShotPlan(db: Database.Database,
     const existing = requireShot(db, input.shot_plan_id);
     requireGenerationUnlocked(db, existing.project_id);
     const now = new Date().toISOString();
+    const promptSpec = input.h3_prompt_spec === undefined
+      ? existing.h3_prompt_spec : input.h3_prompt_spec;
     db.prepare(`UPDATE shot_plans SET semantic_references_json = ?,
-      opening_state_json = ?, ending_state_json = ?, updated_at = ? WHERE id = ?`)
+      opening_state_json = ?, ending_state_json = ?, h3_prompt_spec_json = ?,
+      updated_at = ? WHERE id = ?`)
       .run(JSON.stringify(input.semantic_references ?? existing.semantic_references),
         JSON.stringify(input.opening_state === undefined ? existing.opening_state : input.opening_state),
         JSON.stringify(input.ending_state === undefined ? existing.ending_state : input.ending_state),
+        promptSpec === null ? null : JSON.stringify(promptSpec),
         now, existing.id);
     return mapShotPlan(db.prepare('SELECT * FROM shot_plans WHERE id = ?').get(existing.id));
   })();

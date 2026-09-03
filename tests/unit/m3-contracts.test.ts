@@ -48,7 +48,8 @@ describe('M3 batch orchestration contracts', () => {
       error_message: null, lease_token: null, lease_expires_at: null,
       heartbeat_at: null, created_at: now, updated_at: now,
       completed_at: null, lock_snapshot: null, compiled_bindings: null,
-      gate_override_reason: null, cancel_reason: null };
+      gate_override_reason: null, cancel_reason: null,
+      film_studio_revision: null };
     const item = { shot_plan_id: crypto.randomUUID(), ordinal: 0,
       original_job_id: jobId, retry_count: 0, retryable: false,
       current_job: currentJob };

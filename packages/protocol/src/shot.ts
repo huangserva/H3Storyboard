@@ -58,6 +58,42 @@ export type ContinuityDependency = z.infer<
   typeof ContinuityDependencySchema
 >;
 
+/**
+ * Structured source for the H3 prompt. It is compiled into MiniMax's official
+ * prompt format by the h3-film-studio skill (ADR 0003); the product never
+ * hand-writes the final prompt. Body fields are English; only `lines[].text`
+ * carries dialogue in its original language.
+ */
+export const H3PromptLineSchema = z.object({
+  speaker: z.string().regex(/^S[1-9]$/),
+  who: NonEmptyTextSchema.max(200),
+  verb: NonEmptyTextSchema.max(80),
+  text: NonEmptyTextSchema.max(400),
+  lang: NonEmptyTextSchema.max(40).default('Chinese'),
+  after: z.string().max(400).default(''),
+});
+export type H3PromptLine = z.infer<typeof H3PromptLineSchema>;
+
+/** Full-reference mode (r2v): which <Picture N> defines which <Subject N>. */
+export const H3PromptSubjectSchema = z.object({
+  picture: z.number().int().min(1).max(9),
+  description: NonEmptyTextSchema.max(300),
+});
+export type H3PromptSubject = z.infer<typeof H3PromptSubjectSchema>;
+
+export const H3PromptSpecSchema = z.object({
+  subjects: z.array(H3PromptSubjectSchema).max(9).default([]),
+  style: NonEmptyTextSchema.max(120),
+  anchor: NonEmptyTextSchema.max(1_200),
+  beats: z.array(NonEmptyTextSchema.max(600)).max(12).default([]),
+  soundscape: NonEmptyTextSchema.max(800),
+  lines: z.array(H3PromptLineSchema).max(12).default([]),
+  silent_subjects: z.array(NonEmptyTextSchema.max(200)).max(6).default([]),
+  camera: NonEmptyTextSchema.max(300).default('The camera holds a static shot'),
+  music: NonEmptyTextSchema.max(400).default('N/A'),
+});
+export type H3PromptSpec = z.infer<typeof H3PromptSpecSchema>;
+
 const shotPlanFields = {
   title: NonEmptyTextSchema.max(160),
   scene_id: NonEmptyTextSchema.max(120),
@@ -68,6 +104,7 @@ const shotPlanFields = {
   dialogue: z.string().max(1_200).default(''),
   sound: z.string().max(1_200).default(''),
   prompt: z.string().max(7_000).default(''),
+  h3_prompt_spec: H3PromptSpecSchema.nullable().default(null),
   continuity_mode: ContinuityModeSchema.default('independent'),
   continuity_dependencies: z.array(ContinuityDependencySchema).default([]),
   costume_state: z.record(z.string(), z.string()).default({}),
@@ -141,8 +178,10 @@ export const UpdateShotPlanInputSchema = z.object({
   semantic_references: z.array(SemanticReferenceSchema).optional(),
   opening_state: ShotStateSchema.nullable().optional(),
   ending_state: ShotStateSchema.nullable().optional(),
-}).refine(({ semantic_references, opening_state, ending_state }) =>
-  [semantic_references, opening_state, ending_state].some((value) => value !== undefined),
+  h3_prompt_spec: H3PromptSpecSchema.nullable().optional(),
+}).refine(({ semantic_references, opening_state, ending_state, h3_prompt_spec }) =>
+  [semantic_references, opening_state, ending_state, h3_prompt_spec]
+    .some((value) => value !== undefined),
 { message: 'At least one shot production field must be updated' });
 export type UpdateShotPlanInput = z.infer<typeof UpdateShotPlanInputSchema>;
 

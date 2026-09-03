@@ -125,7 +125,7 @@ alignment is scoped by `scene_id`, so inserting or deleting a shot does not
 cascade every later shot into a false change.
 
 Director edits are strict and may change only title, duration, shot size,
-camera movement, action, dialogue, H3 prompt, and costume/position/prop maps.
+camera movement, action, dialogue, H3 prompt, and costume/position/prop maps. Since protocol 2.3 a plan also carries `h3_prompt_spec` (style, anchor, beats, soundscape, lines, silent_subjects, camera, music): the structured source that the h3-film-studio skill compiles into MiniMax's official prompt format at job creation (ADR 0003). The legacy free-text `prompt` is never sent to the provider; `H3Job.prompt` is always the compiled text and `H3Job.film_studio_revision` records the skill revision that produced it. `GenerationPreflight` exposes the same text as `compiled_prompt` so the director sees exactly what will run; a missing spec blocks with `H3_PROMPT_SPEC_REQUIRED`, Chinese outside `<d>` with `FILM_STUDIO_COMPILER_REJECTED`.
 They must send both compilation and Plan revisions. `sound`, provenance,
 bindings, continuity, and production state are not editable through this
 contract; unknown fields are rejected. Each successful edit increments both

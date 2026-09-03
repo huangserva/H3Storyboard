@@ -415,6 +415,11 @@ async function createShot(origin: string, project: string,
     shot_size: 'medium', camera_movement: 'locked',
     action: `Shot ${ordinal} crosses frame.`, dialogue: '', sound: '',
     prompt: `Cinematic P1.5B shot ${ordinal}.`, continuity_mode: 'independent',
+    h3_prompt_spec: { style: 'Live-action, cinematic',
+      anchor: 'a medium shot frames the subject shown in <Picture 1>',
+      beats: ['The subject crosses the frame'], soundscape: 'Quiet room tone.',
+      lines: [], silent_subjects: [], subjects: [],
+      camera: 'The camera holds a static shot', music: 'N/A' },
     continuity_dependencies: [], costume_state: {}, reference_bindings: [],
   });
   expect(response.status).toBe(201);

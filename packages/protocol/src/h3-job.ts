@@ -105,6 +105,8 @@ export const H3JobSchema = z.object({
   lock_snapshot: JobLockSnapshotSchema.nullable(),
   compiled_bindings: z.array(CompiledBindingSchema).nullable(),
   gate_override_reason: NonEmptyTextSchema.max(1_000).nullable(),
+  /** git revision of h3-film-studio that compiled `prompt` (ADR 0003) */
+  film_studio_revision: z.string().nullable(),
   cancel_reason: NonEmptyTextSchema.max(1_000).nullable(),
 });
 export type H3Job = z.infer<typeof H3JobSchema>;
@@ -118,6 +120,9 @@ export const GenerationPreflightSchema = z.object({
   mode: H3ModeSchema.nullable(),
   input_bindings: z.array(AssetBindingSchema),
   gate_override_required: z.boolean(),
+  /** the exact official-format prompt the job will run, from h3-film-studio */
+  compiled_prompt: z.string().nullable(),
+  film_studio_revision: z.string().nullable(),
 });
 export type GenerationPreflight = z.infer<typeof GenerationPreflightSchema>;
 

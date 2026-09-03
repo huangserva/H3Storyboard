@@ -58,8 +58,10 @@ export function PlannedShotPanel({ shot, busy, job, preflight,
         </div>
       </article>
       <div className="prompt-block">
-        <span>H3 PROMPT</span>
-        <p>{shot.prompt || '尚未填写生成提示词'}</p>
+        <span>H3 PROMPT · h3-film-studio 官方格式{preflight?.film_studio_revision
+          ? ` @${preflight.film_studio_revision.slice(0, 7)}` : ''}</span>
+        <p>{preflight?.compiled_prompt ?? (shot.h3_prompt_spec
+          ? '生成检查通过后显示编译结果' : '尚未填写结构化提示词（h3_prompt_spec）')}</p>
       </div>
       <GenerationControl busy={busy} job={job} preflight={preflight}
         onGenerate={onGenerate} onSetup={onSetup} />

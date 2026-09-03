@@ -9,7 +9,8 @@ describe('H3 batch UI retry identity', () => {
     const shots = [{ id: crypto.randomUUID(), prompt: 'shot one',
       duration_seconds: 5, ordinal: 1 }] as ShotPlan[];
     const preflight = { ready: true, mode: 'i2v', blocking_error: null,
-      gate_override_required: false, input_bindings: [{ asset_id: crypto.randomUUID(),
+      gate_override_required: false, compiled_prompt: null,
+      film_studio_revision: null, input_bindings: [{ asset_id: crypto.randomUUID(),
         asset_kind: 'image', role: 'first_frame', ordinal: 0 }] } as
       GenerationPreflight;
     const preflights = new Map([[shots[0]!.id, preflight]]);

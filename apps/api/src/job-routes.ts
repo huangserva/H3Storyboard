@@ -9,6 +9,8 @@ import { StoreError, type BindingCompilationOutcome,
 import type { IncomingMessage } from 'node:http';
 import { ApiError, parseResponseContract } from './api-error.js';
 import { readJson } from './http.js';
+import { compileShotPrompt, isCompilableMode, promptCompilationMessages } from
+  './prompt-compilation.js';
 
 interface JobRouteResult { status: number; body: unknown }
 
@@ -54,10 +56,13 @@ export async function dispatchJobRoute(request: IncomingMessage,
       read.lock_engaged, read.has_brief);
     const compilations = new Map(read.compilations.map(
         (outcome) => [outcome.shot_plan_id, outcome]));
-    const body: GenerationPreflightBatch = { project_id: projectId,
-      items: read.snapshot.shot_plans.map(({ id }) => ({ shot_plan_id: id,
-        preflight: generationPreflight(store, id, context,
-          compilations.get(id)) })) };
+    const items: GenerationPreflightBatch['items'] = [];
+    for (const shot of read.snapshot.shot_plans) {
+      items.push({ shot_plan_id: shot.id, preflight: await withCompiledPrompt(
+        shot, generationPreflight(store, shot.id, context,
+          compilations.get(shot.id))) });
+    }
+    const body: GenerationPreflightBatch = { project_id: projectId, items };
     return { status: 200,
       body: parseResponseContract(GenerationPreflightBatchSchema, body) };
   }
@@ -72,18 +77,31 @@ export async function dispatchJobRoute(request: IncomingMessage,
       job.provider === 'local_comfyui' && !isWorkerMode(job.mode));
     if (unavailable) throw new ApiError(409, 'H3_MODE_UNAVAILABLE',
       `本机常驻 worker 尚不支持 ${unavailable.job.mode}，请调整 Production Mode`);
+    const batchSnapshot = store.getProjectSnapshot(projectId);
+    const revisions = new Map<string, string>();
+    for (const item of parsed.data.items) {
+      const shot = batchSnapshot.shot_plans.find(({ id }) => id === item.shot_plan_id);
+      if (!shot) continue; // the store reports SHOT_PROJECT_MISMATCH itself
+      if (shot.planning_status !== 'approved') continue; // store raises SHOT_PLAN_DRAFT
+      if (!isCompilableMode(item.job.mode)) continue; // contract-only mode
+      const compiled = await compileShotPrompt(shot, item.job.mode,
+        item.job.input_bindings.length);
+      item.job.prompt = compiled.prompt;
+      revisions.set(shot.id, compiled.film_studio_revision);
+    }
     return { status: 201, body: parseResponseContract(
       CreateH3JobBatchResultSchema,
-      store.createH3JobBatch(projectId, parsed.data)) };
+      store.createH3JobBatch(projectId, parsed.data, revisions)) };
   }
   const preflight = PREFLIGHT.exec(pathname);
   if (preflight && method === 'GET') {
     const { projectId, shotId, snapshot } = scopedShot(
       store, preflight[1] ?? '', preflight[2] ?? '');
-    return { status: 200, body: generationPreflight(
-      store, shotId, preflightContext(snapshot,
+    const shot = snapshot.shot_plans.find(({ id }) => id === shotId)!;
+    return { status: 200, body: await withCompiledPrompt(shot,
+      generationPreflight(store, shotId, preflightContext(snapshot,
         store.production.getLock(projectId).engaged,
-        store.production.listBriefs(projectId).length > 0)) };
+        store.production.listBriefs(projectId).length > 0))) };
   }
   const jobs = JOBS.exec(pathname);
   if (!jobs || method !== 'POST') return null;
@@ -100,7 +118,34 @@ export async function dispatchJobRoute(request: IncomingMessage,
     !isWorkerMode(parsed.data.mode)) throw new ApiError(409,
       'H3_MODE_UNAVAILABLE',
       `本机常驻 worker 尚不支持 ${parsed.data.mode}，请调整 Production Mode`);
-  return { status: 201, body: store.createH3Job(shotId, parsed.data) };
+  if (!readiness.ready || !isCompilableMode(parsed.data.mode)) return {
+    status: 201, body: store.createH3Job(shotId, parsed.data) }; // store raises the block
+  const shot = snapshot.shot_plans.find(({ id }) => id === shotId)!;
+  const compiled = await compileShotPrompt(shot, parsed.data.mode,
+    parsed.data.input_bindings.length);
+  parsed.data.prompt = compiled.prompt;
+  return { status: 201, body: store.createH3Job(shotId, parsed.data,
+    compiled.film_studio_revision) };
+}
+
+/**
+ * ADR 0003: a ready preflight also carries the exact official-format prompt
+ * the job will run; a spec or compiler problem blocks generation with the
+ * compiler's stable code.
+ */
+async function withCompiledPrompt(shot: ProjectSnapshot['shot_plans'][number],
+  preflight: GenerationPreflight): Promise<GenerationPreflight> {
+  if (!preflight.ready || !preflight.mode || !isCompilableMode(preflight.mode)) return preflight;
+  try {
+    const compiled = await compileShotPrompt(shot, preflight.mode,
+      preflight.input_bindings.length);
+    return { ...preflight, compiled_prompt: compiled.prompt,
+      film_studio_revision: compiled.film_studio_revision };
+  } catch (error) {
+    if (error instanceof ApiError) return blocked(error.code,
+      promptCompilationMessages[error.code] ?? error.message);
+    throw error;
+  }
 }
 
 function scopedShot(store: ProjectStore, rawProjectId: string,
@@ -171,6 +216,7 @@ function generationPreflight(store: ProjectStore, shotId: string,
       'H3_MODE_UNAVAILABLE',
       `本机常驻 worker 尚不支持 ${compiled.generation_mode}，请调整 Production Mode`);
     return { ready: true, blocking_error: null,
+      compiled_prompt: null, film_studio_revision: null,
       mode: compiled.generation_mode, input_bindings: compiled.bindings.map(
         ({ asset_id, purpose }, ordinal) => {
           const asset = context.assets_by_id.get(asset_id);
@@ -216,7 +262,8 @@ const purposeRole = {
 
 function blocked(code: string, message: string): GenerationPreflight {
   return { ready: false, blocking_error: { code, message }, mode: null,
-    input_bindings: [], gate_override_required: false };
+    input_bindings: [], gate_override_required: false,
+    compiled_prompt: null, film_studio_revision: null };
 }
 
 function decode(value: string, name: string): string {

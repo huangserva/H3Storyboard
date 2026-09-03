@@ -9,6 +9,7 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@h3storyboard/film-studio-bridge": "workspace:*",
     "@h3storyboard/h3-provider": "workspace:*",
     "@h3storyboard/project-store": "workspace:*",
     "@h3storyboard/protocol": "workspace:*",

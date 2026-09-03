@@ -172,7 +172,7 @@ describe('P2.1 Script Studio HTTP and SQLite integration', () => {
       try {
         expect(database.prepare(
           'SELECT MAX(version) AS version FROM schema_version').get())
-          .toEqual({ version: 28 });
+          .toEqual({ version: 29 });
         expect(database.prepare(
           'SELECT COUNT(*) AS count FROM script_compilations').get())
           .toEqual({ count: 1 });

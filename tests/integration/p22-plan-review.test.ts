@@ -448,6 +448,12 @@ function planContent(shot: ShotPlan) {
 }
 async function prepareGenerationContext(fixture: Fixture,
   shotPlanId: string): Promise<void> {
+  expect((await patch(`${fixture.origin}/api/shots/${shotPlanId}`, {
+    h3_prompt_spec: { style: 'Live-action, cinematic',
+        anchor: 'a medium shot frames the subject shown in <Picture 1>',
+        beats: ['The subject crosses the frame'], soundscape: 'Quiet room tone.',
+        lines: [], silent_subjects: [], subjects: [],
+        camera: 'The camera holds a static shot', music: 'N/A' }, })).status).toBe(200);
   expect((await post(`${fixture.origin}/api/modes`, {
     key: 'p22-review-mode', title: 'P2.2 Review Mode',
     description: 'Verified i2v mode for plan approval integration.',
